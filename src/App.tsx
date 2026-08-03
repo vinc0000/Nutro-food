@@ -27,6 +27,7 @@ const AdminOrders = lazy(() => import('@/pages/admin/Orders'));
 const AdminStaff = lazy(() => import('@/pages/admin/Staff'));
 const AdminSettings = lazy(() => import('@/pages/admin/Settings'));
 const AdminReports = lazy(() => import('@/pages/admin/Reports'));
+const AdminNotifications = lazy(() => import('@/pages/admin/Notifications'));
 
 const PosTerminal = lazy(() => import('@/pages/pos/PosTerminal'));
 const KdsView = lazy(() => import('@/pages/kds/KdsView'));
@@ -71,6 +72,7 @@ export default function App() {
                 <Route path="reports" element={<AdminReports />} />
                 <Route path="staff" element={<AdminStaff />} />
                 <Route path="settings" element={<AdminSettings />} />
+                <Route path="notifications" element={<AdminNotifications />} />
               </Route>
 
               <Route path="/app/pos" element={<AuthGuard><PosLayout /></AuthGuard>}>

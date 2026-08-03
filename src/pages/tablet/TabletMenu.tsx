@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   UtensilsCrossed, Search, ShoppingCart, X, Plus, Minus,
   Info, Check, AlertTriangle, Leaf, Instagram, Facebook, MessageCircle, MapPin,
-  CreditCard, Banknote, Lock
+  CreditCard, Banknote, Lock, Loader2
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSearchParams } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import { useOrgContext } from '@/hooks/useOrgContext';
 
 const CURRENCIES = ['USD', 'EUR', 'AED', 'XAF', 'NGN', 'GBP'];
 const CURRENCY_RATES: Record<string, number> = { USD: 1, EUR: 0.92, AED: 3.67, XAF: 600, NGN: 1500, GBP: 0.79 };
@@ -19,7 +21,7 @@ interface MenuItem {
   ingredients: string[]; allergens: string[]; stock: number; portionSize: string;
 }
 
-const MENU: MenuItem[] = [
+const DEFAULT_MENU: MenuItem[] = [
   { id: '1', name: 'Wagyu Beef Burger', category: 'Mains', price: 24, calories: 820, protein: 48, carbs: 42, fats: 52, weight: 380, portionSize: 'Regular',
     description: 'Premium A5 Wagyu patty, aged cheddar, truffle aioli on brioche bun.',
     image: 'https://images.pexels.com/photos/1639557/pexels-photo-1639557.jpeg?w=400',
@@ -52,8 +54,6 @@ const MENU: MenuItem[] = [
     ingredients: ['Lemon juice', 'Sugar syrup', 'Mint', 'Sparkling water'], allergens: [], stock: 50 },
 ];
 
-const CATS = ['All', 'Starters', 'Mains', 'Desserts', 'Drinks'];
-
 const DIET_FILTERS = [
   { key: 'halal', label: 'Halal', color: '#22c55e' },
   { key: 'vegan', label: 'Vegan', color: '#84cc16' },
@@ -73,11 +73,13 @@ type PayMethod = 'cash' | 'card' | 'tablet_pay';
 
 export default function TabletMenu() {
   const { theme } = useTheme();
+  const { orgContext } = useOrgContext();
   const [searchParams] = useSearchParams();
   const tableNum = searchParams.get('table') ?? '1';
 
   const [currency, setCurrency] = useState('USD');
   const [activeCat, setActiveCat] = useState('All');
+  const [cats, setCats] = useState<string[]>(['All', 'Starters', 'Mains', 'Desserts', 'Drinks']);
   const [search, setSearch] = useState('');
   const [activeDietFilters, setActiveDietFilters] = useState<string[]>([]);
   const [customAllergy, setCustomAllergy] = useState('');
@@ -89,10 +91,75 @@ export default function TabletMenu() {
   const [showSocial, setShowSocial] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [payMethod, setPayMethod] = useState<PayMethod>('tablet_pay');
-  const [isPaid, setIsPaid] = useState(false);
-  void isPaid;
-  const [, setShowReceipt] = useState(false);
-  void setShowReceipt;
+  const [menu, setMenu] = useState<MenuItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchLiveMenu = useCallback(async () => {
+    if (!orgContext?.branch_id) return;
+    setLoading(true);
+    try {
+      // 1. Fetch live categories
+      const { data: catData } = await supabase
+        .from('menu_categories')
+        .select('id, name')
+        .eq('branch_id', orgContext.branch_id)
+        .order('sort_order', { ascending: true });
+
+      const fetchedCats = catData?.map(c => c.name) || [];
+      if (fetchedCats.length > 0) {
+        setCats(['All', ...fetchedCats]);
+      }
+
+      // 2. Fetch live items
+      const { data: itemData, error } = await supabase
+        .from('menu_items')
+        .select('*')
+        .eq('branch_id', orgContext.branch_id)
+        .order('sort_order', { ascending: true });
+
+      if (error) throw error;
+
+      if (itemData && itemData.length > 0) {
+        const mapped: MenuItem[] = itemData.map(dbItem => {
+          const matchedCatName = catData?.find(c => c.id === dbItem.category_id)?.name || 'Mains';
+          return {
+            id: dbItem.id,
+            name: dbItem.name,
+            category: matchedCatName,
+            price: Number(dbItem.price),
+            calories: dbItem.calories || 0,
+            protein: dbItem.protein_g || 0,
+            carbs: dbItem.carbs_g || 0,
+            fats: dbItem.fats_g || 0,
+            weight: dbItem.weight_g || 0,
+            description: dbItem.description || '',
+            image: dbItem.image_url || '',
+            halal: !!dbItem.is_halal,
+            vegan: !!dbItem.is_vegan,
+            glutenFree: !!dbItem.is_gluten_free,
+            nutFree: !!dbItem.is_nut_free,
+            spicy: !!dbItem.is_spicy,
+            ingredients: [],
+            allergens: [],
+            stock: 15,
+            portionSize: 'Regular',
+          };
+        });
+        setMenu(mapped);
+      } else {
+        setMenu(DEFAULT_MENU);
+      }
+    } catch (err) {
+      console.error('Error fetching tablet menu:', err);
+      setMenu(DEFAULT_MENU);
+    } finally {
+      setLoading(false);
+    }
+  }, [orgContext?.branch_id]);
+
+  useEffect(() => {
+    fetchLiveMenu();
+  }, [fetchLiveMenu]);
 
   const rate = CURRENCY_RATES[currency];
   const sym = CURRENCY_SYMBOLS[currency];
@@ -100,7 +167,7 @@ export default function TabletMenu() {
 
   const toggleDiet = (key: string) => setActiveDietFilters(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
 
-  const filtered = MENU.filter(item => {
+  const filtered = menu.filter(item => {
     if (activeCat !== 'All' && item.category !== activeCat) return false;
     if (search && !item.name.toLowerCase().includes(search.toLowerCase())) return false;
     for (const f of activeDietFilters) { if (!item[f as keyof MenuItem]) return false; }
@@ -119,13 +186,35 @@ export default function TabletMenu() {
   const cartTotal = cart.reduce((s, c) => s + c.item.price * c.qty, 0);
   const cartCount = cart.reduce((s, c) => s + c.qty, 0);
 
-  const processPayment = () => {
-    setIsPaid(true);
-    setShowPayment(false);
-    setOrderPlaced(true);
-    setTimeout(() => setOrderPlaced(false), 4000);
-    setCart([]);
-    setIsPaid(false);
+  const processPayment = async () => {
+    if (!orgContext?.branch_id) return;
+    try {
+      // Create a real order in Supabase
+      const { error } = await supabase
+        .from('orders')
+        .insert([{
+          branch_id: orgContext.branch_id,
+          order_number: Math.floor(1000 + Math.random() * 9000).toString(),
+          order_type: 'dine_in',
+          status: 'pending',
+          subtotal: cartTotal * 0.95,
+          tax_amount: cartTotal * 0.05,
+          discount_amount: 0,
+          total_amount: cartTotal,
+          payment_status: payMethod === 'tablet_pay' ? 'unpaid' : 'paid',
+          payment_method: payMethod === 'tablet_pay' ? null : payMethod,
+          notes: `Table ${tableNum}`,
+        }]);
+
+      if (error) throw error;
+
+      setShowPayment(false);
+      setOrderPlaced(true);
+      setTimeout(() => setOrderPlaced(false), 4000);
+      setCart([]);
+    } catch (err) {
+      console.error('Error placing order:', err);
+    }
   };
 
   const sendServiceRequest = (req: string) => {
@@ -142,8 +231,8 @@ export default function TabletMenu() {
               <UtensilsCrossed size={18} color="#fff" />
             </div>
             <div>
-              <div className="text-sm font-extrabold" style={{ color: theme.text }}>Le Maison Dubai</div>
-              <div className="text-xs" style={{ color: theme.textMuted }}>Table {tableNum}</div>
+              <div className="text-sm font-extrabold" style={{ color: theme.text }}>{orgContext?.org_name || 'Le Maison Dubai'}</div>
+              <div className="text-xs" style={{ color: theme.textMuted }}>{orgContext?.branch_name || 'Main Branch'} · Table {tableNum}</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -173,91 +262,98 @@ export default function TabletMenu() {
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto w-full px-4 py-4 space-y-4">
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: theme.textMuted }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search dishes..."
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm outline-none"
+      {loading ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3">
+          <Loader2 size={36} className="animate-spin" style={{ color: theme.primary }} />
+          <span className="text-sm font-semibold" style={{ color: theme.textMuted }}>Loading interactive tablet menu...</span>
+        </div>
+      ) : (
+        <div className="max-w-4xl mx-auto w-full px-4 py-4 space-y-4">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: theme.textMuted }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search dishes..."
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm outline-none"
+              style={{ background: theme.surface, color: theme.text, border: `1px solid ${theme.border}` }} />
+          </div>
+
+          <div className="flex gap-2 flex-wrap">
+            {DIET_FILTERS.map(f => (
+              <button key={f.key} onClick={() => toggleDiet(f.key)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+                style={{ background: activeDietFilters.includes(f.key) ? f.color : f.color + '18', color: activeDietFilters.includes(f.key) ? '#fff' : f.color, border: `1px solid ${f.color}40` }}>
+                {activeDietFilters.includes(f.key) && <Check size={11} />}{f.label}
+              </button>
+            ))}
+          </div>
+
+          <input value={customAllergy} onChange={e => setCustomAllergy(e.target.value)} placeholder="Custom allergy or dietary note..."
+            className="w-full px-4 py-2 rounded-xl text-xs outline-none"
             style={{ background: theme.surface, color: theme.text, border: `1px solid ${theme.border}` }} />
-        </div>
 
-        <div className="flex gap-2 flex-wrap">
-          {DIET_FILTERS.map(f => (
-            <button key={f.key} onClick={() => toggleDiet(f.key)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
-              style={{ background: activeDietFilters.includes(f.key) ? f.color : f.color + '18', color: activeDietFilters.includes(f.key) ? '#fff' : f.color, border: `1px solid ${f.color}40` }}>
-              {activeDietFilters.includes(f.key) && <Check size={11} />}{f.label}
-            </button>
-          ))}
-        </div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {cats.map(c => (
+              <button key={c} onClick={() => setActiveCat(c)}
+                className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: activeCat === c ? theme.primary : theme.surface, color: activeCat === c ? '#fff' : theme.textMuted, border: `1px solid ${activeCat === c ? theme.primary : theme.border}` }}>{c}</button>
+            ))}
+          </div>
 
-        <input value={customAllergy} onChange={e => setCustomAllergy(e.target.value)} placeholder="Custom allergy or dietary note..."
-          className="w-full px-4 py-2 rounded-xl text-xs outline-none"
-          style={{ background: theme.surface, color: theme.text, border: `1px solid ${theme.border}` }} />
-
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {CATS.map(c => (
-            <button key={c} onClick={() => setActiveCat(c)}
-              className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
-              style={{ background: activeCat === c ? theme.primary : theme.surface, color: activeCat === c ? '#fff' : theme.textMuted, border: `1px solid ${activeCat === c ? theme.primary : theme.border}` }}>{c}</button>
-          ))}
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-4">
-          {filtered.map((item, i) => (
-            <motion.div key={item.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-              className="rounded-2xl overflow-hidden flex flex-col relative" style={{ background: theme.surface, border: `1px solid ${theme.border}`, opacity: item.stock > 0 ? 1 : 0.6 }}>
-              <div className="relative h-40 overflow-hidden">
-                <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                <div className="absolute bottom-2 left-3 flex gap-1 flex-wrap">
-                  {item.halal && <span className="badge badge-green">Halal</span>}
-                  {item.vegan && <span className="badge" style={{ background: '#84cc1620', color: '#84cc16' }}>Vegan</span>}
-                  {item.glutenFree && <span className="badge" style={{ background: '#06b6d420', color: '#06b6d4' }}>GF</span>}
-                  {item.spicy && <span className="badge badge-red">Spicy</span>}
-                </div>
-                <div className="absolute top-2 right-2 flex gap-1">
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md text-white" style={{ background: theme.primary }}>{item.portionSize}</span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md text-white" style={{ background: '#1E293B' }}>{item.weight}g</span>
-                </div>
-                {item.stock === 0 && (
-                  <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.6)' }}>
-                    <span className="badge badge-red text-sm px-4 py-2">SOLD OUT</span>
+          <div className="grid sm:grid-cols-2 gap-4">
+            {filtered.map((item, i) => (
+              <motion.div key={item.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
+                className="rounded-2xl overflow-hidden flex flex-col relative" style={{ background: theme.surface, border: `1px solid ${theme.border}`, opacity: item.stock > 0 ? 1 : 0.6 }}>
+                <div className="relative h-40 overflow-hidden">
+                  <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                  <div className="absolute bottom-2 left-3 flex gap-1 flex-wrap">
+                    {item.halal && <span className="badge badge-green">Halal</span>}
+                    {item.vegan && <span className="badge" style={{ background: '#84cc1620', color: '#84cc16' }}>Vegan</span>}
+                    {item.glutenFree && <span className="badge" style={{ background: '#06b6d420', color: '#06b6d4' }}>GF</span>}
+                    {item.spicy && <span className="badge badge-red">Spicy</span>}
                   </div>
-                )}
-              </div>
-              <div className="p-4 flex flex-col flex-1">
-                <div className="flex items-start justify-between mb-1">
-                  <h3 className="font-bold text-base leading-tight" style={{ color: theme.text }}>{item.name}</h3>
-                  <span className="text-lg font-extrabold ml-2 flex-shrink-0" style={{ color: theme.primary }}>{toPrice(item.price)}</span>
-                </div>
-                <p className="text-xs mb-3 leading-relaxed" style={{ color: theme.textMuted }}>{item.description}</p>
-                <div className="grid grid-cols-4 gap-1 mb-3">
-                  {[{ label: 'Cal', val: item.calories }, { label: 'Prot', val: `${item.protein}g` }, { label: 'Carbs', val: `${item.carbs}g` }, { label: 'Wt', val: `${item.weight}g` }].map(m => (
-                    <div key={m.label} className="text-center py-1.5 rounded-lg" style={{ background: theme.bg }}>
-                      <div className="text-xs font-bold" style={{ color: theme.text }}>{m.val}</div>
-                      <div className="text-[10px]" style={{ color: theme.textMuted }}>{m.label}</div>
+                  <div className="absolute top-2 right-2 flex gap-1">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md text-white" style={{ background: theme.primary }}>{item.portionSize}</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md text-white" style={{ background: '#1E293B' }}>{item.weight}g</span>
+                  </div>
+                  {item.stock === 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.6)' }}>
+                      <span className="badge badge-red text-sm px-4 py-2">SOLD OUT</span>
                     </div>
-                  ))}
+                  )}
                 </div>
-                <div className="flex gap-2 mt-auto">
-                  <button onClick={() => setSelectedItem(item)} className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold"
-                    style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}><Info size={13} /> Details</button>
-                  <button onClick={() => addToCart(item)} disabled={item.stock <= 0}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-40"
-                    style={{ background: theme.primary }}>{item.stock <= 0 ? 'Sold Out' : <><Plus size={15} /> Add to Order</>}</button>
+                <div className="p-4 flex flex-col flex-1">
+                  <div className="flex items-start justify-between mb-1">
+                    <h3 className="font-bold text-base leading-tight" style={{ color: theme.text }}>{item.name}</h3>
+                    <span className="text-lg font-extrabold ml-2 flex-shrink-0" style={{ color: theme.primary }}>{toPrice(item.price)}</span>
+                  </div>
+                  <p className="text-xs mb-3 leading-relaxed" style={{ color: theme.textMuted }}>{item.description}</p>
+                  <div className="grid grid-cols-4 gap-1 mb-3">
+                    {[{ label: 'Cal', val: item.calories }, { label: 'Prot', val: `${item.protein}g` }, { label: 'Carbs', val: `${item.carbs}g` }, { label: 'Wt', val: `${item.weight}g` }].map(m => (
+                      <div key={m.label} className="text-center py-1.5 rounded-lg" style={{ background: theme.bg }}>
+                        <div className="text-xs font-bold" style={{ color: theme.text }}>{m.val}</div>
+                        <div className="text-[10px]" style={{ color: theme.textMuted }}>{m.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-2 mt-auto">
+                    <button onClick={() => setSelectedItem(item)} className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold"
+                      style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}><Info size={13} /> Details</button>
+                    <button onClick={() => addToCart(item)} disabled={item.stock <= 0}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-40"
+                      style={{ background: theme.primary }}>{item.stock <= 0 ? 'Sold Out' : <><Plus size={15} /> Add to Order</>}</button>
+                  </div>
                 </div>
+              </motion.div>
+            ))}
+            {filtered.length === 0 && (
+              <div className="col-span-2 text-center py-16">
+                <Leaf size={40} className="mx-auto mb-3 opacity-20" style={{ color: theme.primary }} />
+                <p style={{ color: theme.textMuted }}>No items match your filters.</p>
               </div>
-            </motion.div>
-          ))}
-          {filtered.length === 0 && (
-            <div className="col-span-2 text-center py-16">
-              <Leaf size={40} className="mx-auto mb-3 opacity-20" style={{ color: theme.primary }} />
-              <p style={{ color: theme.textMuted }}>No items match your filters.</p>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Item detail modal */}
       <AnimatePresence>
@@ -291,7 +387,7 @@ export default function TabletMenu() {
                 </div>
                 <div className="mb-4">
                   <h4 className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: theme.textMuted }}>Ingredients</h4>
-                  <p className="text-sm" style={{ color: theme.text }}>{selectedItem.ingredients.join(', ')}</p>
+                  <p className="text-sm" style={{ color: theme.text }}>{selectedItem.ingredients.join(', ') || 'Fresh ingredients selected by the chef'}</p>
                 </div>
                 {selectedItem.allergens.length > 0 && (
                   <div className="flex items-start gap-2 p-3 rounded-xl mb-4" style={{ background: '#ef444410', border: '1px solid #ef444430' }}>

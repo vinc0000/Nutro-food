@@ -31,7 +31,7 @@ export default function AdminDashboard() {
   const { theme } = useTheme();
   const { profile } = useAuth();
   const { orgContext } = useOrgContext();
-  const { isTrialActive, daysLeft, isTrialExpired, plan } = usePlanInfo();
+  const { isTrialActive, daysLeft, isTrialExpired } = usePlanInfo();
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [todayRevenue, setTodayRevenue] = useState(0);
   const [todayOrders, setTodayOrders] = useState(0);

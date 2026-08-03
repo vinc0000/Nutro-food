@@ -1,39 +1,138 @@
-import { useState } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any, prefer-const, @typescript-eslint/no-unused-vars */
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Check, Eye, X, Printer } from 'lucide-react';
+import { Search, Check, Eye, X, Printer, Loader2 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { supabase } from '@/lib/supabase';
+import { useOrgContext } from '@/hooks/useOrgContext';
 
-const ORDERS = [
-  { id: '#1042', table: 'Table 4', type: 'dine_in', items: 3, total: 87.50, status: 'preparing', payment: 'unpaid', time: '12:34' },
-  { id: '#1041', table: 'Table 7', type: 'dine_in', items: 5, total: 142.00, status: 'ready', payment: 'unpaid', time: '12:28' },
-  { id: '#1040', table: 'Takeaway', type: 'takeaway', items: 2, total: 34.00, status: 'paid', payment: 'paid', time: '12:20' },
-  { id: '#1039', table: 'Table 2', type: 'dine_in', items: 4, total: 96.00, status: 'paid', payment: 'paid', time: '12:10' },
-  { id: '#1038', table: 'Table 9', type: 'dine_in', items: 6, total: 210.00, status: 'served', payment: 'paid', time: '11:55' },
+interface OrderRow {
+  id: string;
+  table: string;
+  table_id?: string | null;
+  type: 'dine_in' | 'takeaway' | 'delivery';
+  items: number;
+  total: number;
+  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'served' | 'paid' | 'cancelled';
+  payment: 'unpaid' | 'partial' | 'paid' | 'refunded';
+  time: string;
+}
+
+const DEFAULT_ORDERS = [
+  { order_number: '1042', table_name: 'Table 4', order_type: 'dine_in', subtotal: 83.33, tax_amount: 4.17, total_amount: 87.50, status: 'preparing', payment_status: 'unpaid' },
+  { order_number: '1041', table_name: 'Table 7', order_type: 'dine_in', subtotal: 135.24, tax_amount: 6.76, total_amount: 142.00, status: 'ready', payment_status: 'unpaid' },
+  { order_number: '1040', table_name: 'Takeaway', order_type: 'takeaway', subtotal: 32.38, tax_amount: 1.62, total_amount: 34.00, status: 'paid', payment_status: 'paid' },
+  { order_number: '1039', table_name: 'Table 2', order_type: 'dine_in', subtotal: 91.43, tax_amount: 4.57, total_amount: 96.00, status: 'paid', payment_status: 'paid' },
+  { order_number: '1038', table_name: 'Table 9', order_type: 'dine_in', subtotal: 200.00, tax_amount: 10.00, total_amount: 210.00, status: 'served', payment_status: 'paid' },
 ];
 
 const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
+  pending: { bg: '#3b82f620', text: '#3b82f6', label: 'Pending' },
   preparing: { bg: '#3b82f620', text: '#3b82f6', label: 'Preparing' },
   ready: { bg: '#22c55e20', text: '#22c55e', label: 'Ready' },
   served: { bg: '#06b6d420', text: '#06b6d4', label: 'Served' },
   paid: { bg: '#6b728020', text: '#6b7280', label: 'Paid' },
+  completed: { bg: '#6b728020', text: '#6b7280', label: 'Completed' },
+  cancelled: { bg: '#ef444420', text: '#ef4444', label: 'Cancelled' },
 };
 
 export default function AdminOrders() {
   const { theme } = useTheme();
+  const { orgContext } = useOrgContext();
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [orders, setOrders] = useState(ORDERS);
-  const [viewOrder, setViewOrder] = useState<typeof ORDERS[0] | null>(null);
+  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [viewOrder, setViewOrder] = useState<OrderRow | null>(null);
+  const [savedMsg, setSavedMsg] = useState('');
+
+  const showToast = (msg: string) => { setSavedMsg(msg); setTimeout(() => setSavedMsg(''), 2500); };
+
+  const fetchOrders = useCallback(async () => {
+    if (!orgContext?.branch_id) return;
+    setLoading(true);
+    try {
+      let { data: dbOrders, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('branch_id', orgContext.branch_id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Auto-seed if empty
+      if (!dbOrders || dbOrders.length === 0) {
+        const seedPayload = DEFAULT_ORDERS.map(o => ({
+          branch_id: orgContext.branch_id,
+          order_number: o.order_number,
+          order_type: o.order_type,
+          status: o.status,
+          subtotal: o.subtotal,
+          tax_amount: o.tax_amount,
+          discount_amount: 0,
+          total_amount: o.total_amount,
+          payment_status: o.payment_status,
+          payment_method: o.payment_status === 'paid' ? 'cash' : null,
+          notes: o.table_name, // temporary place to store mock table label
+        }));
+
+        const { data: inserted, error: insErr } = await supabase
+          .from('orders')
+          .insert(seedPayload)
+          .select('*');
+
+        if (insErr) throw insErr;
+        dbOrders = inserted || [];
+      }
+
+      const mapped: OrderRow[] = dbOrders.map((o: any) => ({
+        id: o.id,
+        table: o.notes || 'Table',
+        table_id: o.table_id,
+        type: o.order_type || 'dine_in',
+        items: 3, // Mock number of items for rendering
+        total: Number(o.total_amount),
+        status: o.status,
+        payment: o.payment_status || 'unpaid',
+        time: new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }));
+
+      setOrders(mapped);
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [orgContext?.branch_id]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
   const filtered = orders.filter(o =>
     (filterStatus === 'all' || o.status === filterStatus) &&
     (o.id.includes(search) || o.table.toLowerCase().includes(search.toLowerCase()))
   );
 
-  const totals = { revenue: orders.filter(o => o.payment === 'paid').reduce((s, o) => s + o.total, 0), count: orders.length };
+  const totals = useMemo(() => {
+    return {
+      revenue: orders.filter(o => o.payment === 'paid').reduce((s, o) => s + o.total, 0),
+      count: orders.length
+    };
+  }, [orders]);
 
-  const markAsPaid = (id: string) => {
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'paid', payment: 'paid' } : o));
+  const markAsPaid = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: 'paid', payment_status: 'paid', payment_method: 'cash' })
+        .eq('id', id);
+      if (error) throw error;
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'paid', payment: 'paid' } : o));
+      showToast('Order marked as paid');
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
@@ -72,35 +171,42 @@ export default function AdminOrders() {
         </div>
       </div>
 
-      <div className="rounded-2xl overflow-hidden" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
-        <table className="w-full data-table">
-          <thead>
-            <tr><th>Order</th><th>Location</th><th>Type</th><th>Items</th><th>Total</th><th>Status</th><th>Payment</th><th>Time</th><th>Actions</th></tr>
-          </thead>
-          <tbody>
-            {filtered.map(o => (
-              <tr key={o.id}>
-                <td><span className="font-mono text-sm font-bold" style={{ color: theme.primary }}>{o.id}</span></td>
-                <td><span className="text-sm">{o.table}</span></td>
-                <td><span className="text-xs px-2 py-0.5 rounded-full font-semibold capitalize" style={{ background: theme.bg, color: theme.textMuted }}>{o.type.replace('_', ' ')}</span></td>
-                <td><span className="text-sm">{o.items}</span></td>
-                <td><span className="text-sm font-semibold">${o.total.toFixed(2)}</span></td>
-                <td><span className="badge text-[10px]" style={{ background: statusConfig[o.status]?.bg, color: statusConfig[o.status]?.text }}>{statusConfig[o.status]?.label}</span></td>
-                <td><span className="badge text-[10px]" style={{ background: o.payment === 'paid' ? '#22c55e20' : '#eab30820', color: o.payment === 'paid' ? '#22c55e' : '#eab308' }}>{o.payment}</span></td>
-                <td><span className="text-xs" style={{ color: theme.textMuted }}>{o.time}</span></td>
-                <td>
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => setViewOrder(o)} title="View details" className="p-1.5 rounded-lg hover:opacity-70" style={{ color: theme.textMuted }}><Eye size={13} /></button>
-                    {o.status !== 'paid' && (
-                      <button onClick={() => markAsPaid(o.id)} title="Mark as paid" className="p-1.5 rounded-lg hover:opacity-70" style={{ color: '#22c55e' }}><Check size={13} /></button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <Loader2 size={32} className="animate-spin" style={{ color: theme.primary }} />
+          <span className="text-sm" style={{ color: theme.textMuted }}>Loading orders from database...</span>
+        </div>
+      ) : (
+        <div className="rounded-2xl overflow-hidden" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
+          <table className="w-full data-table">
+            <thead>
+              <tr><th>Order</th><th>Location</th><th>Type</th><th>Items</th><th>Total</th><th>Status</th><th>Payment</th><th>Time</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              {filtered.map(o => (
+                <tr key={o.id}>
+                  <td><span className="font-mono text-sm font-bold text-gray-500" style={{ color: theme.primary }}>#{o.id.substring(0, 5)}</span></td>
+                  <td><span className="text-sm font-semibold">{o.table}</span></td>
+                  <td><span className="text-xs px-2 py-0.5 rounded-full font-semibold capitalize" style={{ background: theme.bg, color: theme.textMuted }}>{o.type.replace('_', ' ')}</span></td>
+                  <td><span className="text-sm">{o.items}</span></td>
+                  <td><span className="text-sm font-semibold">${o.total.toFixed(2)}</span></td>
+                  <td><span className="badge text-[10px]" style={{ background: statusConfig[o.status]?.bg || '#6b728020', color: statusConfig[o.status]?.text || '#6b7280' }}>{statusConfig[o.status]?.label || o.status}</span></td>
+                  <td><span className="badge text-[10px]" style={{ background: o.payment === 'paid' ? '#22c55e20' : '#eab30820', color: o.payment === 'paid' ? '#22c55e' : '#eab308' }}>{o.payment}</span></td>
+                  <td><span className="text-xs" style={{ color: theme.textMuted }}>{o.time}</span></td>
+                  <td>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setViewOrder(o)} title="View details" className="p-1.5 rounded-lg hover:opacity-70" style={{ color: theme.textMuted }}><Eye size={13} /></button>
+                      {o.status !== 'paid' && (
+                        <button onClick={() => markAsPaid(o.id)} title="Mark as paid" className="p-1.5 rounded-lg hover:opacity-70" style={{ color: '#22c55e' }}><Check size={13} /></button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <AnimatePresence>
         {viewOrder && (
@@ -110,7 +216,7 @@ export default function AdminOrders() {
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
               className="w-full max-w-sm rounded-2xl p-6" style={{ background: theme.surface, border: `1px solid ${theme.border}` }} onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-extrabold" style={{ color: theme.text }}>Order {viewOrder.id}</h2>
+                <h2 className="text-lg font-extrabold" style={{ color: theme.text }}>Order details</h2>
                 <button onClick={() => setViewOrder(null)} style={{ color: theme.textMuted }}><X size={18} /></button>
               </div>
               <div className="space-y-3 text-sm">
@@ -156,6 +262,12 @@ export default function AdminOrders() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {savedMsg && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl font-semibold text-sm text-white shadow-2xl flex items-center gap-2" style={{ background: '#22c55e' }}>
+          <Check size={16} /> {savedMsg}
+        </div>
+      )}
     </div>
   );
 }

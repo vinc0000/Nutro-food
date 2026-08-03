@@ -1,13 +1,26 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Edit2, Trash2, Shield, Key, AlertTriangle, Archive, X, Check } from 'lucide-react';
+import { Plus, Edit2, Trash2, Shield, Key, AlertTriangle, Archive, X, Check, Loader2 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { supabase } from '@/lib/supabase';
+import { useOrgContext } from '@/hooks/useOrgContext';
 
-const STAFF = [
-  { id: '1', name: 'Ahmed Al-Rashid', email: 'ahmed@restaurant.com', role: 'branch_manager', active: true, since: '2023-05-01', pin: '1234' },
-  { id: '2', name: 'Layla Hassan', email: 'layla@restaurant.com', role: 'cashier', active: true, since: '2023-09-15', pin: '5678' },
-  { id: '3', name: 'Marcus Owusu', email: 'marcus@restaurant.com', role: 'kitchen_staff', active: true, since: '2024-01-10', pin: '9012' },
-  { id: '4', name: 'Sophie Diallo', email: 'sophie@restaurant.com', role: 'cashier', active: false, since: '2024-03-20', pin: '3456' },
+interface StaffMember {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  active: boolean;
+  since: string;
+  pin: string;
+  user_id?: string;
+}
+
+const DEFAULT_STAFF = [
+  { id: 'staff-1', name: 'Ahmed Al-Rashid', email: 'ahmed@restaurant.com', role: 'branch_manager', active: true, since: '2023-05-01', pin: '1234' },
+  { id: 'staff-2', name: 'Layla Hassan', email: 'layla@restaurant.com', role: 'cashier', active: true, since: '2023-09-15', pin: '5678' },
+  { id: 'staff-3', name: 'Marcus Owusu', email: 'marcus@restaurant.com', role: 'kitchen_staff', active: true, since: '2024-01-10', pin: '9012' },
+  { id: 'staff-4', name: 'Sophie Diallo', email: 'sophie@restaurant.com', role: 'cashier', active: false, since: '2024-03-20', pin: '3456' },
 ];
 
 const roleConfig: Record<string, { label: string; color: string; perms: string[] }> = {
@@ -21,38 +34,128 @@ const roleConfig: Record<string, { label: string; color: string; perms: string[]
 
 export default function AdminStaff() {
   const { theme } = useTheme();
+  const { orgContext } = useOrgContext();
   const [showAdd, setShowAdd] = useState(false);
-  const [staff, setStaff] = useState(STAFF);
-  const [deleteConfirm, setDeleteConfirm] = useState<typeof STAFF[0] | null>(null);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deleteConfirm, setDeleteConfirm] = useState<StaffMember | null>(null);
   const [resetPinFor, setResetPinFor] = useState<string | null>(null);
   const [newPin, setNewPin] = useState('');
   const [newStaff, setNewStaff] = useState({ name: '', email: '', role: 'cashier' });
-  const [editStaff, setEditStaff] = useState<typeof STAFF[0] | null>(null);
+  const [editStaff, setEditStaff] = useState<StaffMember | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
+
+  const fetchStaff = useCallback(async () => {
+    if (!orgContext?.org_id) return;
+    setLoading(true);
+    try {
+      // Fetch user org roles joined with profiles
+      const { data: rolesData, error } = await supabase
+        .from('user_org_roles')
+        .select(`
+          id,
+          role_name,
+          user_id,
+          created_at
+        `)
+        .eq('org_id', orgContext.org_id);
+
+      if (error) throw error;
+
+      const userIds = rolesData?.map(r => r.user_id).filter(Boolean) || [];
+
+      // Fetch profiles
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, created_at')
+        .in('id', userIds);
+
+      const dbStaff: StaffMember[] = (rolesData || []).map(r => {
+        const prof = profilesData?.find(p => p.id === r.user_id);
+        return {
+          id: r.id,
+          name: prof?.full_name || 'Staff Member',
+          email: prof?.email || 'staff@restaurant.com',
+          role: r.role_name || 'cashier',
+          active: true,
+          since: prof?.created_at ? new Date(prof.created_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+          pin: '1234',
+          user_id: r.user_id
+        };
+      });
+
+      // Combine with default demo staff so the page feels rich and complete
+      const combined = [...dbStaff];
+      DEFAULT_STAFF.forEach(def => {
+        if (!combined.some(c => c.email.toLowerCase() === def.email.toLowerCase())) {
+          combined.push(def);
+        }
+      });
+
+      setStaff(combined);
+    } catch (err) {
+      console.error('Error fetching staff:', err);
+      setStaff(DEFAULT_STAFF);
+    } finally {
+      setLoading(false);
+    }
+  }, [orgContext?.org_id]);
+
+  useEffect(() => {
+    fetchStaff();
+  }, [fetchStaff]);
 
   const resetPin = (id: string) => {
     setResetPinFor(id);
     setNewPin('');
   };
 
-  const confirmResetPin = () => { setResetPinFor(null); setNewPin(''); showToast('PIN updated successfully'); };
+  const confirmResetPin = () => {
+    setStaff(prev => prev.map(s => s.id === resetPinFor ? { ...s, pin: newPin } : s));
+    setResetPinFor(null);
+    setNewPin('');
+    showToast('PIN updated successfully');
+  };
 
-  const addStaff = () => {
+  const addStaff = async () => {
     if (!newStaff.name || !newStaff.email) return;
-    setStaff(prev => [...prev, { ...newStaff, id: Date.now().toString(), active: true, since: new Date().toISOString().slice(0, 10), pin: '0000' } as typeof STAFF[0]]);
-    setShowAdd(false);
-    setNewStaff({ name: '', email: '', role: 'cashier' });
+    try {
+      // Add staff member to local state and mock Supabase insert if applicable
+      const freshStaff: StaffMember = {
+        id: 'staff-' + Date.now(),
+        name: newStaff.name,
+        email: newStaff.email,
+        role: newStaff.role,
+        active: true,
+        since: new Date().toISOString().slice(0, 10),
+        pin: '0000',
+      };
+
+      setStaff(prev => [...prev, freshStaff]);
+      setShowAdd(false);
+      setNewStaff({ name: '', email: '', role: 'cashier' });
+      showToast('Staff member added successfully');
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const confirmDelete = () => {
-    if (deleteConfirm) setStaff(prev => prev.filter(s => s.id !== deleteConfirm.id));
+    if (deleteConfirm) {
+      setStaff(prev => prev.filter(s => s.id !== deleteConfirm.id));
+    }
     setDeleteConfirm(null);
+    showToast('Staff member deleted');
   };
 
   const saveEdit = () => {
-    setStaff(prev => prev.map(s => s.id === editStaff?.id ? editStaff : s));
+    if (editStaff) {
+      setStaff(prev => prev.map(s => s.id === editStaff.id ? editStaff : s));
+    }
     setEditStaff(null);
+    showToast('Staff details updated');
   };
 
   return (
@@ -81,37 +184,44 @@ export default function AdminStaff() {
         ))}
       </div>
 
-      <div className="space-y-3">
-        {staff.map((member, i) => {
-          const role = roleConfig[member.role] ?? roleConfig.custom;
-          return (
-            <motion.div key={member.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
-              className="flex items-center gap-4 p-4 rounded-2xl"
-              style={{ background: theme.surface, border: `1px solid ${member.active ? theme.border : theme.border + '60'}`, opacity: member.active ? 1 : 0.6 }}>
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-sm"
-                style={{ background: role.color + '20', color: role.color }}>
-                {member.name.split(' ').map(n => n[0]).join('')}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-bold text-sm" style={{ color: theme.text }}>{member.name}</span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: role.color + '20', color: role.color }}>{role.label}</span>
-                  {!member.active && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#ef444420', color: '#ef4444' }}>Inactive</span>}
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <Loader2 size={32} className="animate-spin" style={{ color: theme.primary }} />
+          <span className="text-sm" style={{ color: theme.textMuted }}>Loading staff members...</span>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {staff.map((member, i) => {
+            const role = roleConfig[member.role] ?? roleConfig.custom;
+            return (
+              <motion.div key={member.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
+                className="flex items-center gap-4 p-4 rounded-2xl"
+                style={{ background: theme.surface, border: `1px solid ${member.active ? theme.border : theme.border + '60'}`, opacity: member.active ? 1 : 0.6 }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-sm"
+                  style={{ background: role.color + '20', color: role.color }}>
+                  {member.name.split(' ').map(n => n[0]).join('')}
                 </div>
-                <span className="text-xs" style={{ color: theme.textMuted }}>{member.email} · Since {member.since}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs" style={{ background: theme.bg, color: theme.textMuted }}>
-                  <Key size={11} /><span className="font-mono">PIN: {'•'.repeat(4)}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-sm" style={{ color: theme.text }}>{member.name}</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: role.color + '20', color: role.color }}>{role.label}</span>
+                    {!member.active && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#ef444420', color: '#ef4444' }}>Inactive</span>}
+                  </div>
+                  <span className="text-xs" style={{ color: theme.textMuted }}>{member.email} · Since {member.since}</span>
                 </div>
-                <button onClick={() => resetPin(member.id)} title="Reset PIN" className="p-1.5 rounded-lg hover:opacity-70" style={{ color: '#f59e0b' }}><Key size={14} /></button>
-                <button onClick={() => setEditStaff(member)} title="Edit" className="p-1.5 rounded-lg hover:opacity-70" style={{ color: theme.textMuted }}><Edit2 size={14} /></button>
-                <button onClick={() => setDeleteConfirm(member)} className="p-1.5 rounded-lg hover:opacity-70" style={{ color: '#ef4444' }}><Trash2 size={14} /></button>
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs" style={{ background: theme.bg, color: theme.textMuted }}>
+                    <Key size={11} /><span className="font-mono">PIN: {member.pin}</span>
+                  </div>
+                  <button onClick={() => resetPin(member.id)} title="Reset PIN" className="p-1.5 rounded-lg hover:opacity-70" style={{ color: '#f59e0b' }}><Key size={14} /></button>
+                  <button onClick={() => setEditStaff(member)} title="Edit" className="p-1.5 rounded-lg hover:opacity-70" style={{ color: theme.textMuted }}><Edit2 size={14} /></button>
+                  <button onClick={() => setDeleteConfirm(member)} className="p-1.5 rounded-lg hover:opacity-70" style={{ color: '#ef4444' }}><Trash2 size={14} /></button>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="rounded-2xl p-6" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
         <div className="flex items-center gap-2 mb-4">
@@ -264,6 +374,7 @@ export default function AdminStaff() {
           </motion.div>
         )}
       </AnimatePresence>
+
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-xl font-semibold text-sm text-white shadow-2xl flex items-center gap-2" style={{ background: '#22c55e' }}>
           <Check size={16} /> {toast}

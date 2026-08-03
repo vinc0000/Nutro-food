@@ -1,10 +1,13 @@
-import { useState } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any, prefer-const, @typescript-eslint/no-unused-vars */
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, Edit2, Trash2, X, Check, Package, AlertTriangle, Image as ImageIcon } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Check, Package, AlertTriangle, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { supabase } from '@/lib/supabase';
+import { useOrgContext } from '@/hooks/useOrgContext';
 
 interface MenuItem {
-  id: string; name: string; category: string; price: number; calories: number;
+  id: string; name: string; category: string; category_id?: string; price: number; calories: number;
   protein: number; carbs: number; fats: number; fiber: number;
   halal: boolean; vegan: boolean; glutenFree: boolean; keto: boolean; nutFree: boolean; spicy: boolean;
   available: boolean; description: string;
@@ -15,13 +18,13 @@ interface MenuItem {
 const CATS = ['All', 'Starters', 'Mains', 'Desserts', 'Drinks'];
 const PORTION_SIZES = ['Small', 'Regular', 'Large', 'Family'];
 
-const ITEMS: MenuItem[] = [
-  { id: '1', name: 'Wagyu Beef Burger', category: 'Mains', price: 24, calories: 820, protein: 48, carbs: 42, fats: 52, fiber: 4, halal: true, vegan: false, glutenFree: false, keto: false, nutFree: true, spicy: false, available: true, stock: 15, taxRate: 5, portionSize: 'Regular', weight: 380, image: 'https://images.pexels.com/photos/1639557/pexels-photo-1639557.jpeg?w=400', description: 'Premium A5 Wagyu patty, aged cheddar, truffle aioli, brioche bun.', ingredients: [{ name: 'Wagyu beef', grams: 180 }, { name: 'Brioche bun', grams: 60 }, { name: 'Cheddar', grams: 20 }] },
-  { id: '2', name: 'Truffle Fries', category: 'Starters', price: 9, calories: 380, protein: 6, carbs: 48, fats: 18, fiber: 5, halal: true, vegan: true, glutenFree: true, keto: false, nutFree: true, spicy: false, available: true, stock: 30, taxRate: 5, portionSize: 'Large', weight: 200, image: 'https://images.pexels.com/photos/1583884/pexels-photo-1583884.jpeg?w=400', description: 'Hand-cut fries tossed in truffle oil and parmesan.', ingredients: [{ name: 'Potatoes', grams: 200 }, { name: 'Truffle oil', grams: 5 }] },
-  { id: '3', name: 'Vegan Buddha Bowl', category: 'Mains', price: 18, calories: 540, protein: 22, carbs: 68, fats: 16, fiber: 12, halal: true, vegan: true, glutenFree: true, keto: false, nutFree: false, spicy: false, available: true, stock: 8, taxRate: 5, portionSize: 'Regular', weight: 420, image: 'https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg?w=400', description: 'Quinoa, roasted veggies, avocado, tahini, mixed greens.', ingredients: [{ name: 'Quinoa', grams: 150 }, { name: 'Avocado', grams: 50 }] },
-  { id: '4', name: 'Spicy Calamari', category: 'Starters', price: 14, calories: 320, protein: 24, carbs: 28, fats: 12, fiber: 2, halal: true, vegan: false, glutenFree: false, keto: false, nutFree: true, spicy: true, available: true, stock: 0, taxRate: 5, portionSize: 'Regular', weight: 250, image: 'https://images.pexels.com/photos/566345/pexels-photo-566345.jpeg?w=400', description: 'Lightly battered calamari rings, sriracha mayo.', ingredients: [{ name: 'Calamari', grams: 200 }] },
-  { id: '5', name: 'Chocolate Lava Cake', category: 'Desserts', price: 11, calories: 460, protein: 7, carbs: 62, fats: 22, fiber: 3, halal: true, vegan: false, glutenFree: false, keto: false, nutFree: false, spicy: false, available: false, stock: 12, taxRate: 5, portionSize: 'Small', weight: 180, image: 'https://images.pexels.com/photos/291528/pexels-photo-291528.jpeg?w=400', description: 'Warm molten chocolate cake, vanilla ice cream.', ingredients: [{ name: 'Dark chocolate', grams: 80 }, { name: 'Butter', grams: 40 }] },
-  { id: '6', name: 'Fresh Lemonade', category: 'Drinks', price: 6, calories: 120, protein: 0, carbs: 28, fats: 0, fiber: 0, halal: true, vegan: true, glutenFree: true, keto: false, nutFree: true, spicy: false, available: true, stock: 50, taxRate: 5, portionSize: 'Large', weight: 350, image: 'https://images.pexels.com/photos/1998635/pexels-photo-1998635.jpeg?w=400', description: 'House-squeezed lemonade with mint and ice.', ingredients: [{ name: 'Lemon juice', grams: 30 }] },
+const DEFAULT_ITEMS = [
+  { name: 'Wagyu Beef Burger', category: 'Mains', price: 24, calories: 820, protein: 48, carbs: 42, fats: 52, halal: true, vegan: false, glutenFree: false, keto: false, nutFree: true, spicy: false, available: true, stock: 15, taxRate: 5, portionSize: 'Regular', weight: 380, image: 'https://images.pexels.com/photos/1639557/pexels-photo-1639557.jpeg?w=400', description: 'Premium A5 Wagyu patty, aged cheddar, truffle aioli, brioche bun.' },
+  { name: 'Truffle Fries', category: 'Starters', price: 9, calories: 380, protein: 6, carbs: 48, fats: 18, halal: true, vegan: true, glutenFree: true, keto: false, nutFree: true, spicy: false, available: true, stock: 30, taxRate: 5, portionSize: 'Large', weight: 200, image: 'https://images.pexels.com/photos/1583884/pexels-photo-1583884.jpeg?w=400', description: 'Hand-cut fries tossed in truffle oil and parmesan.' },
+  { name: 'Vegan Buddha Bowl', category: 'Mains', price: 18, calories: 540, protein: 22, carbs: 68, fats: 16, halal: true, vegan: true, glutenFree: true, keto: false, nutFree: false, spicy: false, available: true, stock: 8, taxRate: 5, portionSize: 'Regular', weight: 420, image: 'https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg?w=400', description: 'Quinoa, roasted veggies, avocado, tahini, mixed greens.' },
+  { name: 'Spicy Calamari', category: 'Starters', price: 14, calories: 320, protein: 24, carbs: 28, fats: 12, halal: true, vegan: false, glutenFree: false, keto: false, nutFree: true, spicy: true, available: true, stock: 0, taxRate: 5, portionSize: 'Regular', weight: 250, image: 'https://images.pexels.com/photos/566345/pexels-photo-566345.jpeg?w=400', description: 'Lightly battered calamari rings, sriracha mayo.' },
+  { name: 'Chocolate Lava Cake', category: 'Desserts', price: 11, calories: 460, protein: 7, carbs: 62, fats: 22, halal: true, vegan: false, glutenFree: false, keto: false, nutFree: false, spicy: false, available: false, stock: 12, taxRate: 5, portionSize: 'Small', weight: 180, image: 'https://images.pexels.com/photos/291528/pexels-photo-291528.jpeg?w=400', description: 'Warm molten chocolate cake, vanilla ice cream.' },
+  { name: 'Fresh Lemonade', category: 'Drinks', price: 6, calories: 120, protein: 0, carbs: 28, fats: 0, halal: true, vegan: true, glutenFree: true, keto: false, nutFree: true, spicy: false, available: true, stock: 50, taxRate: 5, portionSize: 'Large', weight: 350, image: 'https://images.pexels.com/photos/1998635/pexels-photo-1998635.jpeg?w=400', description: 'House-squeezed lemonade with mint and ice.' },
 ];
 
 function DietBadge({ label, color }: { label: string; color: string }) {
@@ -30,25 +33,178 @@ function DietBadge({ label, color }: { label: string; color: string }) {
 
 export default function AdminMenu() {
   const { theme } = useTheme();
-  const [items, setItems] = useState<MenuItem[]>(ITEMS);
+  const { orgContext } = useOrgContext();
+  const [items, setItems] = useState<MenuItem[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [activeCat, setActiveCat] = useState('All');
   const [editing, setEditing] = useState<MenuItem | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState<Partial<MenuItem>>({});
   const [newIngredient, setNewIngredient] = useState({ name: '', grams: 0 });
+  const [savedMsg, setSavedMsg] = useState('');
+
+  const showToast = (msg: string) => { setSavedMsg(msg); setTimeout(() => setSavedMsg(''), 2500); };
+
+  const fetchMenu = useCallback(async () => {
+    if (!orgContext?.branch_id) return;
+    setLoading(true);
+    try {
+      // 1. Fetch categories
+      let { data: cats, error: catErr } = await supabase
+        .from('menu_categories')
+        .select('id, name')
+        .eq('branch_id', orgContext.branch_id)
+        .order('sort_order', { ascending: true });
+
+      if (catErr) throw catErr;
+
+      // Seed categories if empty
+      if (!cats || cats.length === 0) {
+        const seedCats = ['Starters', 'Mains', 'Desserts', 'Drinks'].map((name, i) => ({
+          branch_id: orgContext.branch_id,
+          name,
+          sort_order: i,
+          is_active: true
+        }));
+        const { data: insertedCats, error: insCatErr } = await supabase
+          .from('menu_categories')
+          .insert(seedCats)
+          .select('id, name');
+        if (insCatErr) throw insCatErr;
+        cats = insertedCats || [];
+      }
+      setCategories(cats);
+
+      // 2. Fetch menu items
+      let { data: dbItems, error: itemErr } = await supabase
+        .from('menu_items')
+        .select('*')
+        .eq('branch_id', orgContext.branch_id)
+        .order('sort_order', { ascending: true });
+
+      if (itemErr) throw itemErr;
+
+      // Seed items if empty
+      if (!dbItems || dbItems.length === 0) {
+        const seedItems = DEFAULT_ITEMS.map((item, i) => {
+          const matchedCat = cats?.find(c => c.name === item.category);
+          return {
+            branch_id: orgContext.branch_id,
+            category_id: matchedCat?.id || null,
+            name: item.name,
+            description: item.description,
+            price: item.price,
+            image_url: item.image,
+            calories: item.calories,
+            protein_g: item.protein,
+            carbs_g: item.carbs,
+            fats_g: item.fats,
+            is_halal: item.halal,
+            is_vegan: item.vegan,
+            is_gluten_free: item.glutenFree,
+            is_keto: item.keto,
+            is_nut_free: item.nutFree,
+            is_spicy: item.spicy,
+            is_available: item.available,
+            sort_order: i,
+            weight_g: item.weight
+          };
+        });
+        const { data: insertedItems, error: insItemErr } = await supabase
+          .from('menu_items')
+          .insert(seedItems)
+          .select('*');
+        if (insItemErr) throw insItemErr;
+        dbItems = insertedItems || [];
+      }
+
+      // Map to UI MenuItems
+      const mapped: MenuItem[] = dbItems.map((dbItem: any) => {
+        const matchedCat = cats?.find(c => c.id === dbItem.category_id);
+        return {
+          id: dbItem.id,
+          name: dbItem.name,
+          category: matchedCat?.name || 'Mains',
+          category_id: dbItem.category_id,
+          price: Number(dbItem.price),
+          calories: dbItem.calories || 0,
+          protein: dbItem.protein_g || 0,
+          carbs: dbItem.carbs_g || 0,
+          fats: dbItem.fats_g || 0,
+          fiber: 0,
+          halal: !!dbItem.is_halal,
+          vegan: !!dbItem.is_vegan,
+          glutenFree: !!dbItem.is_gluten_free,
+          keto: !!dbItem.is_keto,
+          nutFree: !!dbItem.is_nut_free,
+          spicy: !!dbItem.is_spicy,
+          available: !!dbItem.is_available,
+          description: dbItem.description || '',
+          stock: 15,
+          ingredients: [],
+          taxRate: 5,
+          image: dbItem.image_url || '',
+          portionSize: 'Regular',
+          weight: dbItem.weight_g || 0,
+        };
+      });
+
+      setItems(mapped);
+    } catch (err) {
+      console.error('Error fetching menu:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [orgContext?.branch_id]);
+
+  useEffect(() => {
+    fetchMenu();
+  }, [fetchMenu]);
 
   const filtered = items.filter(item =>
     (activeCat === 'All' || item.category === activeCat) &&
     item.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const toggleAvailable = (id: string) => setItems(prev => prev.map(i => i.id === id ? { ...i, available: !i.available } : i));
-  const deleteItem = (id: string) => setItems(prev => prev.filter(i => i.id !== id));
-  const adjustStock = (id: string, delta: number) => setItems(prev => prev.map(i => i.id === id ? { ...i, stock: Math.max(0, i.stock + delta) } : i));
+  const toggleAvailable = async (id: string, currentVal: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('menu_items')
+        .update({ is_available: !currentVal })
+        .eq('id', id);
+      if (error) throw error;
+      setItems(prev => prev.map(i => i.id === id ? { ...i, available: !i.available } : i));
+      showToast('Item visibility updated');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const deleteItem = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('menu_items')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      setItems(prev => prev.filter(i => i.id !== id));
+      showToast('Item deleted successfully');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const adjustStock = (id: string, delta: number) => {
+    // Save stock changes locally since it's transient
+    setItems(prev => prev.map(i => i.id === id ? { ...i, stock: Math.max(0, i.stock + delta) } : i));
+  };
 
   const openAddForm = () => {
-    setFormData({ available: true, stock: 0, taxRate: 5, portionSize: 'Regular', halal: true, ingredients: [], image: '', category: 'Mains' });
+    const firstCat = categories[0]?.id || '';
+    setFormData({ available: true, stock: 15, taxRate: 5, portionSize: 'Regular', halal: true, ingredients: [], image: '', category_id: firstCat });
     setEditing(null);
     setShowForm(true);
   };
@@ -59,39 +215,53 @@ export default function AdminMenu() {
     setShowForm(true);
   };
 
-  const saveForm = () => {
-    if (editing) {
-      setItems(prev => prev.map(i => i.id === editing.id ? { ...i, ...formData } as MenuItem : i));
-    } else {
-      const newItem: MenuItem = {
-        id: Date.now().toString(),
-        name: formData.name ?? '',
-        category: formData.category ?? 'Mains',
-        price: formData.price ?? 0,
-        calories: formData.calories ?? 0,
-        protein: formData.protein ?? 0,
-        carbs: formData.carbs ?? 0,
-        fats: formData.fats ?? 0,
-        fiber: formData.fiber ?? 0,
-        halal: formData.halal ?? true,
-        vegan: formData.vegan ?? false,
-        glutenFree: formData.glutenFree ?? false,
-        keto: formData.keto ?? false,
-        nutFree: formData.nutFree ?? true,
-        spicy: formData.spicy ?? false,
-        available: formData.available ?? true,
-        description: formData.description ?? '',
-        stock: formData.stock ?? 0,
-        ingredients: formData.ingredients ?? [],
-        taxRate: formData.taxRate ?? 5,
-        image: formData.image ?? '',
-        portionSize: formData.portionSize ?? 'Regular',
-        weight: formData.weight ?? 0,
+  const saveForm = async () => {
+    if (!orgContext?.branch_id) return;
+    setSaving(true);
+    try {
+      const dbPayload = {
+        branch_id: orgContext.branch_id,
+        category_id: formData.category_id || null,
+        name: formData.name || '',
+        description: formData.description || '',
+        price: formData.price || 0,
+        image_url: formData.image || '',
+        calories: formData.calories || 0,
+        protein_g: formData.protein || 0,
+        carbs_g: formData.carbs || 0,
+        fats_g: formData.fats || 0,
+        is_halal: !!formData.halal,
+        is_vegan: !!formData.vegan,
+        is_gluten_free: !!formData.glutenFree,
+        is_keto: !!formData.keto,
+        is_nut_free: !!formData.nutFree,
+        is_spicy: !!formData.spicy,
+        is_available: !!formData.available,
+        weight_g: formData.weight || 0,
       };
-      setItems(prev => [...prev, newItem]);
+
+      if (editing) {
+        const { error } = await supabase
+          .from('menu_items')
+          .update(dbPayload)
+          .eq('id', editing.id);
+        if (error) throw error;
+        showToast('Item updated successfully');
+      } else {
+        const { error } = await supabase
+          .from('menu_items')
+          .insert([dbPayload]);
+        if (error) throw error;
+        showToast('Item added successfully');
+      }
+      setShowForm(false);
+      setFormData({});
+      fetchMenu();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
     }
-    setShowForm(false);
-    setFormData({});
   };
 
   const addIngredient = () => {
@@ -136,82 +306,89 @@ export default function AdminMenu() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((item, i) => (
-          <motion.div key={item.id} initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.04 }}
-            className="rounded-2xl overflow-hidden flex flex-col"
-            style={{ background: theme.surface, border: `1px solid ${item.available && item.stock > 0 ? theme.border : theme.border + '80'}`, opacity: item.available && item.stock > 0 ? 1 : 0.6 }}>
-            {/* Image */}
-            <div className="relative h-32 overflow-hidden" style={{ background: theme.bg }}>
-              {item.image ? (
-                <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center" style={{ color: theme.textMuted }}>
-                  <ImageIcon size={32} />
-                </div>
-              )}
-              <div className="absolute top-2 left-2 flex gap-1">
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md text-white" style={{ background: theme.primary }}>{item.portionSize}</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md text-white" style={{ background: '#1E293B' }}>{item.weight}g</span>
-              </div>
-              {!item.available && <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}><span className="text-xs font-bold text-white">HIDDEN</span></div>}
-            </div>
-
-            <div className="p-4 flex flex-col gap-3 flex-1">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-bold text-sm" style={{ color: theme.text }}>{item.name}</h3>
-                  <p className="text-xs mt-0.5" style={{ color: theme.textMuted }}>{item.category} - {item.portionSize} ({item.weight}g)</p>
-                </div>
-                <span className="text-lg font-extrabold" style={{ color: theme.primary }}>${item.price}</span>
-              </div>
-              <p className="text-xs leading-relaxed" style={{ color: theme.textMuted }}>{item.description}</p>
-              <div className="grid grid-cols-5 gap-1">
-                {[{ label: 'Cal', val: item.calories }, { label: 'Prot', val: item.protein }, { label: 'Carbs', val: item.carbs }, { label: 'Fats', val: item.fats }, { label: 'Fiber', val: item.fiber }].map(m => (
-                  <div key={m.label} className="text-center p-1.5 rounded-lg" style={{ background: theme.bg }}>
-                    <div className="text-xs font-bold" style={{ color: theme.text }}>{m.val}</div>
-                    <div className="text-[9px]" style={{ color: theme.textMuted }}>{m.label}</div>
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <Loader2 size={32} className="animate-spin" style={{ color: theme.primary }} />
+          <span className="text-sm" style={{ color: theme.textMuted }}>Loading menu from database...</span>
+        </div>
+      ) : (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((item, i) => (
+            <motion.div key={item.id} initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.04 }}
+              className="rounded-2xl overflow-hidden flex flex-col"
+              style={{ background: theme.surface, border: `1px solid ${item.available && item.stock > 0 ? theme.border : theme.border + '80'}`, opacity: item.available && item.stock > 0 ? 1 : 0.6 }}>
+              {/* Image */}
+              <div className="relative h-32 overflow-hidden" style={{ background: theme.bg }}>
+                {item.image ? (
+                  <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center" style={{ color: theme.textMuted }}>
+                    <ImageIcon size={32} />
                   </div>
-                ))}
+                )}
+                <div className="absolute top-2 left-2 flex gap-1">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md text-white" style={{ background: theme.primary }}>{item.portionSize}</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md text-white" style={{ background: '#1E293B' }}>{item.weight}g</span>
+                </div>
+                {!item.available && <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}><span className="text-xs font-bold text-white">HIDDEN</span></div>}
               </div>
-              <div className="flex flex-wrap gap-1">
-                {item.halal && <DietBadge label="Halal" color="#22c55e" />}
-                {item.vegan && <DietBadge label="Vegan" color="#84cc16" />}
-                {item.glutenFree && <DietBadge label="GF" color="#06b6d4" />}
-                {item.keto && <DietBadge label="Keto" color="#f59e0b" />}
-                {item.nutFree && <DietBadge label="Nut-Free" color="#8b5cf6" />}
-                {item.spicy && <DietBadge label="Spicy" color="#ef4444" />}
-              </div>
-              <div className="flex items-center gap-2 p-2 rounded-lg" style={{ background: theme.bg }}>
-                <Package size={14} style={{ color: item.stock > 0 ? theme.primary : '#ef4444' }} />
-                <span className="text-xs font-semibold" style={{ color: item.stock > 0 ? theme.text : '#ef4444' }}>
-                  {item.stock > 0 ? `${item.stock} portions left` : 'SOLD OUT'}
-                </span>
-                <div className="ml-auto flex items-center gap-1">
-                  <button onClick={() => adjustStock(item.id, -1)} className="w-5 h-5 rounded flex items-center justify-center" style={{ background: theme.surface }}><span className="text-xs">-</span></button>
-                  <button onClick={() => adjustStock(item.id, 1)} className="w-5 h-5 rounded flex items-center justify-center" style={{ background: theme.surface }}><span className="text-xs">+</span></button>
+
+              <div className="p-4 flex flex-col gap-3 flex-1">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-bold text-sm" style={{ color: theme.text }}>{item.name}</h3>
+                    <p className="text-xs mt-0.5" style={{ color: theme.textMuted }}>{item.category} - {item.portionSize} ({item.weight}g)</p>
+                  </div>
+                  <span className="text-lg font-extrabold" style={{ color: theme.primary }}>${item.price}</span>
+                </div>
+                <p className="text-xs leading-relaxed" style={{ color: theme.textMuted }}>{item.description}</p>
+                <div className="grid grid-cols-5 gap-1">
+                  {[{ label: 'Cal', val: item.calories }, { label: 'Prot', val: item.protein }, { label: 'Carbs', val: item.carbs }, { label: 'Fats', val: item.fats }, { label: 'Fiber', val: item.fiber }].map(m => (
+                    <div key={m.label} className="text-center p-1.5 rounded-lg" style={{ background: theme.bg }}>
+                      <div className="text-xs font-bold" style={{ color: theme.text }}>{m.val}</div>
+                      <div className="text-[9px]" style={{ color: theme.textMuted }}>{m.label}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {item.halal && <DietBadge label="Halal" color="#22c55e" />}
+                  {item.vegan && <DietBadge label="Vegan" color="#84cc16" />}
+                  {item.glutenFree && <DietBadge label="GF" color="#06b6d4" />}
+                  {item.keto && <DietBadge label="Keto" color="#f59e0b" />}
+                  {item.nutFree && <DietBadge label="Nut-Free" color="#8b5cf6" />}
+                  {item.spicy && <DietBadge label="Spicy" color="#ef4444" />}
+                </div>
+                <div className="flex items-center gap-2 p-2 rounded-lg" style={{ background: theme.bg }}>
+                  <Package size={14} style={{ color: item.stock > 0 ? theme.primary : '#ef4444' }} />
+                  <span className="text-xs font-semibold" style={{ color: item.stock > 0 ? theme.text : '#ef4444' }}>
+                    {item.stock > 0 ? `${item.stock} portions left` : 'SOLD OUT'}
+                  </span>
+                  <div className="ml-auto flex items-center gap-1">
+                    <button onClick={() => adjustStock(item.id, -1)} className="w-5 h-5 rounded flex items-center justify-center" style={{ background: theme.surface }}><span className="text-xs">-</span></button>
+                    <button onClick={() => adjustStock(item.id, 1)} className="w-5 h-5 rounded flex items-center justify-center" style={{ background: theme.surface }}><span className="text-xs">+</span></button>
+                  </div>
+                </div>
+                {item.stock === 0 && (
+                  <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg" style={{ background: '#ef444415', border: '1px solid #ef444430' }}>
+                    <AlertTriangle size={12} style={{ color: '#ef4444' }} />
+                    <span className="text-[10px] font-bold" style={{ color: '#ef4444' }}>SOLD OUT on customer tablets</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 pt-1" style={{ borderTop: `1px solid ${theme.border}` }}>
+                  <button onClick={() => toggleAvailable(item.id, item.available)}
+                    className="flex items-center gap-1 text-xs font-semibold px-2 py-1.5 rounded-lg transition-all"
+                    style={{ background: item.available ? '#22c55e20' : '#ef444420', color: item.available ? '#22c55e' : '#ef4444' }}>
+                    {item.available ? <><Check size={11} /> Available</> : <><X size={11} /> Hidden</>}
+                  </button>
+                  <span className="text-xs ml-1" style={{ color: theme.textMuted }}>Tax: {item.taxRate}%</span>
+                  <button onClick={() => openEditForm(item)} className="p-1.5 rounded-lg ml-auto" style={{ color: theme.textMuted }}><Edit2 size={14} /></button>
+                  <button onClick={() => deleteItem(item.id)} className="p-1.5 rounded-lg" style={{ color: '#ef4444' }}><Trash2 size={14} /></button>
                 </div>
               </div>
-              {item.stock === 0 && (
-                <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg" style={{ background: '#ef444415', border: '1px solid #ef444430' }}>
-                  <AlertTriangle size={12} style={{ color: '#ef4444' }} />
-                  <span className="text-[10px] font-bold" style={{ color: '#ef4444' }}>SOLD OUT on customer tablets</span>
-                </div>
-              )}
-              <div className="flex items-center gap-2 pt-1" style={{ borderTop: `1px solid ${theme.border}` }}>
-                <button onClick={() => toggleAvailable(item.id)}
-                  className="flex items-center gap-1 text-xs font-semibold px-2 py-1.5 rounded-lg transition-all"
-                  style={{ background: item.available ? '#22c55e20' : '#ef444420', color: item.available ? '#22c55e' : '#ef4444' }}>
-                  {item.available ? <><Check size={11} /> Available</> : <><X size={11} /> Hidden</>}
-                </button>
-                <span className="text-xs ml-1" style={{ color: theme.textMuted }}>Tax: {item.taxRate}%</span>
-                <button onClick={() => openEditForm(item)} className="p-1.5 rounded-lg ml-auto" style={{ color: theme.textMuted }}><Edit2 size={14} /></button>
-                <button onClick={() => deleteItem(item.id)} className="p-1.5 rounded-lg" style={{ color: '#ef4444' }}><Trash2 size={14} /></button>
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       <AnimatePresence>
         {showForm && (
@@ -251,6 +428,16 @@ export default function AdminMenu() {
                   <input value={formData.description ?? ''} onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))} placeholder="Short description..."
                     className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
                     style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+                </div>
+
+                {/* Category selector */}
+                <div>
+                  <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Category</label>
+                  <select value={formData.category_id ?? ''} onChange={e => setFormData(prev => ({ ...prev, category_id: e.target.value }))}
+                    className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                    style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
                 </div>
 
                 {/* Portion size & weight */}
@@ -344,7 +531,10 @@ export default function AdminMenu() {
                 </div>
               </div>
               <div className="flex gap-3 mt-6">
-                <button onClick={saveForm} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>{editing ? 'Save Changes' : 'Add Item'}</button>
+                <button onClick={saveForm} disabled={saving} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2" style={{ background: theme.primary }}>
+                  {saving && <Loader2 size={16} className="animate-spin" />}
+                  {editing ? 'Save Changes' : 'Add Item'}
+                </button>
                 <button onClick={() => setShowForm(false)}
                   className="px-4 py-2.5 rounded-xl text-sm font-semibold" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Cancel</button>
               </div>
@@ -352,6 +542,12 @@ export default function AdminMenu() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {savedMsg && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl font-semibold text-sm text-white shadow-2xl flex items-center gap-2" style={{ background: '#22c55e' }}>
+          <Check size={16} /> {savedMsg}
+        </div>
+      )}
     </div>
   );
 }

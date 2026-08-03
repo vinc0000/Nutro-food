@@ -1,13 +1,16 @@
-import { useState } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any, prefer-const, @typescript-eslint/no-unused-vars */
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Monitor, Search, Plus, Minus, X, CreditCard, Banknote, Smartphone, Gift,
   Clock, Printer, ArrowLeft, Check, Hash, Edit2, FileText, Lock,
-  Tablet
+  Tablet, Loader2
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import { useOrgContext, usePlanInfo } from '@/hooks/useOrgContext';
 
 interface CartItem { id: string; name: string; price: number; qty: number; }
 interface TabletOrder {
@@ -15,9 +18,7 @@ interface TabletOrder {
   total: number; status: 'pending' | 'accepted' | 'rejected'; time: string;
 }
 
-const CATEGORIES = ['All', 'Starters', 'Mains', 'Desserts', 'Drinks'];
-
-const MENU: { id: string; name: string; price: number; cat: string; calories: number; available: boolean }[] = [
+const DEFAULT_MENU = [
   { id: '1', name: 'Wagyu Burger', price: 24, cat: 'Mains', calories: 820, available: true },
   { id: '2', name: 'Truffle Fries', price: 9, cat: 'Starters', calories: 380, available: true },
   { id: '3', name: 'Caesar Salad', price: 12, cat: 'Starters', calories: 320, available: true },
@@ -32,7 +33,6 @@ const MENU: { id: string; name: string; price: number; cat: string; calories: nu
   { id: '12', name: 'Creme Brulee', price: 10, cat: 'Desserts', calories: 390, available: false },
 ];
 
-const PLAN_TABLE_LIMIT = 10;
 const tableColor: Record<string, string> = { available: '#22c55e', occupied: '#ef4444', reserved: '#eab308', cleaning: '#94a3b8' };
 type PayMethod = 'cash' | 'card' | 'tap' | 'gift_card';
 
@@ -130,9 +130,14 @@ function ManagerPinModal({ onClose, onApprove, theme }: { onClose: () => void; o
 export default function PosTerminal() {
   const { theme } = useTheme();
   const { profile } = useAuth();
+  const { orgContext } = useOrgContext();
+  const { plan } = usePlanInfo();
+  const PLAN_TABLE_LIMIT = plan === 'premium' ? 30 : plan === 'enterprise' ? 999 : 10;
+
   const navigate = useNavigate();
   const [unlocked, setUnlocked] = useState(false);
   const [cat, setCat] = useState('All');
+  const [cats, setCats] = useState<string[]>(['All', 'Starters', 'Mains', 'Desserts', 'Drinks']);
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
@@ -144,9 +149,19 @@ export default function PosTerminal() {
   const [sessionStart] = useState(new Date());
   const [orderCount, setOrderCount] = useState(0);
   const [sessionSales, setSessionSales] = useState(0);
-  const [tables, setTables] = useState(
-    Array.from({ length: 8 }, (_, i) => ({ id: String(i + 1), name: `T${i + 1}`, status: i < 2 ? 'occupied' : i < 4 ? 'available' : i < 6 ? 'reserved' : 'cleaning' }))
-  );
+  const [menu, setMenu] = useState<{ id: string; name: string; price: number; cat: string; calories: number; available: boolean }[]>(DEFAULT_MENU);
+  const [loading, setLoading] = useState(false);
+
+  const [tables, setTables] = useState([
+    { id: '1', name: 'T1', status: 'occupied' },
+    { id: '2', name: 'T2', status: 'occupied' },
+    { id: '3', name: 'T3', status: 'available' },
+    { id: '4', name: 'T4', status: 'available' },
+    { id: '5', name: 'T5', status: 'reserved' },
+    { id: '6', name: 'T6', status: 'reserved' },
+    { id: '7', name: 'T7', status: 'cleaning' },
+    { id: '8', name: 'T8', status: 'cleaning' },
+  ]);
   const [editingTable, setEditingTable] = useState<string | null>(null);
   const [tableName, setTableName] = useState('');
   const [cardDetail, setCardDetail] = useState('');
@@ -162,14 +177,77 @@ export default function PosTerminal() {
     { id: 'to2', tableNum: '3', items: [{ name: 'Margherita Pizza', qty: 1, price: 18 }, { name: 'Fresh Juice', qty: 2, price: 6 }], total: 30, status: 'pending', time: '5 min ago' },
   ]);
 
-  const filtered = MENU.filter(i => (cat === 'All' || i.cat === cat) && i.name.toLowerCase().includes(search.toLowerCase()));
+  const fetchLiveMenu = useCallback(async () => {
+    if (!orgContext?.branch_id) return;
+    setLoading(true);
+    try {
+      // 1. Fetch categories
+      const { data: catData } = await supabase
+        .from('menu_categories')
+        .select('id, name')
+        .eq('branch_id', orgContext.branch_id);
+
+      if (catData && catData.length > 0) {
+        setCats(['All', ...catData.map(c => c.name)]);
+      }
+
+      // 2. Fetch live items
+      const { data: itemData } = await supabase
+        .from('menu_items')
+        .select('*')
+        .eq('branch_id', orgContext.branch_id);
+
+      if (itemData && itemData.length > 0) {
+        const mapped = itemData.map(dbItem => {
+          const matchedCatName = catData?.find(c => c.id === dbItem.category_id)?.name || 'Mains';
+          return {
+            id: dbItem.id,
+            name: dbItem.name,
+            price: Number(dbItem.price),
+            cat: matchedCatName,
+            calories: dbItem.calories || 0,
+            available: !!dbItem.is_available,
+          };
+        });
+        setMenu(mapped);
+      } else {
+        setMenu(DEFAULT_MENU);
+      }
+
+      // 3. Fetch real tables if they exist
+      const { data: tableData } = await supabase
+        .from('restaurant_tables')
+        .select('*')
+        .eq('branch_id', orgContext.branch_id);
+
+      if (tableData && tableData.length > 0) {
+        setTables(tableData.map((t: any) => ({
+          id: t.id,
+          name: t.name || `T${t.table_number || ''}`,
+          status: t.status || 'available'
+        })));
+      }
+    } catch (err) {
+      console.error('Error fetching live data for POS:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [orgContext?.branch_id]);
+
+  useEffect(() => {
+    if (unlocked) {
+      fetchLiveMenu();
+    }
+  }, [unlocked, fetchLiveMenu]);
+
+  const filtered = menu.filter(i => (cat === 'All' || i.cat === cat) && i.name.toLowerCase().includes(search.toLowerCase()));
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const tax = subtotal * 0.05;
   const total = subtotal + tax;
   const change = cashGiven ? Math.max(0, parseFloat(cashGiven) - total) : 0;
   const pendingTabletOrders = tabletOrders.filter(o => o.status === 'pending');
 
-  const addItem = (item: typeof MENU[0]) => {
+  const addItem = (item: any) => {
     if (!item.available) return;
     setCart(prev => {
       const existing = prev.find(c => c.id === item.id);
@@ -182,12 +260,37 @@ export default function PosTerminal() {
     setCart(prev => prev.map(c => c.id === id ? { ...c, qty: Math.max(0, c.qty + delta) } : c).filter(c => c.qty > 0));
   };
 
-  const processPayment = () => {
-    setPaidSuccess(true);
-    setIsPaid(true);
-    setOrderCount(c => c + 1);
-    setSessionSales(s => s + total);
-    setTimeout(() => { setShowPayment(false); setPaidSuccess(false); }, 2000);
+  const processPayment = async () => {
+    if (!orgContext?.branch_id) return;
+    try {
+      const orderNumber = Math.floor(1000 + Math.random() * 9000).toString();
+      // Insert real order into Supabase
+      const { error } = await supabase
+        .from('orders')
+        .insert([{
+          branch_id: orgContext.branch_id,
+          order_number: orderNumber,
+          order_type: orderType,
+          status: 'paid',
+          subtotal: subtotal,
+          tax_amount: tax,
+          discount_amount: 0,
+          total_amount: total,
+          payment_status: 'paid',
+          payment_method: payMethod,
+          notes: selectedTable ? `Table ${tables.find(t => t.id === selectedTable)?.name || selectedTable}` : 'Dine-In',
+        }]);
+
+      if (error) throw error;
+
+      setPaidSuccess(true);
+      setIsPaid(true);
+      setOrderCount(c => c + 1);
+      setSessionSales(s => s + total);
+      setTimeout(() => { setShowPayment(false); setPaidSuccess(false); }, 2000);
+    } catch (err) {
+      console.error('Error recording POS order:', err);
+    }
   };
 
   const acceptTabletOrder = (id: string) => {
@@ -234,149 +337,156 @@ export default function PosTerminal() {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="px-4 pt-3 pb-2 flex items-center gap-2 flex-wrap flex-shrink-0">
-            {(['dine_in', 'takeaway', 'delivery'] as const).map(t => (
-              <button key={t} onClick={() => setOrderType(t)}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold capitalize transition-all"
-                style={{ background: orderType === t ? theme.primary : theme.surface, color: orderType === t ? '#fff' : theme.textMuted, border: `1px solid ${orderType === t ? theme.primary : theme.border}` }}>
-                {t.replace('_', ' ')}
-              </button>
-            ))}
-            <div className="ml-auto flex gap-1.5 flex-wrap items-center">
-              {tables.map(t => (
-                <div key={t.id} className="relative group">
-                  <button onClick={() => setSelectedTable(t.id === selectedTable ? null : t.id)}
-                    onDoubleClick={() => { setEditingTable(t.id); setTableName(t.name); }}
-                    className="w-auto min-w-[36px] h-9 px-2 rounded-lg text-[11px] font-bold transition-all"
-                    style={{ background: selectedTable === t.id ? tableColor[t.status] : tableColor[t.status] + '20', color: selectedTable === t.id ? '#fff' : tableColor[t.status], border: `1px solid ${tableColor[t.status]}40` }}>
-                    {t.name}
-                  </button>
-                  <button onClick={() => { setEditingTable(t.id); setTableName(t.name); }}
-                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{ background: theme.primary }}>
-                    <Edit2 size={8} color="#fff" />
-                  </button>
-                </div>
-              ))}
-              {tables.length < PLAN_TABLE_LIMIT && (
-                <button onClick={() => setTables(prev => [...prev, { id: Date.now().toString(), name: `T${prev.length + 1}`, status: 'available' }])}
-                  className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold"
-                  style={{ background: theme.primary + '20', color: theme.primary, border: `1px dashed ${theme.primary}40` }}>
-                  <Plus size={14} />
-                </button>
-              )}
-              {tables.length >= PLAN_TABLE_LIMIT && (
-                <span className="text-[10px] font-bold px-2 py-1 rounded-lg" style={{ background: '#eab30820', color: '#eab308' }}>Limit: {PLAN_TABLE_LIMIT}</span>
-              )}
-            </div>
-          </div>
-
-          {editingTable && (
-            <div className="px-4 pb-2 flex items-center gap-2">
-              <input value={tableName} onChange={e => setTableName(e.target.value)} placeholder="Table name"
-                className="px-3 py-1.5 rounded-lg text-xs outline-none w-40"
-                style={{ background: theme.surface, color: theme.text, border: `1px solid ${theme.primary}` }} />
-              <button onClick={() => { setTables(prev => prev.map(t => t.id === editingTable ? { ...t, name: tableName || t.name } : t)); setEditingTable(null); }} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: theme.primary }}>Save</button>
-              <button onClick={() => setEditingTable(null)} className="px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: theme.surface, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Cancel</button>
-            </div>
-          )}
-
-          <div className="px-4 pb-2 flex gap-1.5 overflow-x-auto flex-shrink-0">
-            {CATEGORIES.map(c => (
-              <button key={c} onClick={() => setCat(c)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0"
-                style={{ background: cat === c ? theme.primary : theme.surface, color: cat === c ? '#fff' : theme.textMuted, border: `1px solid ${cat === c ? theme.primary : theme.border}` }}>{c}</button>
-            ))}
-          </div>
-
-          <div className="px-4 pb-3 flex-shrink-0">
-            <div className="relative">
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: theme.textMuted }} />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search items..."
-                className="w-full pl-8 pr-4 py-2 rounded-xl text-sm outline-none"
-                style={{ background: theme.surface, color: theme.text, border: `1px solid ${theme.border}` }} />
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-auto px-4 pb-4">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-              {filtered.map(item => {
-                const inCart = cart.find(c => c.id === item.id);
-                return (
-                  <motion.button key={item.id} whileTap={{ scale: 0.96 }} onClick={() => addItem(item)} disabled={!item.available}
-                    className="p-3 rounded-xl text-left transition-all relative disabled:opacity-40"
-                    style={{ background: inCart ? theme.primary + '15' : theme.surface, border: `1px solid ${inCart ? theme.primary : theme.border}` }}>
-                    <div className="text-sm font-bold leading-tight mb-1" style={{ color: theme.text }}>{item.name}</div>
-                    <div className="text-xs" style={{ color: theme.textMuted }}>{item.calories} kcal</div>
-                    <div className="text-base font-extrabold mt-2" style={{ color: theme.primary }}>${item.price}</div>
-                    {!item.available && <div className="absolute inset-0 flex items-center justify-center rounded-xl" style={{ background: 'rgba(0,0,0,0.4)' }}><span className="text-[10px] font-bold text-white">SOLD OUT</span></div>}
-                    {inCart && <div className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-extrabold text-white" style={{ background: theme.primary }}>{inCart.qty}</div>}
-                  </motion.button>
-                );
-              })}
-            </div>
-          </div>
+      {loading ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3">
+          <Loader2 size={36} className="animate-spin" style={{ color: theme.primary }} />
+          <span className="text-sm font-semibold" style={{ color: theme.textMuted }}>Loading terminal items & table map...</span>
         </div>
-
-        <div className="w-72 flex-shrink-0 flex flex-col" style={{ background: theme.surface, borderLeft: `1px solid ${theme.border}` }}>
-          <div className="px-4 py-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: `1px solid ${theme.border}` }}>
-            <span className="text-sm font-extrabold" style={{ color: theme.text }}>Order {selectedTable ? `· ${tables.find(t => t.id === selectedTable)?.name ?? `T${selectedTable}`}` : ''}</span>
-            {cart.length > 0 && <button onClick={startNewOrder} className="text-xs" style={{ color: '#ef4444' }}>Clear</button>}
-          </div>
-          <div className="flex-1 overflow-auto p-3 space-y-2">
-            {cart.length === 0 ? (
-              <div className="text-center py-12" style={{ color: theme.textMuted }}>
-                <Hash size={32} className="mx-auto mb-2 opacity-30" />
-                <p className="text-sm">Tap items to add to order</p>
+      ) : (
+        <div className="flex flex-1 overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="px-4 pt-3 pb-2 flex items-center gap-2 flex-wrap flex-shrink-0">
+              {(['dine_in', 'takeaway', 'delivery'] as const).map(t => (
+                <button key={t} onClick={() => setOrderType(t)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold capitalize transition-all"
+                  style={{ background: orderType === t ? theme.primary : theme.surface, color: orderType === t ? '#fff' : theme.textMuted, border: `1px solid ${orderType === t ? theme.primary : theme.border}` }}>
+                  {t.replace('_', ' ')}
+                </button>
+              ))}
+              <div className="ml-auto flex gap-1.5 flex-wrap items-center">
+                {tables.map(t => (
+                  <div key={t.id} className="relative group">
+                    <button onClick={() => setSelectedTable(t.id === selectedTable ? null : t.id)}
+                      onDoubleClick={() => { setEditingTable(t.id); setTableName(t.name); }}
+                      className="w-auto min-w-[36px] h-9 px-2 rounded-lg text-[11px] font-bold transition-all"
+                      style={{ background: selectedTable === t.id ? tableColor[t.status] : tableColor[t.status] + '20', color: selectedTable === t.id ? '#fff' : tableColor[t.status], border: `1px solid ${tableColor[t.status]}40` }}>
+                      {t.name}
+                    </button>
+                    <button onClick={() => { setEditingTable(t.id); setTableName(t.name); }}
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{ background: theme.primary }}>
+                      <Edit2 size={8} color="#fff" />
+                    </button>
+                  </div>
+                ))}
+                {tables.length < PLAN_TABLE_LIMIT && (
+                  <button onClick={() => setTables(prev => [...prev, { id: Date.now().toString(), name: `T${prev.length + 1}`, status: 'available' }])}
+                    className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold"
+                    style={{ background: theme.primary + '20', color: theme.primary, border: `1px dashed ${theme.primary}40` }}>
+                    <Plus size={14} />
+                  </button>
+                )}
+                {tables.length >= PLAN_TABLE_LIMIT && (
+                  <span className="text-[10px] font-bold px-2 py-1 rounded-lg" style={{ background: '#eab30820', color: '#eab308' }}>Limit: {PLAN_TABLE_LIMIT}</span>
+                )}
               </div>
-            ) : cart.map(item => (
-              <div key={item.id} className="flex items-center gap-2 py-2" style={{ borderBottom: `1px solid ${theme.border}` }}>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold truncate" style={{ color: theme.text }}>{item.name}</div>
-                  <div className="text-xs" style={{ color: theme.primary }}>${(item.price * item.qty).toFixed(2)}</div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => updateQty(item.id, -1)} className="w-6 h-6 rounded flex items-center justify-center" style={{ background: theme.bg, color: theme.textMuted }}><Minus size={10} /></button>
-                  <span className="text-xs font-bold w-4 text-center" style={{ color: theme.text }}>{item.qty}</span>
-                  <button onClick={() => updateQty(item.id, 1)} className="w-6 h-6 rounded flex items-center justify-center" style={{ background: theme.bg, color: theme.textMuted }}><Plus size={10} /></button>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="p-3 space-y-2 flex-shrink-0" style={{ borderTop: `1px solid ${theme.border}` }}>
-            <div className="flex justify-between text-xs" style={{ color: theme.textMuted }}><span>Subtotal</span><span>${subtotal.toFixed(2)}</span></div>
-            <div className="flex justify-between text-xs" style={{ color: theme.textMuted }}><span>Tax (5%)</span><span>${tax.toFixed(2)}</span></div>
-            <div className="flex justify-between font-extrabold text-base" style={{ color: theme.text }}>
-              <span>Total</span><span style={{ color: theme.primary }}>${total.toFixed(2)}</span>
             </div>
-            {isPaid && (
-              <div className="flex items-center gap-2 p-2 rounded-lg" style={{ background: '#22c55e15', border: '1px solid #22c55e30' }}>
-                <Check size={14} style={{ color: '#22c55e' }} />
-                <span className="text-xs font-bold" style={{ color: '#22c55e' }}>Payment received - receipt ready</span>
+
+            {editingTable && (
+              <div className="px-4 pb-2 flex items-center gap-2">
+                <input value={tableName} onChange={e => setTableName(e.target.value)} placeholder="Table name"
+                  className="px-3 py-1.5 rounded-lg text-xs outline-none w-40"
+                  style={{ background: theme.surface, color: theme.text, border: `1px solid ${theme.primary}` }} />
+                <button onClick={() => { setTables(prev => prev.map(t => t.id === editingTable ? { ...t, name: tableName || t.name } : t)); setEditingTable(null); }} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: theme.primary }}>Save</button>
+                <button onClick={() => setEditingTable(null)} className="px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: theme.surface, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Cancel</button>
               </div>
             )}
-            <button onClick={() => cart.length > 0 && setShowPayment(true)} disabled={cart.length === 0 || isPaid}
-              className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all disabled:opacity-40" style={{ background: theme.primary }}>
-              {isPaid ? 'Paid' : `Charge $${total.toFixed(2)}`}
-            </button>
-            <div className="flex gap-2">
-              <button onClick={() => cart.length > 0 && isPaid && setShowReceipt(true)} disabled={cart.length === 0 || !isPaid}
-                className="flex-1 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40"
-                style={{ background: theme.bg, color: isPaid ? theme.primary : theme.textMuted, border: `1px solid ${isPaid ? theme.primary : theme.border}` }}>
-                <Printer size={12} /> Receipt
-              </button>
-              <button onClick={() => { setPendingAction('void'); setShowManagerPin(true); }} disabled={cart.length === 0}
-                className="flex-1 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40"
-                style={{ background: theme.bg, color: '#ef4444', border: `1px solid ${theme.border}` }}>
-                <X size={12} /> Void
-              </button>
+
+            <div className="px-4 pb-2 flex gap-1.5 overflow-x-auto flex-shrink-0">
+              {cats.map(c => (
+                <button key={c} onClick={() => setCat(c)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0"
+                  style={{ background: cat === c ? theme.primary : theme.surface, color: cat === c ? '#fff' : theme.textMuted, border: `1px solid ${cat === c ? theme.primary : theme.border}` }}>{c}</button>
+              ))}
             </div>
-            {isPaid && <button onClick={startNewOrder} className="w-full py-2 rounded-xl text-xs font-bold text-white" style={{ background: '#22c55e' }}>New Order</button>}
+
+            <div className="px-4 pb-3 flex-shrink-0">
+              <div className="relative">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: theme.textMuted }} />
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search items..."
+                  className="w-full pl-8 pr-4 py-2 rounded-xl text-sm outline-none"
+                  style={{ background: theme.surface, color: theme.text, border: `1px solid ${theme.border}` }} />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto px-4 pb-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                {filtered.map(item => {
+                  const inCart = cart.find(c => c.id === item.id);
+                  return (
+                    <motion.button key={item.id} whileTap={{ scale: 0.96 }} onClick={() => addItem(item)} disabled={!item.available}
+                      className="p-3 rounded-xl text-left transition-all relative disabled:opacity-40"
+                      style={{ background: inCart ? theme.primary + '15' : theme.surface, border: `1px solid ${inCart ? theme.primary : theme.border}` }}>
+                      <div className="text-sm font-bold leading-tight mb-1" style={{ color: theme.text }}>{item.name}</div>
+                      <div className="text-xs" style={{ color: theme.textMuted }}>{item.calories} kcal</div>
+                      <div className="text-base font-extrabold mt-2" style={{ color: theme.primary }}>${item.price}</div>
+                      {!item.available && <div className="absolute inset-0 flex items-center justify-center rounded-xl" style={{ background: 'rgba(0,0,0,0.4)' }}><span className="text-[10px] font-bold text-white">SOLD OUT</span></div>}
+                      {inCart && <div className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-extrabold text-white" style={{ background: theme.primary }}>{inCart.qty}</div>}
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="w-72 flex-shrink-0 flex flex-col" style={{ background: theme.surface, borderLeft: `1px solid ${theme.border}` }}>
+            <div className="px-4 py-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: `1px solid ${theme.border}` }}>
+              <span className="text-sm font-extrabold" style={{ color: theme.text }}>Order {selectedTable ? `· ${tables.find(t => t.id === selectedTable)?.name ?? `T${selectedTable}`}` : ''}</span>
+              {cart.length > 0 && <button onClick={startNewOrder} className="text-xs" style={{ color: '#ef4444' }}>Clear</button>}
+            </div>
+            <div className="flex-1 overflow-auto p-3 space-y-2">
+              {cart.length === 0 ? (
+                <div className="text-center py-12" style={{ color: theme.textMuted }}>
+                  <Hash size={32} className="mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">Tap items to add to order</p>
+                </div>
+              ) : cart.map(item => (
+                <div key={item.id} className="flex items-center gap-2 py-2" style={{ borderBottom: `1px solid ${theme.border}` }}>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold truncate" style={{ color: theme.text }}>{item.name}</div>
+                    <div className="text-xs" style={{ color: theme.primary }}>${(item.price * item.qty).toFixed(2)}</div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => updateQty(item.id, -1)} className="w-6 h-6 rounded flex items-center justify-center" style={{ background: theme.bg, color: theme.textMuted }}><Minus size={10} /></button>
+                    <span className="text-xs font-bold w-4 text-center" style={{ color: theme.text }}>{item.qty}</span>
+                    <button onClick={() => updateQty(item.id, 1)} className="w-6 h-6 rounded flex items-center justify-center" style={{ background: theme.bg, color: theme.textMuted }}><Plus size={10} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="p-3 space-y-2 flex-shrink-0" style={{ borderTop: `1px solid ${theme.border}` }}>
+              <div className="flex justify-between text-xs" style={{ color: theme.textMuted }}><span>Subtotal</span><span>${subtotal.toFixed(2)}</span></div>
+              <div className="flex justify-between text-xs" style={{ color: theme.textMuted }}><span>Tax (5%)</span><span>${tax.toFixed(2)}</span></div>
+              <div className="flex justify-between font-extrabold text-base" style={{ color: theme.text }}>
+                <span>Total</span><span style={{ color: theme.primary }}>${total.toFixed(2)}</span>
+              </div>
+              {isPaid && (
+                <div className="flex items-center gap-2 p-2 rounded-lg" style={{ background: '#22c55e15', border: '1px solid #22c55e30' }}>
+                  <Check size={14} style={{ color: '#22c55e' }} />
+                  <span className="text-xs font-bold" style={{ color: '#22c55e' }}>Payment received - receipt ready</span>
+                </div>
+              )}
+              <button onClick={() => cart.length > 0 && setShowPayment(true)} disabled={cart.length === 0 || isPaid}
+                className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all disabled:opacity-40" style={{ background: theme.primary }}>
+                {isPaid ? 'Paid' : `Charge $${total.toFixed(2)}`}
+              </button>
+              <div className="flex gap-2">
+                <button onClick={() => cart.length > 0 && isPaid && setShowReceipt(true)} disabled={cart.length === 0 || !isPaid}
+                  className="flex-1 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40"
+                  style={{ background: theme.bg, color: isPaid ? theme.primary : theme.textMuted, border: `1px solid ${isPaid ? theme.primary : theme.border}` }}>
+                  <Printer size={12} /> Receipt
+                </button>
+                <button onClick={() => { setPendingAction('void'); setShowManagerPin(true); }} disabled={cart.length === 0}
+                  className="flex-1 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40"
+                  style={{ background: theme.bg, color: '#ef4444', border: `1px solid ${theme.border}` }}>
+                  <X size={12} /> Void
+                </button>
+              </div>
+              {isPaid && <button onClick={startNewOrder} className="w-full py-2 rounded-xl text-xs font-bold text-white" style={{ background: '#22c55e' }}>New Order</button>}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Payment modal */}
       <AnimatePresence>
@@ -468,9 +578,9 @@ export default function PosTerminal() {
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
               className="w-80 rounded-2xl p-6" style={{ background: '#fff', color: '#000' }} onClick={e => e.stopPropagation()}>
               <div className="text-center mb-4">
-                <div className="text-lg font-extrabold">Le Maison Dubai</div>
+                <div className="text-lg font-extrabold">{orgContext?.org_name || 'Le Maison Dubai'}</div>
                 <div className="text-xs text-gray-500">Powered by Nutro - LiAfrik</div>
-                <div className="text-xs text-gray-500">123 Main St, Dubai - +971 XX XXX XXXX</div>
+                <div className="text-xs text-gray-500">{orgContext?.city || 'Dubai'} - {profile?.email}</div>
               </div>
               <div className="border-t border-b border-dashed border-gray-300 py-3 mb-3 text-xs">
                 <div className="flex justify-between mb-1"><span>Table: {tables.find(t => t.id === selectedTable)?.name ?? (selectedTable ? `T${selectedTable}` : '-')}</span><span>Cashier: {profile?.full_name ?? 'Staff'}</span></div>

@@ -7,7 +7,7 @@ import {
   Star, Award, Headphones, Cloud, Scale, Brain,
   Phone, MessageCircle, ArrowUp
 } from 'lucide-react';
-import { useTheme, THEMES, ThemeName } from '@/contexts/ThemeContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { CURRENCIES } from '@/lib/countries';
 
 const SLIDES = [
@@ -159,7 +159,7 @@ function LegalModal({ type, onClose, theme }: { type: 'privacy' | 'terms' | 'gdp
 }
 
 export default function LandingPage() {
-  const { theme, themeName, setTheme } = useTheme();
+  const { theme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [currency, setCurrency] = useState('USD');
