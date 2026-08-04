@@ -8,6 +8,7 @@ import {
   Phone, MessageCircle, ArrowUp
 } from 'lucide-react';
 import { useTheme, THEMES, ThemeName } from '@/contexts/ThemeContext';
+import { useLocale, type SupportedCurrency } from '@/contexts/LocaleContext';
 import { CURRENCIES } from '@/lib/countries';
 
 const SLIDES = [
@@ -168,9 +169,9 @@ function LegalModal({ type, onClose, theme }: { type: 'privacy' | 'terms' | 'gdp
 
 export default function LandingPage() {
   const { theme, themeName, setTheme } = useTheme();
+  const { language, currency, setLanguage, setCurrency, t, formatCurrency } = useLocale();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [currency, setCurrency] = useState('USD');
   const [legalModal, setLegalModal] = useState<'privacy' | 'terms' | 'gdpr' | null>(null);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -200,7 +201,7 @@ export default function LandingPage() {
   }, []);
 
   const selectedCurrency = CURRENCIES.find(c => c.code === currency) ?? CURRENCIES[0];
-  const toPrice = (usd: number) => `${selectedCurrency.symbol}${(usd * selectedCurrency.rate).toFixed(0)}`;
+  const toPrice = (usd: number) => formatCurrency(usd * selectedCurrency.rate, currency);
 
   const navSections = [
     {
@@ -265,15 +266,22 @@ export default function LandingPage() {
             <Link to="/help" className="text-sm font-medium transition-colors hover:text-white" style={{ color: 'rgba(255,255,255,0.65)' }}>Aide</Link>
           </div>
           <div className="flex items-center gap-2">
-            <select value={currency} onChange={e => setCurrency(e.target.value)}
+            <select value={currency} onChange={e => setCurrency(e.target.value as SupportedCurrency)}
               className="text-xs font-semibold px-2 py-1.5 rounded-lg outline-none cursor-pointer hidden sm:block max-w-[90px]"
               style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.8)', border: '1px solid rgba(255,255,255,0.1)' }}>
               {CURRENCIES.map(c => <option key={c.code} value={c.code} style={{ color: '#000' }}>{c.symbol} {c.code}</option>)}
             </select>
+            <select value={language} onChange={e => setLanguage(e.target.value as 'en' | 'fr' | 'ar')}
+              className="text-xs font-semibold px-2 py-1.5 rounded-lg outline-none cursor-pointer hidden sm:block max-w-[70px]"
+              style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.8)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <option value="en" style={{ color: '#000' }}>EN</option>
+              <option value="fr" style={{ color: '#000' }}>FR</option>
+              <option value="ar" style={{ color: '#000' }}>AR</option>
+            </select>
             <Link to="/auth/login" className="text-sm font-semibold px-4 py-2 rounded-lg transition-all hidden sm:block"
-              style={{ color: 'rgba(255,255,255,0.8)', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}>Connexion</Link>
+              style={{ color: 'rgba(255,255,255,0.8)', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}>{t('nav.login')}</Link>
             <Link to="/auth/signup" className="text-sm font-bold px-5 py-2 rounded-full transition-all hover:scale-105"
-              style={{ background: '#fff', color: '#0F172A' }}>Essai gratuit</Link>
+              style={{ background: '#fff', color: '#0F172A' }}>{t('nav.trial')}</Link>
             <button className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
               <MenuIcon size={20} color="#fff" />
             </button>

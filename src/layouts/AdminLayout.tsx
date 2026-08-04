@@ -158,7 +158,7 @@ export default function AdminLayout() {
             <div className="text-[11px] truncate capitalize" style={{ color: theme.textMuted }}>{profile?.system_role ?? 'admin'}</div>
           </div>
         )}
-        <button onClick={() => { signOut(); navigate('/'); }}
+        <button onClick={async () => { await signOut(); navigate('/'); }}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold hover:opacity-80"
           style={{ color: theme.textMuted }} title={collapsed ? 'Sign Out' : undefined}>
           <LogOut size={16} className="flex-shrink-0" />
@@ -195,7 +195,7 @@ export default function AdminLayout() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeSwitcher />
-            <button onClick={() => navigate('/app/admin/notifications')} className="p-2 rounded-lg hover:opacity-70 relative" style={{ color: theme.textMuted }}>
+            <button onClick={() => navigate('/app/admin/orders')} className="p-2 rounded-lg hover:opacity-70 relative" style={{ color: theme.textMuted }}>
               <Bell size={16} />
               <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full" style={{ background: '#ef4444' }} />
             </button>
@@ -222,7 +222,7 @@ export default function AdminLayout() {
                       className="w-full flex items-center gap-2 py-2 rounded-lg text-xs font-semibold mb-1" style={{ color: theme.textMuted }}>
                       <Settings size={13} /> Settings
                     </button>
-                    <button onClick={() => { signOut(); navigate('/'); }}
+                    <button onClick={async () => { await signOut(); navigate('/'); }}
                       className="w-full flex items-center gap-2 py-2 rounded-lg text-xs font-semibold" style={{ color: '#ef4444' }}>
                       <LogOut size={13} /> Sign Out
                     </button>

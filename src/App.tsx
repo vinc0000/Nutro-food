@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { LocaleProvider } from '@/contexts/LocaleContext';
 import { AuthGuard, SuperAdminGuard, PublicOnlyGuard, TabletGuard } from '@/components/guards/RouteGuards';
 
 const LandingPage = lazy(() => import('@/pages/LandingPage'));
@@ -43,6 +44,7 @@ function PageLoader() {
 export default function App() {
   return (
     <ThemeProvider>
+      <LocaleProvider>
       <AuthProvider>
         <BrowserRouter>
           <Suspense fallback={<PageLoader />}>
@@ -86,6 +88,7 @@ export default function App() {
           </Suspense>
         </BrowserRouter>
       </AuthProvider>
+      </LocaleProvider>
     </ThemeProvider>
   );
 }

@@ -4,6 +4,7 @@ import { DollarSign, ShoppingBag, Users, TrendingUp, ArrowUpRight, ChefHat, Tabl
 import { Link } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLocale } from '@/contexts/LocaleContext';
 import { useOrgContext, usePlanInfo } from '@/hooks/useOrgContext';
 import { supabase } from '@/lib/supabase';
 import StatCard from '@/components/ui/StatCard';
@@ -30,6 +31,7 @@ const statusStyle: Record<string, { bg: string; text: string }> = {
 export default function AdminDashboard() {
   const { theme } = useTheme();
   const { profile } = useAuth();
+  const { t, formatCurrency } = useLocale();
   const { orgContext } = useOrgContext();
   const { isTrialActive, daysLeft, isTrialExpired, plan } = usePlanInfo();
   const [orders, setOrders] = useState<OrderRow[]>([]);
@@ -77,14 +79,14 @@ export default function AdminDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold" style={{ color: theme.text }}>
-            Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {profile?.full_name?.split(' ')[0] ?? 'Chef'}
+            {new Date().getHours() < 12 ? t('dashboard.greetingMorning') : new Date().getHours() < 17 ? t('dashboard.greetingAfternoon') : t('dashboard.greetingEvening')}, {profile?.full_name?.split(' ')[0] ?? 'Chef'}
           </h1>
           <p className="text-sm mt-1" style={{ color: theme.textMuted }}>
             {orgContext?.org_name ?? 'Your restaurant'} · {orgContext?.branch_name ?? 'Main Branch'}
           </p>
         </div>
         <Link to="/app/admin/menu" className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>
-          <Plus size={16} /> Add Menu Item
+          <Plus size={16} /> {t('dashboard.addMenu')}
         </Link>
       </div>
 
@@ -107,9 +109,9 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { title: "Today's Revenue", value: loading ? '—' : `$${todayRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: DollarSign, trend: 12, color: '#22c55e', delay: 0 },
+          { title: "Today's Revenue", value: loading ? '—' : formatCurrency(todayRevenue), icon: DollarSign, trend: 12, color: '#22c55e', delay: 0 },
           { title: "Today's Orders", value: loading ? '—' : todayOrders, icon: ShoppingBag, trend: 8, delay: 0.05 },
-          { title: 'Avg Order Value', value: loading ? '—' : `$${avgOrder.toFixed(2)}`, icon: TrendingUp, color: '#3b82f6', delay: 0.1 },
+          { title: 'Avg Order Value', value: loading ? '—' : formatCurrency(avgOrder), icon: TrendingUp, color: '#3b82f6', delay: 0.1 },
           { title: 'Active Tables', value: loading ? '—' : `${activeTables} / ${totalTables}`, icon: Users, color: '#f59e0b', delay: 0.15 },
         ].map(s => (
           <motion.div key={s.title} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: s.delay }}>
@@ -120,9 +122,9 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Open POS', desc: 'Start taking orders', to: '/app/pos', icon: Monitor, color: '#3b82f6', external: true },
-          { label: 'Kitchen Display', desc: 'View KDS board', to: '/app/kds', icon: ChefHat, color: '#f59e0b', external: true },
-          { label: 'Tablet Preview', desc: 'Customer-facing menu', to: '/app/tablet', icon: Tablet, color: '#8b5cf6', external: true },
+          { label: t('dashboard.openPos'), desc: 'Start taking orders', to: '/app/pos', icon: Monitor, color: '#3b82f6', external: true },
+          { label: t('dashboard.kds'), desc: 'View KDS board', to: '/app/kds', icon: ChefHat, color: '#f59e0b', external: true },
+          { label: t('dashboard.tablet'), desc: 'Customer-facing menu', to: '/app/tablet', icon: Tablet, color: '#8b5cf6', external: true },
         ].map(item =>
           item.external ? (
             <a key={item.label} href={item.to} target="_blank" rel="noopener noreferrer"
@@ -156,8 +158,8 @@ export default function AdminDashboard() {
       <div className="grid lg:grid-cols-5 gap-6">
         <div className="lg:col-span-3 rounded-2xl overflow-hidden" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
           <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: `1px solid ${theme.border}` }}>
-            <h2 className="font-bold" style={{ color: theme.text }}>Recent Orders</h2>
-            <Link to="/app/admin/orders" className="text-xs font-semibold flex items-center gap-1" style={{ color: theme.primary }}>View all <ArrowUpRight size={12} /></Link>
+            <h2 className="font-bold" style={{ color: theme.text }}>{t('dashboard.recentOrders')}</h2>
+            <Link to="/app/admin/orders" className="text-xs font-semibold flex items-center gap-1" style={{ color: theme.primary }}>{t('dashboard.viewAll')} <ArrowUpRight size={12} /></Link>
           </div>
           {loading ? (
             <div className="p-8 text-center text-sm" style={{ color: theme.textMuted }}>Loading orders...</div>
@@ -197,7 +199,7 @@ export default function AdminDashboard() {
           </div>
           <div className="mt-4 pt-4 grid grid-cols-2 gap-3" style={{ borderTop: `1px solid ${theme.border}` }}>
             <div className="text-center">
-              <div className="text-xl font-bold" style={{ color: theme.primary }}>${todayRevenue.toFixed(0)}</div>
+              <div className="text-xl font-bold" style={{ color: theme.primary }}>{formatCurrency(todayRevenue)}</div>
               <div className="text-xs" style={{ color: theme.textMuted }}>Today Total</div>
             </div>
             <div className="text-center">

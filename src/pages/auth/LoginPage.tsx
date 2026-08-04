@@ -4,10 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { UtensilsCrossed, Mail, Lock, Eye, EyeOff, AlertCircle, Check, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLocale } from '@/contexts/LocaleContext';
 
 export default function LoginPage() {
   const { signIn } = useAuth();
   const { theme } = useTheme();
+  const { t } = useLocale();
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/app/admin';
@@ -52,11 +54,11 @@ export default function LoginPage() {
             </div>
             <span className="text-2xl font-extrabold tracking-tight" style={{ color: theme.text }}>NUTRO</span>
           </Link>
-          <p className="mt-2 text-sm" style={{ color: theme.textMuted }}>Sign in to your restaurant platform</p>
+          <p className="mt-2 text-sm" style={{ color: theme.textMuted }}>{t('auth.signin')} to your restaurant platform</p>
         </div>
 
         <div className="rounded-2xl p-8" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
-          <h1 className="text-xl font-bold mb-6" style={{ color: theme.text }}>Welcome back</h1>
+          <h1 className="text-xl font-bold mb-6" style={{ color: theme.text }}>{t('auth.welcome')}</h1>
 
           {error && (
             <div className="flex items-center gap-3 p-3 rounded-lg mb-4 text-sm"
@@ -67,7 +69,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold mb-2" style={{ color: theme.textMuted }}>Email Address</label>
+              <label className="block text-sm font-semibold mb-2" style={{ color: theme.textMuted }}>{t('auth.email')}</label>
               <div className="relative">
                 <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: theme.textMuted }} />
                 <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@restaurant.com"
@@ -78,7 +80,7 @@ export default function LoginPage() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-semibold mb-2" style={{ color: theme.textMuted }}>Password</label>
+              <label className="block text-sm font-semibold mb-2" style={{ color: theme.textMuted }}>{t('auth.password')}</label>
               <div className="relative">
                 <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: theme.textMuted }} />
                 <input type={showPw ? 'text' : 'password'} required value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••"
@@ -94,20 +96,20 @@ export default function LoginPage() {
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} className="rounded" style={{ accentColor: theme.primary }} />
-                <span className="text-xs font-medium" style={{ color: theme.textMuted }}>Remember me</span>
+                <span className="text-xs font-medium" style={{ color: theme.textMuted }}>{t('auth.remember')}</span>
               </label>
-              <button type="button" onClick={() => setShowForgot(true)} className="text-xs font-semibold hover:underline" style={{ color: theme.primary }}>Forgot password?</button>
+              <button type="button" onClick={() => setShowForgot(true)} className="text-xs font-semibold hover:underline" style={{ color: theme.primary }}>{t('auth.forgot')}</button>
             </div>
             <button type="submit" disabled={loading}
               className="w-full py-3 rounded-xl font-bold text-sm transition-all hover:opacity-90 disabled:opacity-50"
               style={{ background: theme.primary, color: '#fff' }}>
-              {loading ? 'Signing in…' : 'Sign In'}
+              {loading ? 'Signing in…' : t('auth.signin')}
             </button>
           </form>
 
           <p className="text-center text-sm mt-6" style={{ color: theme.textMuted }}>
-            Don't have an account?{' '}
-            <Link to="/auth/signup" className="font-semibold hover:underline" style={{ color: theme.primary }}>Start free trial</Link>
+            {t('auth.noAccount')}{' '}
+            <Link to="/auth/signup" className="font-semibold hover:underline" style={{ color: theme.primary }}>{t('auth.signup')}</Link>
           </p>
         </div>
       </motion.div>

@@ -1,9 +1,328 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith('http'));
+
+function createDemoStore() {
+  const branchId = 'demo-branch';
+  const orgId = 'demo-org';
+  const now = new Date().toISOString();
+
+  return {
+    users: [
+      {
+        id: 'demo-admin',
+        email: 'demo@nutro.app',
+        password: 'demo1234',
+        full_name: 'Demo Admin',
+        role: 'admin',
+      },
+    ],
+    profiles: [
+      {
+        id: 'demo-admin',
+        email: 'demo@nutro.app',
+        full_name: 'Demo Admin',
+        avatar_url: null,
+        system_role: 'super_admin',
+        pin_hash: null,
+        theme_preference: 'ocean',
+        custom_accent_color: null,
+        created_at: now,
+      },
+    ],
+    organizations: [
+      {
+        id: orgId,
+        name: 'Le Maison Dubai',
+        slug: 'le-maison-dubai',
+        logo_url: null,
+        owner_id: 'demo-admin',
+        plan: 'premium',
+        plan_status: 'active',
+        trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        billing_email: 'demo@nutro.app',
+        referral_code: 'NUTRO7',
+        created_at: now,
+      },
+    ],
+    branches: [
+      {
+        id: branchId,
+        org_id: orgId,
+        name: 'Main Branch',
+        address: 'Downtown Dubai',
+        city: 'Dubai',
+        country: 'United Arab Emirates',
+        currency: 'AED',
+        timezone: 'Asia/Dubai',
+        is_active: true,
+        tablet_token: 'demo-tablet-token',
+        kds_pin: '1234',
+        pos_pin_hash: '1234',
+        created_at: now,
+      },
+    ],
+    orders: [
+      { id: 'ord-1', branch_id: branchId, table_id: 'table-1', order_number: '1042', order_type: 'dine_in', status: 'preparing', subtotal: 56.5, tax_amount: 2.83, discount_amount: 0, total_amount: 59.33, payment_method: 'card', payment_status: 'paid', notes: null, created_at: new Date().toISOString() },
+      { id: 'ord-2', branch_id: branchId, table_id: 'table-4', order_number: '1043', order_type: 'takeaway', status: 'ready', subtotal: 37.0, tax_amount: 1.85, discount_amount: 0, total_amount: 38.85, payment_method: 'cash', payment_status: 'paid', notes: 'Pack well', created_at: new Date(Date.now() - 20 * 60 * 1000).toISOString() },
+    ],
+    restaurant_tables: [
+      { id: 'table-1', branch_id: branchId, status: 'occupied' },
+      { id: 'table-2', branch_id: branchId, status: 'available' },
+      { id: 'table-3', branch_id: branchId, status: 'reserved' },
+      { id: 'table-4', branch_id: branchId, status: 'occupied' },
+    ],
+    session: null as Record<string, unknown> | null,
+  };
+}
+
+function createMockSupabaseClient() {
+  const STORAGE_KEY = 'nutro-demo-store';
+
+  const getDefaultStore = () => createDemoStore();
+  const readStore = () => {
+    if (typeof window === 'undefined') return getDefaultStore();
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        const seeded = getDefaultStore();
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded));
+        return seeded;
+      }
+      return JSON.parse(raw) as ReturnType<typeof getDefaultStore>;
+    } catch {
+      return getDefaultStore();
+    }
+  };
+
+  const writeStore = (store: ReturnType<typeof getDefaultStore>) => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    }
+  };
+
+  const notifyAuthChange = () => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('nutro-auth-change'));
+    }
+  };
+
+  const auth = {
+    getSession: async () => {
+      const store = readStore();
+      return { data: { session: store.session ?? null } };
+    },
+    onAuthStateChange: (callback: (event: string, session: Record<string, unknown> | null) => void) => {
+      const listener = () => callback('SIGNED_IN', readStore().session ?? null);
+      if (typeof window !== 'undefined') {
+        window.addEventListener('nutro-auth-change', listener);
+      }
+      return { data: { subscription: { unsubscribe: () => { if (typeof window !== 'undefined') window.removeEventListener('nutro-auth-change', listener); } } } };
+    },
+    signInWithPassword: async ({ email, password }: { email: string; password: string }) => {
+      const store = readStore();
+      const user = store.users.find((entry) => entry.email === email && entry.password === password);
+      if (!user) {
+        return { data: { user: null, session: null }, error: { message: 'Invalid email or password' } };
+      }
+      const session = {
+        access_token: `demo-${user.id}`,
+        token_type: 'bearer',
+        user: {
+          id: user.id,
+          email: user.email,
+          user_metadata: { full_name: user.full_name },
+        },
+      };
+      store.session = session;
+      writeStore(store);
+      notifyAuthChange();
+      return { data: { user: session.user, session }, error: null };
+    },
+    signUp: async ({ email, password, options }: { email: string; password: string; options?: { data?: Record<string, unknown> } }) => {
+      const store = readStore();
+      const exists = store.users.some((entry) => entry.email === email);
+      if (exists) {
+        return { data: { user: null, session: null }, error: { message: 'An account already exists for this email.' } };
+      }
+      const userId = `user-${Date.now()}`;
+      const fullName = String(options?.data?.full_name ?? 'New User');
+      const user = { id: userId, email, password, full_name: fullName, role: 'admin' };
+      store.users.push(user);
+      store.profiles.push({
+        id: userId,
+        email,
+        full_name: fullName,
+        avatar_url: null,
+        system_role: 'user',
+        pin_hash: null,
+        theme_preference: 'ocean',
+        custom_accent_color: null,
+        created_at: new Date().toISOString(),
+      });
+      const session = {
+        access_token: `demo-${userId}`,
+        token_type: 'bearer',
+        user: { id: userId, email, user_metadata: { full_name: fullName } },
+      };
+      store.session = session;
+      writeStore(store);
+      notifyAuthChange();
+      return { data: { user: session.user, session }, error: null };
+    },
+    signOut: async () => {
+      const store = readStore();
+      store.session = null;
+      writeStore(store);
+      notifyAuthChange();
+    },
+  };
+
+  const runQuery = (table: string, filters: Array<[string, unknown]>, orderBy: { field: string; ascending: boolean } | null, limitValue: number | null) => {
+    const store = readStore();
+    const items = (store as Record<string, unknown>)[table] as Array<Record<string, unknown>> | undefined;
+    if (!Array.isArray(items)) return [];
+
+    const data = items.filter((item) => filters.every(([field, value]) => item[field] === value));
+    if (orderBy) {
+      data.sort((a, b) => {
+        const aValue = a[orderBy.field];
+        const bValue = b[orderBy.field];
+        if (aValue === bValue) return 0;
+        const comparison = aValue < bValue ? -1 : 1;
+        return orderBy.ascending ? comparison : -comparison;
+      });
+    }
+    return limitValue !== null ? data.slice(0, limitValue) : data;
+  };
+
+  const from = (table: string) => {
+    const builder: Record<string, unknown> = {};
+    const state = { filters: [] as Array<[string, unknown]>, orderBy: null as { field: string; ascending: boolean } | null, limitValue: null as number | null };
+
+    const computeData = () => runQuery(table, state.filters, state.orderBy, state.limitValue);
+
+    builder.select = () => builder;
+    builder.eq = (field: string, value: unknown) => {
+      state.filters.push([field, value]);
+      return builder;
+    };
+    builder.order = (field: string, options?: { ascending?: boolean }) => {
+      state.orderBy = { field, ascending: options?.ascending ?? true };
+      return builder;
+    };
+    builder.limit = (value: number) => {
+      state.limitValue = value;
+      return builder;
+    };
+    builder.maybeSingle = async () => {
+      const data = computeData()[0] ?? null;
+      return { data };
+    };
+    Object.defineProperty(builder, 'data', {
+      get: () => computeData(),
+    });
+
+    return builder as {
+      data: Array<Record<string, unknown>>;
+      select: () => unknown;
+      eq: (field: string, value: unknown) => unknown;
+      order: (field: string, options?: { ascending?: boolean }) => unknown;
+      limit: (value: number) => unknown;
+      maybeSingle: () => Promise<{ data: Record<string, unknown> | null }>;
+    };
+  };
+
+  const rpc = async (name: string, params?: Record<string, unknown>) => {
+    const store = readStore();
+    if (name === 'get_user_org_context') {
+      const currentUser = store.session?.user as { id?: string; email?: string } | undefined;
+      const profile = store.profiles.find((entry) => entry.id === currentUser?.id) ?? null;
+      const organization = store.organizations[0];
+      const branch = store.branches[0];
+      return {
+        data: {
+          org_id: organization?.id ?? 'demo-org',
+          org_name: organization?.name ?? 'Le Maison Dubai',
+          plan: organization?.plan ?? 'premium',
+          plan_status: organization?.plan_status ?? 'active',
+          trial_ends_at: organization?.trial_ends_at ?? null,
+          branch_id: branch?.id ?? 'demo-branch',
+          branch_name: branch?.name ?? 'Main Branch',
+          currency: branch?.currency ?? 'AED',
+          country: branch?.country ?? 'United Arab Emirates',
+          city: branch?.city ?? 'Dubai',
+          role: profile?.system_role ?? 'user',
+          permissions: { menu: ['read', 'write'], orders: ['read', 'write'], reports: ['read'] },
+        },
+        error: null,
+      };
+    }
+
+    if (name === 'create_tenant') {
+      const orgName = String(params?.p_org_name ?? 'Demo Org');
+      const branchName = String(params?.p_branch_name ?? 'Main Branch');
+      const existingOrg = store.organizations[0];
+      if (!existingOrg) {
+        store.organizations.unshift({
+          id: 'demo-org',
+          name: orgName,
+          slug: orgName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          logo_url: null,
+          owner_id: store.session?.user?.id ?? 'demo-admin',
+          plan: String(params?.p_plan ?? 'premium'),
+          plan_status: 'active',
+          trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          billing_email: String(params?.p_billing_email ?? 'demo@nutro.app'),
+          referral_code: 'NUTRO7',
+          created_at: new Date().toISOString(),
+        });
+      }
+      if (!store.branches.find((branch) => branch.name === branchName)) {
+        store.branches.push({
+          id: `branch-${Date.now()}`,
+          org_id: store.organizations[0]?.id ?? 'demo-org',
+          name: branchName,
+          address: null,
+          city: params?.p_city ? String(params.p_city) : null,
+          country: params?.p_country ? String(params.p_country) : null,
+          currency: params?.p_currency ? String(params.p_currency) : 'USD',
+          timezone: 'UTC',
+          is_active: true,
+          tablet_token: null,
+          kds_pin: '1234',
+          pos_pin_hash: null,
+          created_at: new Date().toISOString(),
+        });
+      }
+      writeStore(store);
+      return { data: true, error: null };
+    }
+
+    return { data: null, error: null };
+  };
+
+  const storage = {
+    from: (bucket: string) => ({
+      upload: async (path: string, file: File) => {
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(`nutro:${bucket}:${path}`, JSON.stringify({ name: file.name, type: file.type, size: file.size }));
+        }
+        return { error: null };
+      },
+      getPublicUrl: (path: string) => ({ data: { publicUrl: `https://demo.local/${bucket}/${path}` } }),
+    }),
+  };
+
+  return { auth, from, rpc, storage };
+}
+
+const supabaseClient = isSupabaseConfigured ? createClient(supabaseUrl!, supabaseAnonKey!) : createMockSupabaseClient();
+
+export const supabase = supabaseClient;
 
 export type SystemRole = 'super_admin' | 'sales_rep' | 'accountant' | 'user';
 export type OrgRole = 'org_owner' | 'branch_manager' | 'cashier' | 'kitchen_staff' | 'accountant' | 'custom';
