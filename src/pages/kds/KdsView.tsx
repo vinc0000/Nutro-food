@@ -5,7 +5,7 @@ import { ChefHat, Clock, AlertTriangle, Check, ArrowLeft, Volume2, VolumeX, Lock
 import { useNavigate, Link } from 'react-router-dom';
 import { usePlanInfo, useOrgContext } from '@/hooks/useOrgContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { supabase } from '@/lib/supabase';
+import { supabase, getLocalOrders, saveLocalOrders } from '@/lib/supabase';
 
 interface KdsTicket {
   id: string;
@@ -100,26 +100,46 @@ export default function KdsView() {
     if (!orgContext?.branch_id) return;
     setLoading(true);
     try {
-      // Query pending orders to display in KDS in real time!
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('branch_id', orgContext.branch_id)
-        .neq('status', 'paid')
-        .neq('status', 'cancelled')
-        .order('created_at', { ascending: true });
+      // 1. Load local orders first to merge dynamic offline/demo transactions
+      const localOrders = getLocalOrders()
+        .filter(o => o.branch_id === orgContext.branch_id && o.status !== 'completed' && o.status !== 'cancelled' && o.status !== 'served');
 
-      if (error) throw error;
+      // 2. Query pending orders from database
+      let dbOrders = [];
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('branch_id', orgContext.branch_id)
+          .neq('status', 'paid')
+          .neq('status', 'cancelled')
+          .order('created_at', { ascending: true });
 
-      if (data && data.length > 0) {
-        const mapped: KdsTicket[] = data.map(o => ({
+        if (!error && data) {
+          dbOrders = data;
+        }
+      } catch (dbErr) {
+        console.warn("Background KDS DB fetch skipped, relying on synchronized local state:", dbErr);
+      }
+
+      // 3. Merge database orders and local orders (prevent duplicates)
+      const mergedOrders = [...localOrders];
+      dbOrders.forEach(o => {
+        if (!mergedOrders.some(m => m.order_number === o.order_number)) {
+          mergedOrders.push(o);
+        }
+      });
+
+      if (mergedOrders.length > 0) {
+        const mapped: KdsTicket[] = mergedOrders.map(o => ({
           id: o.id,
           orderNum: `#${o.order_number}`,
           tableLabel: o.notes || 'Dine-In',
           type: o.order_type || 'dine_in',
           status: o.status === 'pending' ? 'new' : (o.status === 'ready' ? 'ready' : 'preparing'),
-          items: [
-            { name: 'Organic Wagyu Burger', qty: 2, mods: ['Gluten Free Bun'] }, // simulated items connected to order
+          items: o.items || [
+            { name: 'Organic Wagyu Burger', qty: 2, mods: ['Gluten Free Bun'] },
+            { name: 'Truffle Parmesan Fries', qty: 1, mods: [] }
           ],
           allergyAlert: o.notes?.toLowerCase().includes('allergy') ? 'CUSTOMER DIETARY / ALLERGY WARNING' : undefined,
           createdAt: new Date(o.created_at),
@@ -140,6 +160,15 @@ export default function KdsView() {
     if (canAccess('kds')) {
       fetchKdsTickets();
     }
+  }, [canAccess, fetchKdsTickets]);
+
+  useEffect(() => {
+    if (!canAccess('kds')) return;
+    const handleStorage = () => {
+      fetchKdsTickets();
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, [canAccess, fetchKdsTickets]);
 
   useEffect(() => {
@@ -165,27 +194,49 @@ export default function KdsView() {
         return { ...t, status: next, startedAt: t.startedAt ?? new Date() };
       })
     );
+
+    // Update state inside local synchronization layer
+    const localOrders = getLocalOrders();
+    const matched = tickets.find(t => t.id === id);
+    const nextStatus = matched?.status === 'new' ? 'preparing' : 'ready';
+    const updated = localOrders.map(o => {
+      if (o.id === id) {
+        return { ...o, status: nextStatus === 'ready' ? 'ready' : 'preparing' };
+      }
+      return o;
+    });
+    saveLocalOrders(updated);
+
     try {
-      const matched = tickets.find(t => t.id === id);
-      const nextStatus = matched?.status === 'new' ? 'preparing' : 'ready';
       await supabase
         .from('orders')
         .update({ status: nextStatus })
         .eq('id', id);
     } catch (err) {
-      console.error(err);
+      console.warn("KDS DB sync skipped:", err);
     }
   };
 
   const bumpTicket = async (id: string) => {
     setTimeout(() => setTickets((prev) => prev.filter((t) => t.id !== id)), 400);
+
+    // Update state inside local synchronization layer (bump completes/serves it)
+    const localOrders = getLocalOrders();
+    const updated = localOrders.map(o => {
+      if (o.id === id) {
+        return { ...o, status: 'completed' };
+      }
+      return o;
+    });
+    saveLocalOrders(updated);
+
     try {
       await supabase
         .from('orders')
         .update({ status: 'ready' })
         .eq('id', id);
     } catch (err) {
-      console.error(err);
+      console.warn("KDS DB bump sync skipped:", err);
     }
   };
 

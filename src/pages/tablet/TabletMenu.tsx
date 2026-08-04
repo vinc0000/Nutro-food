@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSearchParams } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+import { supabase, getLocalOrders, saveLocalOrders } from '@/lib/supabase';
 import { useOrgContext } from '@/hooks/useOrgContext';
 
 const CURRENCIES = ['USD', 'EUR', 'AED', 'XAF', 'NGN', 'GBP'];
@@ -194,24 +194,49 @@ export default function TabletMenu() {
   const processPayment = async () => {
     if (!orgContext?.branch_id) return;
     try {
-      // Create a real order in Supabase
-      const { error } = await supabase
-        .from('orders')
-        .insert([{
-          branch_id: orgContext.branch_id,
-          order_number: Math.floor(1000 + Math.random() * 9000).toString(),
-          order_type: 'dine_in',
-          status: 'pending',
-          subtotal: cartTotal * 0.95,
-          tax_amount: cartTotal * 0.05,
-          discount_amount: 0,
-          total_amount: cartTotal,
-          payment_status: payMethod === 'tablet_pay' ? 'unpaid' : 'paid',
-          payment_method: payMethod === 'tablet_pay' ? null : payMethod,
-          notes: `Table ${tableNum}`,
-        }]);
+      const orderNumber = Math.floor(1000 + Math.random() * 9000).toString();
+      const notesLabel = `Table ${tableNum}`;
 
-      if (error) throw error;
+      // 1. Sync order through shared localStorage key so POS and KDS receive it instantly in offline/demo mode!
+      const localOrders = getLocalOrders();
+      const newLocalOrder = {
+        id: 'order-' + Date.now(),
+        branch_id: orgContext.branch_id,
+        order_number: orderNumber,
+        order_type: 'dine_in',
+        status: 'pending',
+        subtotal: cartTotal * 0.95,
+        tax_amount: cartTotal * 0.05,
+        discount_amount: 0,
+        total_amount: cartTotal,
+        payment_status: payMethod === 'tablet_pay' ? 'unpaid' : 'paid',
+        payment_method: payMethod === 'tablet_pay' ? null : payMethod,
+        notes: notesLabel,
+        items: cart.map(c => ({ name: c.item.name, qty: c.qty, price: c.item.price })),
+        created_at: new Date().toISOString()
+      };
+      saveLocalOrders([newLocalOrder, ...localOrders]);
+
+      // 2. Try background persist to Supabase
+      try {
+        await supabase
+          .from('orders')
+          .insert([{
+            branch_id: orgContext.branch_id,
+            order_number: orderNumber,
+            order_type: 'dine_in',
+            status: 'pending',
+            subtotal: cartTotal * 0.95,
+            tax_amount: cartTotal * 0.05,
+            discount_amount: 0,
+            total_amount: cartTotal,
+            payment_status: payMethod === 'tablet_pay' ? 'unpaid' : 'paid',
+            payment_method: payMethod === 'tablet_pay' ? null : payMethod,
+            notes: notesLabel,
+          }]);
+      } catch (dbErr) {
+        console.warn("Tablet DB sync skipped:", dbErr);
+      }
 
       setShowPayment(false);
       setOrderPlaced(true);

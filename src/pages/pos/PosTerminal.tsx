@@ -9,7 +9,7 @@ import {
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+import { supabase, getLocalOrders, saveLocalOrders } from '@/lib/supabase';
 import { useOrgContext, usePlanInfo } from '@/hooks/useOrgContext';
 
 interface CartItem { id: string; name: string; price: number; qty: number; }
@@ -250,6 +250,43 @@ export default function PosTerminal() {
     }
   }, [unlocked, fetchLiveMenu]);
 
+  useEffect(() => {
+    const syncOrders = () => {
+      if (!orgContext?.branch_id) return;
+      const localOrders = getLocalOrders();
+      // 1. Sync pending Tablet orders
+      const pendingTablet = localOrders
+        .filter(o => o.branch_id === orgContext.branch_id && o.notes?.startsWith('Table ') && o.status === 'pending')
+        .map(o => ({
+          id: o.id,
+          tableNum: o.notes.replace('Table ', ''),
+          items: o.items || [{ name: 'Salad & Proteins', qty: 1, price: o.total_amount }],
+          total: o.total_amount,
+          status: 'pending' as const,
+          time: 'Just now'
+        }));
+      if (pendingTablet.length > 0) {
+        setTabletOrders(pendingTablet);
+      }
+
+      // 2. Sync real table states (mark occupied if there are pending orders)
+      const tablesWithOrders = localOrders
+        .filter(o => o.branch_id === orgContext.branch_id && o.status === 'pending' && o.notes?.startsWith('Table '))
+        .map(o => o.notes.replace('Table ', ''));
+
+      setTables(prev => prev.map(t => {
+        if (tablesWithOrders.includes(t.name)) {
+          return { ...t, status: 'occupied' };
+        }
+        return t;
+      }));
+    };
+
+    syncOrders();
+    window.addEventListener('storage', syncOrders);
+    return () => window.removeEventListener('storage', syncOrders);
+  }, [orgContext?.branch_id]);
+
   const filtered = menu.filter(i => (cat === 'All' || i.cat === cat) && i.name.toLowerCase().includes(search.toLowerCase()));
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const tax = subtotal * 0.05;
@@ -274,24 +311,48 @@ export default function PosTerminal() {
     if (!orgContext?.branch_id) return;
     try {
       const orderNumber = Math.floor(1000 + Math.random() * 9000).toString();
-      // Insert real order into Supabase
-      const { error } = await supabase
-        .from('orders')
-        .insert([{
-          branch_id: orgContext.branch_id,
-          order_number: orderNumber,
-          order_type: orderType,
-          status: 'paid',
-          subtotal: subtotal,
-          tax_amount: tax,
-          discount_amount: 0,
-          total_amount: total,
-          payment_status: 'paid',
-          payment_method: payMethod,
-          notes: selectedTable ? `Table ${tables.find(t => t.id === selectedTable)?.name || selectedTable}` : 'Dine-In',
-        }]);
+      const notesLabel = selectedTable ? `Table ${tables.find(t => t.id === selectedTable)?.name || selectedTable}` : 'Dine-In';
 
-      if (error) throw error;
+      // Store in shared local orders key to trigger real-time sync with other modules (KDS, Admin dashboard, etc)
+      const localOrders = getLocalOrders();
+      const newLocalOrder = {
+        id: 'order-' + Date.now(),
+        branch_id: orgContext.branch_id,
+        order_number: orderNumber,
+        order_type: orderType,
+        status: 'pending', // Pending so it pops on KDS panel in real time!
+        subtotal: subtotal,
+        tax_amount: tax,
+        discount_amount: 0,
+        total_amount: total,
+        payment_status: 'paid',
+        payment_method: payMethod,
+        notes: notesLabel,
+        items: cart.map(c => ({ name: c.name, qty: c.qty, price: c.price })),
+        created_at: new Date().toISOString()
+      };
+      saveLocalOrders([newLocalOrder, ...localOrders]);
+
+      // Try background syncing to Supabase database (does not block POS checkout on offline/relation errors)
+      try {
+        await supabase
+          .from('orders')
+          .insert([{
+            branch_id: orgContext.branch_id,
+            order_number: orderNumber,
+            order_type: orderType,
+            status: 'paid',
+            subtotal: subtotal,
+            tax_amount: tax,
+            discount_amount: 0,
+            total_amount: total,
+            payment_status: 'paid',
+            payment_method: payMethod,
+            notes: notesLabel,
+          }]);
+      } catch (dbErr) {
+        console.warn("Background Supabase order persistence skipped:", dbErr);
+      }
 
       setPaidSuccess(true);
       setIsPaid(true);

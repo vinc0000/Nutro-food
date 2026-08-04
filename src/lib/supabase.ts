@@ -105,3 +105,22 @@ export interface Order {
   notes: string | null;
   created_at: string;
 }
+
+// Shared Local Offline Synchronization Helpers
+export const getLocalOrders = (): any[] => {
+  try {
+    const raw = localStorage.getItem('nutro_orders');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const saveLocalOrders = (orders: any[]) => {
+  try {
+    localStorage.setItem('nutro_orders', JSON.stringify(orders));
+    window.dispatchEvent(new Event('storage'));
+  } catch (err) {
+    console.error('Error saving local orders:', err);
+  }
+};
