@@ -1,15 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Check, Eye, X, Printer } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
-
-const ORDERS = [
-  { id: '#1042', table: 'Table 4', type: 'dine_in', items: 3, total: 87.50, status: 'preparing', payment: 'unpaid', time: '12:34' },
-  { id: '#1041', table: 'Table 7', type: 'dine_in', items: 5, total: 142.00, status: 'ready', payment: 'unpaid', time: '12:28' },
-  { id: '#1040', table: 'Takeaway', type: 'takeaway', items: 2, total: 34.00, status: 'paid', payment: 'paid', time: '12:20' },
-  { id: '#1039', table: 'Table 2', type: 'dine_in', items: 4, total: 96.00, status: 'paid', payment: 'paid', time: '12:10' },
-  { id: '#1038', table: 'Table 9', type: 'dine_in', items: 6, total: 210.00, status: 'served', payment: 'paid', time: '11:55' },
-];
+import { useSharedOrders } from '@/lib/ordersStore';
 
 const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
   preparing: { bg: '#3b82f620', text: '#3b82f6', label: 'Preparing' },
@@ -20,20 +13,23 @@ const statusConfig: Record<string, { bg: string; text: string; label: string }> 
 
 export default function AdminOrders() {
   const { theme } = useTheme();
+  const { orders, updateOrder } = useSharedOrders();
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [orders, setOrders] = useState(ORDERS);
-  const [viewOrder, setViewOrder] = useState<typeof ORDERS[0] | null>(null);
+  const [viewOrder, setViewOrder] = useState<(typeof orders)[number] | null>(null);
 
-  const filtered = orders.filter(o =>
+  const filtered = useMemo(() => orders.filter(o =>
     (filterStatus === 'all' || o.status === filterStatus) &&
-    (o.id.includes(search) || o.table.toLowerCase().includes(search.toLowerCase()))
-  );
+    (o.orderNumber.includes(search) || o.tableLabel.toLowerCase().includes(search.toLowerCase()))
+  ), [filterStatus, orders, search]);
 
-  const totals = { revenue: orders.filter(o => o.payment === 'paid').reduce((s, o) => s + o.total, 0), count: orders.length };
+  const totals = useMemo(() => ({
+    revenue: orders.filter(o => o.payment === 'paid').reduce((s, o) => s + o.total, 0),
+    count: orders.length,
+  }), [orders]);
 
   const markAsPaid = (id: string) => {
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'paid', payment: 'paid' } : o));
+    updateOrder(id, order => ({ ...order, status: 'paid', payment: 'paid', updatedAt: new Date().toISOString() }));
   };
 
   return (
@@ -62,7 +58,7 @@ export default function AdminOrders() {
             style={{ background: theme.surface, color: theme.text, border: `1px solid ${theme.border}` }} />
         </div>
         <div className="flex gap-1 flex-wrap">
-          {['all', 'preparing', 'ready', 'paid'].map(s => (
+          {['all', 'pending', 'preparing', 'ready', 'paid'].map(s => (
             <button key={s} onClick={() => setFilterStatus(s)}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all"
               style={{ background: filterStatus === s ? theme.primary : theme.surface, color: filterStatus === s ? '#fff' : theme.textMuted, border: `1px solid ${filterStatus === s ? theme.primary : theme.border}` }}>
@@ -80,14 +76,14 @@ export default function AdminOrders() {
           <tbody>
             {filtered.map(o => (
               <tr key={o.id}>
-                <td><span className="font-mono text-sm font-bold" style={{ color: theme.primary }}>{o.id}</span></td>
-                <td><span className="text-sm">{o.table}</span></td>
+                <td><span className="font-mono text-sm font-bold" style={{ color: theme.primary }}>{o.orderNumber}</span></td>
+                <td><span className="text-sm">{o.tableLabel}</span></td>
                 <td><span className="text-xs px-2 py-0.5 rounded-full font-semibold capitalize" style={{ background: theme.bg, color: theme.textMuted }}>{o.type.replace('_', ' ')}</span></td>
-                <td><span className="text-sm">{o.items}</span></td>
+                <td><span className="text-sm">{o.items.reduce((sum, item) => sum + item.qty, 0)}</span></td>
                 <td><span className="text-sm font-semibold">${o.total.toFixed(2)}</span></td>
                 <td><span className="badge text-[10px]" style={{ background: statusConfig[o.status]?.bg, color: statusConfig[o.status]?.text }}>{statusConfig[o.status]?.label}</span></td>
                 <td><span className="badge text-[10px]" style={{ background: o.payment === 'paid' ? '#22c55e20' : '#eab30820', color: o.payment === 'paid' ? '#22c55e' : '#eab308' }}>{o.payment}</span></td>
-                <td><span className="text-xs" style={{ color: theme.textMuted }}>{o.time}</span></td>
+                <td><span className="text-xs" style={{ color: theme.textMuted }}>{new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></td>
                 <td>
                   <div className="flex items-center gap-1">
                     <button onClick={() => setViewOrder(o)} title="View details" className="p-1.5 rounded-lg hover:opacity-70" style={{ color: theme.textMuted }}><Eye size={13} /></button>
@@ -110,18 +106,18 @@ export default function AdminOrders() {
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
               className="w-full max-w-sm rounded-2xl p-6" style={{ background: theme.surface, border: `1px solid ${theme.border}` }} onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-extrabold" style={{ color: theme.text }}>Order {viewOrder.id}</h2>
+                <h2 className="text-lg font-extrabold" style={{ color: theme.text }}>Order {viewOrder.orderNumber}</h2>
                 <button onClick={() => setViewOrder(null)} style={{ color: theme.textMuted }}><X size={18} /></button>
               </div>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between p-3 rounded-xl" style={{ background: theme.bg }}>
-                  <span style={{ color: theme.textMuted }}>Location</span><span className="font-bold" style={{ color: theme.text }}>{viewOrder.table}</span>
+                  <span style={{ color: theme.textMuted }}>Location</span><span className="font-bold" style={{ color: theme.text }}>{viewOrder.tableLabel}</span>
                 </div>
                 <div className="flex justify-between p-3 rounded-xl" style={{ background: theme.bg }}>
                   <span style={{ color: theme.textMuted }}>Type</span><span className="font-bold capitalize" style={{ color: theme.text }}>{viewOrder.type.replace('_', ' ')}</span>
                 </div>
                 <div className="flex justify-between p-3 rounded-xl" style={{ background: theme.bg }}>
-                  <span style={{ color: theme.textMuted }}>Items</span><span className="font-bold" style={{ color: theme.text }}>{viewOrder.items}</span>
+                  <span style={{ color: theme.textMuted }}>Items</span><span className="font-bold" style={{ color: theme.text }}>{viewOrder.items.reduce((sum, item) => sum + item.qty, 0)}</span>
                 </div>
                 <div className="flex justify-between p-3 rounded-xl" style={{ background: theme.bg }}>
                   <span style={{ color: theme.textMuted }}>Total</span><span className="font-extrabold" style={{ color: theme.primary }}>${viewOrder.total.toFixed(2)}</span>
@@ -135,7 +131,7 @@ export default function AdminOrders() {
                   <span className="badge text-[10px]" style={{ background: viewOrder.payment === 'paid' ? '#22c55e20' : '#eab30820', color: viewOrder.payment === 'paid' ? '#22c55e' : '#eab308' }}>{viewOrder.payment}</span>
                 </div>
                 <div className="flex justify-between p-3 rounded-xl" style={{ background: theme.bg }}>
-                  <span style={{ color: theme.textMuted }}>Time</span><span className="font-bold" style={{ color: theme.text }}>{viewOrder.time}</span>
+                  <span style={{ color: theme.textMuted }}>Time</span><span className="font-bold" style={{ color: theme.text }}>{new Date(viewOrder.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
               </div>
               <div className="flex gap-3 mt-5">
