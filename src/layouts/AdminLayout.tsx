@@ -15,10 +15,10 @@ import { CURRENCIES, LANGUAGES } from '@/lib/countries';
 
 const NAV = [
   { to: '/app/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/app/tablet', icon: Tablet, label: 'Interactive Tablet Menu', external: true },
+  { to: '/app/tablet', icon: Tablet, label: 'Interactive Tablet Menu' },
   { to: '/app/admin/menu', icon: UtensilsCrossed, label: 'Menu & Recipe Manager' },
-  { to: '/app/pos', icon: Monitor, label: 'POS Terminal', external: true },
-  { to: '/app/kds', icon: ChefHat, label: 'KDS Kitchen Screen', external: true },
+  { to: '/app/pos', icon: Monitor, label: 'POS Terminal' },
+  { to: '/app/kds', icon: ChefHat, label: 'KDS Kitchen Screen' },
   { to: '/app/admin/reports', icon: FileBarChart, label: 'Reports & Analytics' },
   { to: '/app/admin/staff', icon: Users, label: 'Staff & Access Control' },
   { to: '/app/admin/settings', icon: Settings, label: 'Restaurant Settings' },
@@ -64,24 +64,15 @@ export default function AdminLayout() {
         </button>
       </div>
       <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
-        {NAV.map(item =>
-          item.external ? (
-            <a key={item.to} href={item.to} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-80"
-              style={{ color: theme.textMuted }} title={collapsed ? item.label : undefined}>
-              <item.icon size={17} className="flex-shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
-            </a>
-          ) : (
-            <NavLink key={item.to} to={item.to} end={item.end}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all"
-              style={({ isActive }) => navLinkStyle(isActive)} title={collapsed ? item.label : undefined}
-              onClick={() => setMobileOpen(false)}>
-              <item.icon size={17} className="flex-shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
-            </NavLink>
-          )
-        )}
+        {NAV.map(item => (
+          <NavLink key={item.to} to={item.to} end={item.end}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all"
+            style={({ isActive }) => navLinkStyle(isActive)} title={collapsed ? item.label : undefined}
+            onClick={() => setMobileOpen(false)}>
+            <item.icon size={17} className="flex-shrink-0" />
+            {!collapsed && <span>{item.label}</span>}
+          </NavLink>
+        ))}
         {isWhitelisted && (
           <>
             <div className="pt-4 pb-2 px-3" style={{ borderTop: `1px solid ${theme.border}`, marginTop: 8 }}>
