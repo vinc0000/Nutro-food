@@ -70,12 +70,13 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { action, plan, billing_period, tx_ref, transaction_id } = body as {
+    const { action, plan, billing_period, tx_ref, transaction_id, tenant_org_id } = body as {
       action?: string;
       plan?: string;
       billing_period?: string;
       tx_ref?: string;
       transaction_id?: string;
+      tenant_org_id?: string;
     };
 
     const orgData = await getOrgContext(supabase, userData.user.id);
@@ -89,6 +90,13 @@ Deno.serve(async (req: Request) => {
     const orgId = orgData.org;
     const orgName = orgData.org_name || userData.user.email || "Nutro tenant";
     const billingEmail = orgData.billing_email || userData.user.email;
+
+    if (tenant_org_id && tenant_org_id !== orgId) {
+      return new Response(JSON.stringify({ error: "Tenant mismatch for this subscription request" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (action === "initialize") {
       const normalizedPlan = plan?.toLowerCase();
@@ -190,8 +198,8 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "verify") {
-      const verificationTxRef = tx_ref ?? null;
-      const verificationTransactionId = transaction_id ?? null;
+      const verificationTxRef = typeof tx_ref === "string" ? tx_ref : null;
+      const verificationTransactionId = typeof transaction_id === "string" ? transaction_id : null;
       if (!verificationTxRef && !verificationTransactionId) {
         return new Response(JSON.stringify({ error: "Missing payment reference" }), {
           status: 400,
@@ -214,7 +222,9 @@ Deno.serve(async (req: Request) => {
 
       const verifyUrl = verificationTransactionId
         ? `https://api.flutterwave.com/v3/transactions/${verificationTransactionId}/verify`
-        : `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${encodeURIComponent(verificationTxRef)}`;
+        : verificationTxRef
+          ? `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${encodeURIComponent(verificationTxRef)}`
+          : "";
 
       const verifyResponse = await fetch(verifyUrl, {
         headers: { Authorization: `Bearer ${flwSecretKey}` },
@@ -225,11 +235,14 @@ Deno.serve(async (req: Request) => {
       if (isSuccessful) {
         const activePlan = (plan ?? verifyData.data?.meta?.plan ?? "starter").toLowerCase();
         const planStatusValue = "active";
-        const updateResult = await updateSubscriptionStatus(supabase, orgId, verificationTxRef, {
-          status: "successful",
-          flw_tx_id: verificationTransactionId?.toString() ?? verifyData.data?.id?.toString() ?? null,
-          paid_at: new Date().toISOString(),
-        });
+        const txRefToUpdate = verificationTxRef ?? verifyData.data?.tx_ref?.toString() ?? null;
+        const updateResult = txRefToUpdate
+          ? await updateSubscriptionStatus(supabase, orgId, txRefToUpdate, {
+              status: "successful",
+              flw_tx_id: verificationTransactionId?.toString() ?? verifyData.data?.id?.toString() ?? null,
+              paid_at: new Date().toISOString(),
+            })
+          : { error: null };
 
         if (updateResult.error) throw updateResult.error;
 

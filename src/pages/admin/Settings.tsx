@@ -273,12 +273,13 @@ function PosSecurityTab({ theme, showSaved }: { theme: ReturnType<typeof useThem
   const checkExistingPin = async () => {
     if (!branchId) return;
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('branches')
         .select('pos_pin_hash')
         .eq('id', branchId)
-        .maybeSingle();
-      setHasPin(!!data?.pos_pin_hash);
+        .maybeSingle<{ pos_pin_hash: string | null }>();
+      if (error) throw error;
+      setHasPin(Boolean(data?.pos_pin_hash));
     } catch {
       setHasPin(false);
     }
@@ -414,11 +415,13 @@ function PosSecurityTab({ theme, showSaved }: { theme: ReturnType<typeof useThem
 }
 
 function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['theme']; showSaved: (msg: string) => void }) {
-  const { plan, planStatus, isTrialActive, daysLeft } = usePlanInfo();
+  const { plan, planStatus, isTrialActive, daysLeft, refresh } = usePlanInfo();
   const { orgContext } = useOrgContext();
   const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'annual'>('monthly');
   const [paying, setPaying] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [latestTxRef, setLatestTxRef] = useState<string | null>(null);
 
   const PLANS = [
     { name: 'starter', label: 'Starter', price: 29, color: '#94a3b8', features: '10 tables, 3 staff, basic reports' },
@@ -441,6 +444,7 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
           action: 'initialize',
           plan: planName,
           billing_period: selectedPeriod,
+          tenant_org_id: orgContext?.org_id,
         }),
       });
       const result = await response.json();
@@ -448,9 +452,14 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
         setError(result.error);
         return;
       }
+      if (result.tx_ref) {
+        setLatestTxRef(result.tx_ref);
+      }
       if (result.payment_link) {
         window.open(result.payment_link, '_blank');
         showSaved('Redirecting to Flutterwave payment...');
+      } else if (result.demo_mode) {
+        showSaved('Demo billing flow accepted. Verification can be completed below.');
       } else {
         setError('Payment link not available. Flutterwave may not be configured yet.');
       }
@@ -458,6 +467,42 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
       setError(err instanceof Error ? err.message : 'Payment failed');
     } finally {
       setPaying(false);
+    }
+  };
+
+  const handleVerifyPayment = async () => {
+    if (!latestTxRef) {
+      setError('No pending payment was initialized for this tenant yet.');
+      return;
+    }
+
+    setError(null);
+    setVerifying(true);
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flutterwave-pay`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.session?.access_token}`,
+        },
+        body: JSON.stringify({
+          action: 'verify',
+          tx_ref: latestTxRef,
+          tenant_org_id: orgContext?.org_id,
+        }),
+      });
+      const result = await response.json();
+      if (result.status === 'successful') {
+        await refresh();
+        showSaved('Subscription confirmed for this tenant.');
+      } else {
+        setError(result.message || 'Payment verification could not be completed yet.');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Verification failed');
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -515,6 +560,17 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
         <div className="p-3 rounded-xl" style={{ background: '#ef444410', border: '1px solid #ef444430' }}>
           <span className="text-sm font-semibold" style={{ color: '#ef4444' }}>{error}</span>
         </div>
+      )}
+
+      {latestTxRef && (
+        <button
+          onClick={handleVerifyPayment}
+          disabled={verifying}
+          className="w-full py-2.5 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50"
+          style={{ background: theme.primary }}
+        >
+          {verifying ? 'Verifying payment...' : 'Verify payment after completion'}
+        </button>
       )}
 
       <div className="p-4 rounded-xl" style={{ background: theme.bg, border: `1px solid ${theme.border}` }}>
