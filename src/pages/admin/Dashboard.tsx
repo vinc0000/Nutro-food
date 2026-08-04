@@ -76,18 +76,23 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold" style={{ color: theme.text }}>
-            {new Date().getHours() < 12 ? t('dashboard.greetingMorning') : new Date().getHours() < 17 ? t('dashboard.greetingAfternoon') : t('dashboard.greetingEvening')}, {profile?.full_name?.split(' ')[0] ?? 'Chef'}
-          </h1>
-          <p className="text-sm mt-1" style={{ color: theme.textMuted }}>
-            {orgContext?.org_name ?? 'Your restaurant'} · {orgContext?.branch_name ?? 'Main Branch'}
-          </p>
+      <div className="rounded-3xl p-4 sm:p-5" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold mb-3" style={{ background: theme.primary + '14', color: theme.primary }}>
+              <ChefHat size={13} /> Vue d’ensemble du service
+            </div>
+            <h1 className="text-xl font-bold" style={{ color: theme.text }}>
+              {new Date().getHours() < 12 ? t('dashboard.greetingMorning') : new Date().getHours() < 17 ? t('dashboard.greetingAfternoon') : t('dashboard.greetingEvening')}, {profile?.full_name?.split(' ')[0] ?? 'Chef'}
+            </h1>
+            <p className="text-sm mt-1" style={{ color: theme.textMuted }}>
+              {orgContext?.org_name ?? 'Your restaurant'} · {orgContext?.branch_name ?? 'Main Branch'}
+            </p>
+          </div>
+          <Link to="/app/admin/menu" className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold text-white w-full sm:w-auto" style={{ background: theme.primary }}>
+            <Plus size={16} /> {t('dashboard.addMenu')}
+          </Link>
         </div>
-        <Link to="/app/admin/menu" className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>
-          <Plus size={16} /> {t('dashboard.addMenu')}
-        </Link>
       </div>
 
       {(isTrialActive || isTrialExpired) && (
@@ -107,7 +112,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {[
           { title: "Today's Revenue", value: loading ? '—' : formatCurrency(todayRevenue), icon: DollarSign, trend: 12, color: '#22c55e', delay: 0 },
           { title: "Today's Orders", value: loading ? '—' : todayOrders, icon: ShoppingBag, trend: 8, delay: 0.05 },
@@ -120,7 +125,7 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
           { label: t('dashboard.openPos'), desc: 'Start taking orders', to: '/app/pos', icon: Monitor, color: '#3b82f6', external: true },
           { label: t('dashboard.kds'), desc: 'View KDS board', to: '/app/kds', icon: ChefHat, color: '#f59e0b', external: true },
@@ -155,8 +160,8 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      <div className="grid lg:grid-cols-5 gap-6">
-        <div className="lg:col-span-3 rounded-2xl overflow-hidden" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
+      <div className="grid xl:grid-cols-5 gap-6">
+        <div className="xl:col-span-3 rounded-3xl overflow-hidden" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
           <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: `1px solid ${theme.border}` }}>
             <h2 className="font-bold" style={{ color: theme.text }}>{t('dashboard.recentOrders')}</h2>
             <Link to="/app/admin/orders" className="text-xs font-semibold flex items-center gap-1" style={{ color: theme.primary }}>{t('dashboard.viewAll')} <ArrowUpRight size={12} /></Link>
@@ -166,7 +171,8 @@ export default function AdminDashboard() {
           ) : orders.length === 0 ? (
             <div className="p-8 text-center text-sm" style={{ color: theme.textMuted }}>No orders yet. Start taking orders from the POS terminal.</div>
           ) : (
-            <table className="w-full data-table">
+            <div className="table-scroll">
+              <table className="w-full data-table">
               <thead><tr><th>Order</th><th>Type</th><th>Total</th><th>Status</th><th>Time</th></tr></thead>
               <tbody>
                 {orders.map(o => (
@@ -180,10 +186,11 @@ export default function AdminDashboard() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 
-        <div className="lg:col-span-2 rounded-2xl p-5" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
+        <div className="xl:col-span-2 rounded-3xl p-5" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
           <h2 className="font-bold mb-4" style={{ color: theme.text }}>Hourly Revenue</h2>
           <div className="h-36 flex items-end gap-1.5">
             {[80, 120, 200, 180, 320, 420, 380, 510, 480, 390, 280, 220].map((v, i) => {

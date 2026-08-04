@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLocale } from '@/contexts/LocaleContext';
 import { useNavigate } from 'react-router-dom';
 
 interface CartItem { id: string; name: string; price: number; qty: number; }
@@ -38,6 +39,7 @@ type PayMethod = 'cash' | 'card' | 'tap' | 'gift_card';
 
 function PinGuard({ onUnlock }: { onUnlock: () => void }) {
   const { theme } = useTheme();
+  const { t } = useLocale();
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
   const handleKey = (k: string) => {
@@ -55,8 +57,8 @@ function PinGuard({ onUnlock }: { onUnlock: () => void }) {
         <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: theme.primary }}>
           <Monitor size={26} color="#fff" />
         </div>
-        <h1 className="text-lg font-bold mb-1" style={{ color: theme.text }}>POS Terminal</h1>
-        <p className="text-sm mb-8" style={{ color: theme.textMuted }}>Enter your 4-digit PIN to continue</p>
+        <h1 className="text-lg font-bold mb-1" style={{ color: theme.text }}>{t('pos.title')}</h1>
+        <p className="text-sm mb-8" style={{ color: theme.textMuted }}>{t('pos.pinPrompt')}</p>
         <div className="flex justify-center gap-3 mb-6">
           {[0, 1, 2, 3].map(i => (
             <div key={i} className={`w-12 h-14 rounded-xl flex items-center justify-center text-2xl font-extrabold border-2 transition-all ${error ? 'animate-pulse' : ''}`}
@@ -75,13 +77,14 @@ function PinGuard({ onUnlock }: { onUnlock: () => void }) {
             </button>
           ))}
         </div>
-        <p className="text-xs mt-4" style={{ color: theme.textMuted }}>Demo PIN: 1234</p>
+        <p className="text-xs mt-4" style={{ color: theme.textMuted }}>{t('pos.demoPin')}</p>
       </motion.div>
     </div>
   );
 }
 
 function ManagerPinModal({ onClose, onApprove, theme }: { onClose: () => void; onApprove: () => void; theme: ReturnType<typeof useTheme>['theme'] }) {
+  const { t } = useLocale();
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
   const handleKey = (k: string) => {
@@ -101,8 +104,8 @@ function ManagerPinModal({ onClose, onApprove, theme }: { onClose: () => void; o
         <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ background: '#f59e0b20' }}>
           <Lock size={22} style={{ color: '#f59e0b' }} />
         </div>
-        <h2 className="text-lg font-extrabold mb-1" style={{ color: theme.text }}>Manager Approval</h2>
-        <p className="text-xs mb-5" style={{ color: theme.textMuted }}>Enter Manager PIN to authorize</p>
+        <h2 className="text-lg font-extrabold mb-1" style={{ color: theme.text }}>{t('pos.managerTitle')}</h2>
+        <p className="text-xs mb-5" style={{ color: theme.textMuted }}>{t('pos.managerPrompt')}</p>
         <div className="flex justify-center gap-2 mb-4">
           {[0, 1, 2, 3].map(i => (
             <div key={i} className={`w-10 h-12 rounded-lg flex items-center justify-center text-xl font-extrabold border-2 ${error ? 'animate-pulse' : ''}`}
@@ -121,7 +124,7 @@ function ManagerPinModal({ onClose, onApprove, theme }: { onClose: () => void; o
             </button>
           ))}
         </div>
-        <p className="text-[10px] mt-3" style={{ color: theme.textMuted }}>Demo Manager PIN: 9999</p>
+        <p className="text-[10px] mt-3" style={{ color: theme.textMuted }}>{t('pos.managerDemo')}</p>
       </motion.div>
     </motion.div>
   );
@@ -130,6 +133,7 @@ function ManagerPinModal({ onClose, onApprove, theme }: { onClose: () => void; o
 export default function PosTerminal() {
   const { theme } = useTheme();
   const { profile } = useAuth();
+  const { t } = useLocale();
   const navigate = useNavigate();
   const [unlocked, setUnlocked] = useState(false);
   const [cat, setCat] = useState('All');
@@ -211,32 +215,39 @@ export default function PosTerminal() {
   if (!unlocked) return <PinGuard onUnlock={() => setUnlocked(true)} />;
 
   return (
-    <div className="h-screen flex flex-col" style={{ background: theme.bg }}>
-      <header className="h-12 flex items-center justify-between px-4 flex-shrink-0" style={{ background: theme.surface, borderBottom: `1px solid ${theme.border}` }}>
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/app/admin')} className="p-1.5 rounded-lg hover:opacity-70" style={{ color: theme.textMuted }}><ArrowLeft size={16} /></button>
-          <Monitor size={16} style={{ color: theme.primary }} />
-          <span className="text-sm font-bold" style={{ color: theme.text }}>POS Terminal</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-xs" style={{ color: theme.textMuted }}>
-            <Clock size={12} /><span>{Math.floor((Date.now() - sessionStart.getTime()) / 60000)}m</span><span>· {orderCount} orders</span><span>· ${sessionSales.toFixed(2)}</span>
+    <div className="min-h-screen flex flex-col" style={{ background: theme.bg }}>
+      <header className="px-4 sm:px-6 py-3 flex-shrink-0" style={{ background: theme.surface, borderBottom: `1px solid ${theme.border}` }}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate('/app/admin')} className="p-1.5 rounded-lg hover:opacity-70" style={{ color: theme.textMuted }}><ArrowLeft size={16} /></button>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: theme.primary + '16' }}>
+              <Monitor size={16} style={{ color: theme.primary }} />
+            </div>
+            <div>
+              <div className="text-sm font-bold" style={{ color: theme.text }}>{t('pos.title')}</div>
+              <div className="text-[11px]" style={{ color: theme.textMuted }}>Cloud checkout • live floor control</div>
+            </div>
           </div>
-          <button onClick={() => setShowTabletOrders(true)} className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg relative" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>
-            <Tablet size={12} /> Tablet Orders
-            {pendingTabletOrders.length > 0 && <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ background: '#ef4444' }}>{pendingTabletOrders.length}</span>}
-          </button>
-          <button onClick={() => setShowZReport(true)} className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>
-            <FileText size={12} /> Z-Report
-          </button>
-          <span className="text-xs font-semibold" style={{ color: theme.primary }}>{profile?.full_name ?? 'Cashier'}</span>
-          <button onClick={() => setUnlocked(false)} className="text-xs px-2 py-1 rounded-lg" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Lock</button>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 text-xs rounded-full px-3 py-1.5" style={{ color: theme.textMuted, background: theme.bg, border: `1px solid ${theme.border}` }}>
+              <Clock size={12} /><span>{Math.floor((Date.now() - sessionStart.getTime()) / 60000)}{t('pos.minutes')}</span><span>· {orderCount} {t('common.orders')}</span><span>· ${sessionSales.toFixed(2)}</span>
+            </div>
+            <button onClick={() => setShowTabletOrders(true)} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-full relative" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>
+              <Tablet size={12} /> {t('pos.tabletOrders')}
+              {pendingTabletOrders.length > 0 && <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ background: '#ef4444' }}>{pendingTabletOrders.length}</span>}
+            </button>
+            <button onClick={() => setShowZReport(true)} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-full" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>
+              <FileText size={12} /> {t('pos.zReport')}
+            </button>
+            <span className="text-xs font-semibold px-2.5 py-1.5 rounded-full" style={{ color: theme.primary, background: theme.primary + '12' }}>{profile?.full_name ?? 'Cashier'}</span>
+            <button onClick={() => setUnlocked(false)} className="text-xs px-2.5 py-1.5 rounded-full" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>{t('pos.lock')}</button>
+          </div>
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="px-4 pt-3 pb-2 flex items-center gap-2 flex-wrap flex-shrink-0">
+      <div className="flex flex-1 overflow-hidden flex-col lg:flex-row">
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          <div className="px-4 sm:px-5 pt-3 pb-2 flex items-center gap-2 flex-wrap flex-shrink-0">
             {(['dine_in', 'takeaway', 'delivery'] as const).map(t => (
               <button key={t} onClick={() => setOrderType(t)}
                 className="px-3 py-1.5 rounded-lg text-xs font-bold capitalize transition-all"
@@ -274,16 +285,16 @@ export default function PosTerminal() {
           </div>
 
           {editingTable && (
-            <div className="px-4 pb-2 flex items-center gap-2">
+            <div className="px-4 sm:px-5 pb-2 flex items-center gap-2 flex-wrap">
               <input value={tableName} onChange={e => setTableName(e.target.value)} placeholder="Table name"
-                className="px-3 py-1.5 rounded-lg text-xs outline-none w-40"
+                className="px-3 py-1.5 rounded-lg text-xs outline-none w-full sm:w-40"
                 style={{ background: theme.surface, color: theme.text, border: `1px solid ${theme.primary}` }} />
               <button onClick={() => { setTables(prev => prev.map(t => t.id === editingTable ? { ...t, name: tableName || t.name } : t)); setEditingTable(null); }} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: theme.primary }}>Save</button>
               <button onClick={() => setEditingTable(null)} className="px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: theme.surface, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Cancel</button>
             </div>
           )}
 
-          <div className="px-4 pb-2 flex gap-1.5 overflow-x-auto flex-shrink-0">
+          <div className="px-4 sm:px-5 pb-2 flex gap-1.5 overflow-x-auto flex-shrink-0">
             {CATEGORIES.map(c => (
               <button key={c} onClick={() => setCat(c)}
                 className="px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0"
@@ -291,22 +302,22 @@ export default function PosTerminal() {
             ))}
           </div>
 
-          <div className="px-4 pb-3 flex-shrink-0">
+          <div className="px-4 sm:px-5 pb-3 flex-shrink-0">
             <div className="relative">
               <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: theme.textMuted }} />
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search items..."
-                className="w-full pl-8 pr-4 py-2 rounded-xl text-sm outline-none"
+                className="w-full pl-8 pr-4 py-2.5 rounded-2xl text-sm outline-none"
                 style={{ background: theme.surface, color: theme.text, border: `1px solid ${theme.border}` }} />
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto px-4 pb-4">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+          <div className="flex-1 overflow-auto px-4 sm:px-5 pb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
               {filtered.map(item => {
                 const inCart = cart.find(c => c.id === item.id);
                 return (
                   <motion.button key={item.id} whileTap={{ scale: 0.96 }} onClick={() => addItem(item)} disabled={!item.available}
-                    className="p-3 rounded-xl text-left transition-all relative disabled:opacity-40"
+                    className="p-3 rounded-2xl text-left transition-all relative disabled:opacity-40 shadow-sm"
                     style={{ background: inCart ? theme.primary + '15' : theme.surface, border: `1px solid ${inCart ? theme.primary : theme.border}` }}>
                     <div className="text-sm font-bold leading-tight mb-1" style={{ color: theme.text }}>{item.name}</div>
                     <div className="text-xs" style={{ color: theme.textMuted }}>{item.calories} kcal</div>
@@ -320,19 +331,19 @@ export default function PosTerminal() {
           </div>
         </div>
 
-        <div className="w-72 flex-shrink-0 flex flex-col" style={{ background: theme.surface, borderLeft: `1px solid ${theme.border}` }}>
-          <div className="px-4 py-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: `1px solid ${theme.border}` }}>
+        <div className="w-full lg:w-[22rem] xl:w-[24rem] flex-shrink-0 flex flex-col border-t lg:border-t-0 lg:border-l" style={{ background: theme.surface, borderColor: theme.border }}>
+          <div className="px-4 sm:px-5 py-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: `1px solid ${theme.border}` }}>
             <span className="text-sm font-extrabold" style={{ color: theme.text }}>Order {selectedTable ? `· ${tables.find(t => t.id === selectedTable)?.name ?? `T${selectedTable}`}` : ''}</span>
             {cart.length > 0 && <button onClick={startNewOrder} className="text-xs" style={{ color: '#ef4444' }}>Clear</button>}
           </div>
-          <div className="flex-1 overflow-auto p-3 space-y-2">
+          <div className="flex-1 overflow-auto p-3 sm:p-4 space-y-2">
             {cart.length === 0 ? (
               <div className="text-center py-12" style={{ color: theme.textMuted }}>
                 <Hash size={32} className="mx-auto mb-2 opacity-30" />
                 <p className="text-sm">Tap items to add to order</p>
               </div>
             ) : cart.map(item => (
-              <div key={item.id} className="flex items-center gap-2 py-2" style={{ borderBottom: `1px solid ${theme.border}` }}>
+              <div key={item.id} className="flex items-center gap-2 py-2 px-2 rounded-xl" style={{ background: theme.bg, border: `1px solid ${theme.border}` }}>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold truncate" style={{ color: theme.text }}>{item.name}</div>
                   <div className="text-xs" style={{ color: theme.primary }}>${(item.price * item.qty).toFixed(2)}</div>
@@ -345,11 +356,13 @@ export default function PosTerminal() {
               </div>
             ))}
           </div>
-          <div className="p-3 space-y-2 flex-shrink-0" style={{ borderTop: `1px solid ${theme.border}` }}>
-            <div className="flex justify-between text-xs" style={{ color: theme.textMuted }}><span>Subtotal</span><span>${subtotal.toFixed(2)}</span></div>
-            <div className="flex justify-between text-xs" style={{ color: theme.textMuted }}><span>Tax (5%)</span><span>${tax.toFixed(2)}</span></div>
-            <div className="flex justify-between font-extrabold text-base" style={{ color: theme.text }}>
-              <span>Total</span><span style={{ color: theme.primary }}>${total.toFixed(2)}</span>
+          <div className="p-3 sm:p-4 space-y-2 flex-shrink-0" style={{ borderTop: `1px solid ${theme.border}` }}>
+            <div className="rounded-2xl p-3" style={{ background: theme.bg, border: `1px solid ${theme.border}` }}>
+              <div className="flex justify-between text-xs" style={{ color: theme.textMuted }}><span>Subtotal</span><span>${subtotal.toFixed(2)}</span></div>
+              <div className="flex justify-between text-xs mt-1" style={{ color: theme.textMuted }}><span>Tax (5%)</span><span>${tax.toFixed(2)}</span></div>
+              <div className="flex justify-between font-extrabold text-base mt-2" style={{ color: theme.text }}>
+                <span>Total</span><span style={{ color: theme.primary }}>${total.toFixed(2)}</span>
+              </div>
             </div>
             {isPaid && (
               <div className="flex items-center gap-2 p-2 rounded-lg" style={{ background: '#22c55e15', border: '1px solid #22c55e30' }}>
@@ -358,7 +371,7 @@ export default function PosTerminal() {
               </div>
             )}
             <button onClick={() => cart.length > 0 && setShowPayment(true)} disabled={cart.length === 0 || isPaid}
-              className="w-full py-3 rounded-xl font-bold text-sm text-white transition-all disabled:opacity-40" style={{ background: theme.primary }}>
+              className="w-full py-3 rounded-2xl font-bold text-sm text-white transition-all disabled:opacity-40" style={{ background: theme.primary }}>
               {isPaid ? 'Paid' : `Charge $${total.toFixed(2)}`}
             </button>
             <div className="flex gap-2">
@@ -373,7 +386,7 @@ export default function PosTerminal() {
                 <X size={12} /> Void
               </button>
             </div>
-            {isPaid && <button onClick={startNewOrder} className="w-full py-2 rounded-xl text-xs font-bold text-white" style={{ background: '#22c55e' }}>New Order</button>}
+            {isPaid && <button onClick={startNewOrder} className="w-full py-2 rounded-2xl text-xs font-bold text-white" style={{ background: '#22c55e' }}>New Order</button>}
           </div>
         </div>
       </div>

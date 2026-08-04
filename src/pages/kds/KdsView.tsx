@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChefHat, Clock, AlertTriangle, Check, ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useLocale } from '@/contexts/LocaleContext';
 
 interface KdsTicket {
   id: string;
@@ -93,6 +94,7 @@ const COLUMNS: { key: KdsTicket['status']; label: string; color: string }[] = [
 
 export default function KdsView() {
   const navigate = useNavigate();
+  const { t } = useLocale();
   const [tickets, setTickets] = useState<KdsTicket[]>(SEED_TICKETS);
   const [, setTick] = useState(0);
   const [soundOn, setSoundOn] = useState(true);
@@ -137,8 +139,8 @@ export default function KdsView() {
   return (
     <div className="min-h-screen" style={{ background: '#0a0a0a', color: '#fff' }}>
       <header
-        className="h-12 flex items-center justify-between px-6 flex-shrink-0"
-        style={{ background: '#111', borderBottom: '1px solid #222' }}
+        className="px-4 sm:px-6 py-3 flex-shrink-0"
+        style={{ background: 'linear-gradient(135deg, #111827 0%, #0f172a 100%)', borderBottom: '1px solid #222' }}
       >
         <div className="flex items-center gap-3">
           <button
@@ -148,12 +150,12 @@ export default function KdsView() {
             <ArrowLeft size={16} />
           </button>
           <ChefHat size={18} style={{ color: '#10B981' }} />
-          <span className="text-sm font-bold text-white">Kitchen Display System</span>
+          <span className="text-sm font-bold text-white">{t('kds.title')}</span>
           <span
             className="text-xs px-2 py-0.5 rounded-full font-bold"
             style={{ background: '#10B98120', color: '#10B981' }}
           >
-            LIVE
+            {t('kds.live')}
           </span>
         </div>
         <div className="flex items-center gap-4">
@@ -163,7 +165,7 @@ export default function KdsView() {
               className="flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full animate-pulse"
               style={{ background: '#ef444420', color: '#ef4444' }}
             >
-              <AlertTriangle size={12} /> {allergyTickets.length} ALLERGY ALERT{allergyTickets.length > 1 ? 'S' : ''}
+              <AlertTriangle size={12} /> {allergyTickets.length} {t('kds.allergyAlert')}{allergyTickets.length > 1 ? 'S' : ''}
             </span>
           )}
           <button
@@ -174,17 +176,17 @@ export default function KdsView() {
               color: soundOn ? '#10B981' : '#666',
             }}
           >
-            {soundOn ? <Volume2 size={14} /> : <VolumeX size={14} />} Sound {soundOn ? 'On' : 'Off'}
+            {soundOn ? <Volume2 size={14} /> : <VolumeX size={14} />} {soundOn ? t('kds.soundOn') : t('kds.soundOff')}
           </button>
           <span className="text-xs text-gray-500">{new Date().toLocaleTimeString()}</span>
         </div>
       </header>
 
-      <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-3 gap-4">
         {COLUMNS.map((col) => {
           const colTickets = activeTickets.filter((t) => t.status === col.key);
           return (
-            <div key={col.key} className="flex flex-col gap-3">
+            <div key={col.key} className="flex flex-col gap-3 rounded-3xl p-2.5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
               <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full" style={{ background: col.color }} />
@@ -213,9 +215,9 @@ export default function KdsView() {
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.85 }}
-                      className="rounded-2xl overflow-hidden flex flex-col"
+                      className="rounded-2xl overflow-hidden flex flex-col shadow-lg"
                       style={{
-                        background: '#111',
+                        background: '#111827',
                         border: isAllergy ? '2px solid #ef4444' : '1px solid #222',
                         borderLeft: '4px solid ' + (isReady ? '#22c55e' : urgencyColor),
                         boxShadow: isAllergy
@@ -287,7 +289,7 @@ export default function KdsView() {
 
                       <div
                         className="p-3 flex gap-2"
-                        style={{ borderTop: '1px solid #1e1e1e' }}
+                        style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}
                       >
                         {ticket.status !== 'ready' && (
                           <button

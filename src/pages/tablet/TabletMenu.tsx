@@ -6,6 +6,7 @@ import {
   CreditCard, Banknote, Lock
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLocale } from '@/contexts/LocaleContext';
 import { useSearchParams } from 'react-router-dom';
 
 const CURRENCIES = ['USD', 'EUR', 'AED', 'XAF', 'NGN', 'GBP'];
@@ -73,6 +74,7 @@ type PayMethod = 'cash' | 'card' | 'tablet_pay';
 
 export default function TabletMenu() {
   const { theme } = useTheme();
+  const { t } = useLocale();
   const [searchParams] = useSearchParams();
   const tableNum = searchParams.get('table') ?? '1';
 
@@ -135,15 +137,15 @@ export default function TabletMenu() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: theme.bg }}>
-      <header className="sticky top-0 z-30 px-4 py-3" style={{ background: theme.surface + 'F0', backdropFilter: 'blur(12px)', borderBottom: `1px solid ${theme.border}` }}>
+      <header className="sticky top-0 z-30 px-4 sm:px-6 py-3" style={{ background: theme.surface + 'F0', backdropFilter: 'blur(12px)', borderBottom: `1px solid ${theme.border}` }}>
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: theme.primary }}>
               <UtensilsCrossed size={18} color="#fff" />
             </div>
             <div>
-              <div className="text-sm font-extrabold" style={{ color: theme.text }}>Le Maison Dubai</div>
-              <div className="text-xs" style={{ color: theme.textMuted }}>Table {tableNum}</div>
+              <div className="text-sm font-extrabold" style={{ color: theme.text }}>{t('tablet.title')}</div>
+              <div className="text-xs" style={{ color: theme.textMuted }}>{t('tablet.table')} {tableNum}</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -151,7 +153,7 @@ export default function TabletMenu() {
               style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>
               {CURRENCIES.map(c => <option key={c}>{c}</option>)}
             </select>
-            <button onClick={() => setShowSocial(true)} className="px-2 py-1.5 rounded-lg text-xs font-bold" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Social</button>
+            <button onClick={() => setShowSocial(true)} className="px-2 py-1.5 rounded-lg text-xs font-bold" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>{t('tablet.social')}</button>
             <button onClick={() => setShowCart(true)} className="relative flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold"
               style={{ background: theme.primary, color: '#fff' }}>
               <ShoppingCart size={16} />
@@ -162,9 +164,9 @@ export default function TabletMenu() {
         </div>
         <div className="max-w-4xl mx-auto mt-2 flex items-center gap-2 overflow-x-auto pb-1">
           {[
-            { key: 'waiter', label: 'Call Waiter' },
-            { key: 'water', label: 'Water Request' },
-            { key: 'bill', label: 'Bring Bill' },
+            { key: 'waiter', label: t('tablet.callWaiter') },
+            { key: 'water', label: t('tablet.water') },
+            { key: 'bill', label: t('tablet.bill') },
           ].map(req => (
             <button key={req.key} onClick={() => sendServiceRequest(req.label)}
               className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
@@ -173,15 +175,15 @@ export default function TabletMenu() {
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto w-full px-4 py-4 space-y-4">
-        <div className="relative">
+      <div className="max-w-5xl mx-auto w-full px-4 sm:px-6 py-4 sm:py-5 space-y-4">
+        <div className="relative rounded-2xl px-3 py-2" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: theme.textMuted }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search dishes..."
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('tablet.search')}
             className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm outline-none"
-            style={{ background: theme.surface, color: theme.text, border: `1px solid ${theme.border}` }} />
+            style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
         </div>
 
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap rounded-2xl p-3" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
           {DIET_FILTERS.map(f => (
             <button key={f.key} onClick={() => toggleDiet(f.key)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
@@ -191,11 +193,11 @@ export default function TabletMenu() {
           ))}
         </div>
 
-        <input value={customAllergy} onChange={e => setCustomAllergy(e.target.value)} placeholder="Custom allergy or dietary note..."
-          className="w-full px-4 py-2 rounded-xl text-xs outline-none"
+        <input value={customAllergy} onChange={e => setCustomAllergy(e.target.value)} placeholder={t('tablet.customAllergy')}
+          className="w-full px-4 py-2.5 rounded-2xl text-xs outline-none"
           style={{ background: theme.surface, color: theme.text, border: `1px solid ${theme.border}` }} />
 
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="flex gap-2 overflow-x-auto pb-1 rounded-2xl p-2" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
           {CATS.map(c => (
             <button key={c} onClick={() => setActiveCat(c)}
               className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
@@ -203,10 +205,10 @@ export default function TabletMenu() {
           ))}
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((item, i) => (
             <motion.div key={item.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-              className="rounded-2xl overflow-hidden flex flex-col relative" style={{ background: theme.surface, border: `1px solid ${theme.border}`, opacity: item.stock > 0 ? 1 : 0.6 }}>
+              className="rounded-3xl overflow-hidden flex flex-col relative shadow-sm" style={{ background: theme.surface, border: `1px solid ${theme.border}`, opacity: item.stock > 0 ? 1 : 0.6 }}>
               <div className="relative h-40 overflow-hidden">
                 <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
@@ -245,13 +247,13 @@ export default function TabletMenu() {
                     style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}><Info size={13} /> Details</button>
                   <button onClick={() => addToCart(item)} disabled={item.stock <= 0}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-40"
-                    style={{ background: theme.primary }}>{item.stock <= 0 ? 'Sold Out' : <><Plus size={15} /> Add to Order</>}</button>
+                    style={{ background: theme.primary }}>{item.stock <= 0 ? t('tablet.soldOut') : <><Plus size={15} /> {t('tablet.add')}</>}</button>
                 </div>
               </div>
             </motion.div>
           ))}
           {filtered.length === 0 && (
-            <div className="col-span-2 text-center py-16">
+            <div className="sm:col-span-2 xl:col-span-3 text-center py-16">
               <Leaf size={40} className="mx-auto mb-3 opacity-20" style={{ color: theme.primary }} />
               <p style={{ color: theme.textMuted }}>No items match your filters.</p>
             </div>

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLocale } from '@/contexts/LocaleContext';
 import { COUNTRIES, CURRENCIES, LANGUAGES } from '@/lib/countries';
 
 const STEPS = ['Account', 'Business', 'Location', 'Plan'];
@@ -20,6 +21,7 @@ const PLANS = [
 export default function SignupPage() {
   const { signUp } = useAuth();
   const { theme } = useTheme();
+  const { t } = useLocale();
   const navigate = useNavigate();
 
   const [step, setStep] = useState(0);
@@ -127,11 +129,11 @@ export default function SignupPage() {
             {/* Step 0: Account */}
             {step === 0 && (
               <motion.div key="account" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                <h1 className="text-lg font-bold mb-1" style={{ color: theme.text }}>Create your account</h1>
-                <p className="text-sm mb-5" style={{ color: theme.textMuted }}>Start your 7-day free trial. No credit card required.</p>
+                <h1 className="text-lg font-bold mb-1" style={{ color: theme.text }}>{t('auth.createAccount')}</h1>
+                <p className="text-sm mb-5" style={{ color: theme.textMuted }}>{t('auth.freeTrial')}</p>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Full Name</label>
+                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>{t('auth.fullName')}</label>
                     <div className="relative">
                       <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: theme.textMuted }} />
                       <input type="text" required value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Your full name"
@@ -141,7 +143,7 @@ export default function SignupPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Email Address</label>
+                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>{t('auth.email')}</label>
                     <div className="relative">
                       <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: theme.textMuted }} />
                       <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@restaurant.com"
@@ -151,7 +153,7 @@ export default function SignupPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Password</label>
+                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>{t('auth.password')}</label>
                     <div className="relative">
                       <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: theme.textMuted }} />
                       <input type={showPw ? 'text' : 'password'} required value={password} onChange={e => setPassword(e.target.value)} placeholder="Min. 8 characters"
@@ -174,7 +176,7 @@ export default function SignupPage() {
                 <p className="text-sm mb-5" style={{ color: theme.textMuted }}>This information appears on your receipts and tablet menu.</p>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Restaurant Name</label>
+                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>{t('auth.restaurantName')}</label>
                     <div className="relative">
                       <Building2 size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: theme.textMuted }} />
                       <input type="text" required value={restaurantName} onChange={e => setRestaurantName(e.target.value)} placeholder="Le Maison Dubai"
@@ -184,7 +186,7 @@ export default function SignupPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Phone Number</label>
+                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>{t('auth.phoneNumber')}</label>
                     <div className="flex gap-2">
                       <div className="relative w-24 flex-shrink-0">
                         <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: theme.textMuted }} />
@@ -199,7 +201,7 @@ export default function SignupPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Language</label>
+                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>{t('auth.language')}</label>
                     <div className="relative">
                       <Globe size={15} className="absolute left-3 top-1/2 -translate-y-1/2 z-10" style={{ color: theme.textMuted }} />
                       <select value={language} onChange={e => setLanguage(e.target.value)}
@@ -220,7 +222,7 @@ export default function SignupPage() {
                 <p className="text-sm mb-5" style={{ color: theme.textMuted }}>We auto-detect your currency based on country.</p>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Country</label>
+                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>{t('auth.country')}</label>
                     <div className="relative">
                       <MapPin size={15} className="absolute left-3 top-1/2 -translate-y-1/2 z-10" style={{ color: theme.textMuted }} />
                       <select value={country} onChange={e => onCountryChange(e.target.value)}
@@ -231,14 +233,14 @@ export default function SignupPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>City</label>
+                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>{t('auth.city')}</label>
                     <input type="text" required value={city} onChange={e => setCity(e.target.value)} placeholder="Dubai"
                       className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
                       style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}
                       onFocus={e => e.target.style.borderColor = theme.primary} onBlur={e => e.target.style.borderColor = theme.border} />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Currency (auto-detected)</label>
+                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>{t('auth.currencyAuto')}</label>
                     <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: theme.primary + '10', border: `1px solid ${theme.primary}30` }}>
                       <span className="text-lg">{CURRENCIES.find(c => c.code === currency)?.symbol ?? '$'}</span>
                       <div>
@@ -255,8 +257,8 @@ export default function SignupPage() {
             {/* Step 3: Plan */}
             {step === 3 && (
               <motion.div key="plan" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                <h2 className="text-lg font-bold mb-1" style={{ color: theme.text }}>Choose your plan</h2>
-                <p className="text-sm mb-5" style={{ color: theme.textMuted }}>All plans include KDS and thermal receipts. Cancel anytime.</p>
+                <h2 className="text-lg font-bold mb-1" style={{ color: theme.text }}>{t('auth.choosePlan')}</h2>
+                <p className="text-sm mb-5" style={{ color: theme.textMuted }}>{t('auth.planDesc')}</p>
                 <div className="space-y-3">
                   {PLANS.map(p => (
                     <button key={p.name} onClick={() => setPlan(p.name)}

@@ -134,3 +134,46 @@ h1, h2, h3, h4, h5, h6 {
 
 [data-theme="ocean"] body, [data-theme="ocean"] { color: #0F172A; }
 [data-theme="ocean"] .card { box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+.soft-panel {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 10px 35px rgba(15, 23, 42, 0.12);
+}
+
+.section-shell {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.input-shell {
+  width: 100%;
+  border-radius: 9999px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  padding: 0.8rem 1rem;
+  background: rgba(15, 23, 42, 0.45);
+  color: var(--color-text);
+}
+
+.input-shell:focus {
+  outline: none;
+  border-color: rgba(16, 185, 129, 0.45);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
+}
+
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 640px) {
+  body {
+    font-size: 14px;
+  }
+
+  .pin-digit {
+    width: 46px;
+    height: 54px;
+    font-size: 20px;
+  }
+}

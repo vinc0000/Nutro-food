@@ -226,7 +226,7 @@ export default function LandingPage() {
           backdropFilter: 'blur(16px)',
           borderBottom: scrolled ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(255,255,255,0.04)',
         }}>
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="section-shell px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#0369A1' }}>
               <UtensilsCrossed size={18} color="#fff" />
@@ -290,11 +290,29 @@ export default function LandingPage() {
         <AnimatePresence>
           {mobileMenuOpen && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-              className="md:hidden px-6 pb-4" style={{ background: 'rgba(15, 23, 42, 0.98)' }}>
-              {[...navSections, { label: 'Aide', href: '/help' }].map(item => (
-                <a key={item.label} href={item.href} className="block py-3 text-sm font-medium" style={{ color: 'rgba(255,255,255,0.7)' }}
-                  onClick={() => setMobileMenuOpen(false)}>{item.label}</a>
-              ))}
+              className="md:hidden px-4 pb-4" style={{ background: 'rgba(15, 23, 42, 0.98)' }}>
+              <div className="space-y-2 py-2">
+                {[...navSections, { label: 'Aide', href: '/help' }].map(item => (
+                  <a key={item.label} href={item.href} className="block rounded-xl px-3 py-3 text-sm font-medium" style={{ color: 'rgba(255,255,255,0.75)', background: 'rgba(255,255,255,0.04)' }}
+                    onClick={() => setMobileMenuOpen(false)}>{item.label}</a>
+                ))}
+              </div>
+              <div className="flex flex-col gap-2 pt-2">
+                <select value={currency} onChange={e => setCurrency(e.target.value as SupportedCurrency)} className="text-sm rounded-xl px-3 py-2.5 outline-none"
+                  style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)' }}>
+                  {CURRENCIES.map(c => <option key={c.code} value={c.code} style={{ color: '#000' }}>{c.symbol} {c.code}</option>)}
+                </select>
+                <select value={language} onChange={e => setLanguage(e.target.value as 'en' | 'fr' | 'ar')} className="text-sm rounded-xl px-3 py-2.5 outline-none"
+                  style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)' }}>
+                  <option value="en" style={{ color: '#000' }}>EN</option>
+                  <option value="fr" style={{ color: '#000' }}>FR</option>
+                  <option value="ar" style={{ color: '#000' }}>AR</option>
+                </select>
+                <Link to="/auth/login" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-3 py-2.5 text-sm font-semibold text-center"
+                  style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.14)' }}>{t('nav.login')}</Link>
+                <Link to="/auth/signup" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-3 py-2.5 text-sm font-bold text-center"
+                  style={{ background: '#fff', color: '#0F172A' }}>{t('nav.trial')}</Link>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

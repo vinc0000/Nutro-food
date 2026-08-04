@@ -8,25 +8,27 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLocale } from '@/contexts/LocaleContext';
 import ThemeSwitcher from '@/components/ui/ThemeSwitcher';
 import TrialBanner from '@/components/ui/TrialBanner';
 import { SUPER_ADMIN_EMAILS } from '@/components/guards/RouteGuards';
 import { CURRENCIES, LANGUAGES } from '@/lib/countries';
 
 const NAV = [
-  { to: '/app/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/app/tablet', icon: Tablet, label: 'Interactive Tablet Menu', external: true },
-  { to: '/app/admin/menu', icon: UtensilsCrossed, label: 'Menu & Recipe Manager' },
-  { to: '/app/pos', icon: Monitor, label: 'POS Terminal', external: true },
-  { to: '/app/kds', icon: ChefHat, label: 'KDS Kitchen Screen', external: true },
-  { to: '/app/admin/reports', icon: FileBarChart, label: 'Reports & Analytics' },
-  { to: '/app/admin/staff', icon: Users, label: 'Staff & Access Control' },
-  { to: '/app/admin/settings', icon: Settings, label: 'Restaurant Settings' },
+  { to: '/app/admin', icon: LayoutDashboard, labelKey: 'layout.dashboard', end: true },
+  { to: '/app/tablet', icon: Tablet, labelKey: 'layout.tabletMenu', external: true },
+  { to: '/app/admin/menu', icon: UtensilsCrossed, labelKey: 'layout.menuManager' },
+  { to: '/app/pos', icon: Monitor, labelKey: 'layout.posTerminal', external: true },
+  { to: '/app/kds', icon: ChefHat, labelKey: 'layout.kds', external: true },
+  { to: '/app/admin/reports', icon: FileBarChart, labelKey: 'layout.reports' },
+  { to: '/app/admin/staff', icon: Users, labelKey: 'layout.staff' },
+  { to: '/app/admin/settings', icon: Settings, labelKey: 'layout.settings' },
 ];
 
 export default function AdminLayout() {
   const { profile, signOut, user } = useAuth();
   const { theme } = useTheme();
+  const { t } = useLocale();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -68,17 +70,17 @@ export default function AdminLayout() {
           item.external ? (
             <a key={item.to} href={item.to} target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-80"
-              style={{ color: theme.textMuted }} title={collapsed ? item.label : undefined}>
+              style={{ color: theme.textMuted }} title={collapsed ? t(item.labelKey) : undefined}>
               <item.icon size={17} className="flex-shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
+              {!collapsed && <span>{t(item.labelKey)}</span>}
             </a>
           ) : (
             <NavLink key={item.to} to={item.to} end={item.end}
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all"
-              style={({ isActive }) => navLinkStyle(isActive)} title={collapsed ? item.label : undefined}
+              style={({ isActive }) => navLinkStyle(isActive)} title={collapsed ? t(item.labelKey) : undefined}
               onClick={() => setMobileOpen(false)}>
               <item.icon size={17} className="flex-shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
+              {!collapsed && <span>{t(item.labelKey)}</span>}
             </NavLink>
           )
         )}
@@ -86,7 +88,7 @@ export default function AdminLayout() {
           <>
             <div className="pt-4 pb-2 px-3" style={{ borderTop: `1px solid ${theme.border}`, marginTop: 8 }}>
               {!collapsed && (
-                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>Platform</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: theme.textMuted }}>{t('layout.platform')}</p>
               )}
             </div>
             <NavLink to="/app/super-admin"
@@ -95,7 +97,7 @@ export default function AdminLayout() {
                 background: isActive ? theme.primary : theme.primary + '15',
                 color: isActive ? '#fff' : theme.primary,
               })}
-              title={collapsed ? 'Super Admin Command Center' : undefined}
+              title={collapsed ? t('layout.superAdmin') : undefined}
               onClick={() => setMobileOpen(false)}>
               <ShieldCheck size={17} className="flex-shrink-0" />
               {!collapsed && <span>Super Admin Command</span>}
@@ -125,7 +127,7 @@ export default function AdminLayout() {
               <div className="fixed inset-0 z-40" onClick={() => setLocaleMenu(false)} />
               <div className="absolute bottom-full mb-2 left-0 right-0 z-50 rounded-xl p-3 shadow-2xl max-h-80 overflow-auto"
                 style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
-                <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: theme.textMuted }}>Language</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: theme.textMuted }}>{t('layout.language')}</p>
                 <div className="grid grid-cols-3 gap-1 mb-3">
                   {LANGUAGES.map(l => (
                     <button key={l.code} onClick={() => setLang(l.code)}
@@ -139,7 +141,7 @@ export default function AdminLayout() {
                     </button>
                   ))}
                 </div>
-                <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: theme.textMuted }}>Currency</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: theme.textMuted }}>{t('layout.currency')}</p>
                 <select value={currency} onChange={e => setCurrency(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg text-xs font-bold outline-none"
                   style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>
@@ -154,7 +156,7 @@ export default function AdminLayout() {
       <div className="p-3 space-y-1 flex-shrink-0" style={{ borderTop: `1px solid ${theme.border}` }}>
         {!collapsed && (
           <div className="px-3 py-2">
-            <div className="text-xs font-bold truncate" style={{ color: theme.text }}>{profile?.full_name ?? 'Restaurant Admin'}</div>
+            <div className="text-xs font-bold truncate" style={{ color: theme.text }}>{profile?.full_name ?? t('layout.restaurantAdmin')}</div>
             <div className="text-[11px] truncate capitalize" style={{ color: theme.textMuted }}>{profile?.system_role ?? 'admin'}</div>
           </div>
         )}
@@ -162,7 +164,7 @@ export default function AdminLayout() {
           className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold hover:opacity-80"
           style={{ color: theme.textMuted }} title={collapsed ? 'Sign Out' : undefined}>
           <LogOut size={16} className="flex-shrink-0" />
-          {!collapsed && 'Sign Out'}
+          {!collapsed && t('layout.signOut')}
         </button>
       </div>
     </>
@@ -191,7 +193,7 @@ export default function AdminLayout() {
             <button onClick={() => setMobileOpen(true)} className="md:hidden p-2 rounded-lg" style={{ color: theme.text }}>
               <MenuIcon size={18} />
             </button>
-            <h1 className="text-sm font-bold" style={{ color: theme.textMuted }}>Restaurant Back-Office</h1>
+            <h1 className="text-sm font-bold" style={{ color: theme.textMuted }}>{t('layout.backOffice')}</h1>
           </div>
           <div className="flex items-center gap-2">
             <ThemeSwitcher />
@@ -215,16 +217,16 @@ export default function AdminLayout() {
                   <div className="absolute right-0 top-full mt-2 z-50 w-56 rounded-xl p-4 shadow-2xl"
                     style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
                     <div className="pb-3 mb-3" style={{ borderBottom: `1px solid ${theme.border}` }}>
-                      <div className="text-sm font-bold" style={{ color: theme.text }}>{profile?.full_name ?? 'Restaurant Admin'}</div>
+                      <div className="text-sm font-bold" style={{ color: theme.text }}>{profile?.full_name ?? t('layout.restaurantAdmin')}</div>
                       <div className="text-xs" style={{ color: theme.textMuted }}>{user?.email}</div>
                     </div>
                     <button onClick={() => { setProfileMenu(false); navigate('/app/admin/settings'); }}
                       className="w-full flex items-center gap-2 py-2 rounded-lg text-xs font-semibold mb-1" style={{ color: theme.textMuted }}>
-                      <Settings size={13} /> Settings
+                      <Settings size={13} /> {t('common.settings')}
                     </button>
                     <button onClick={async () => { await signOut(); navigate('/'); }}
                       className="w-full flex items-center gap-2 py-2 rounded-lg text-xs font-semibold" style={{ color: '#ef4444' }}>
-                      <LogOut size={13} /> Sign Out
+                      <LogOut size={13} /> {t('layout.signOut')}
                     </button>
                   </div>
                 </>
