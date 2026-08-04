@@ -305,15 +305,19 @@ function createMockSupabaseClient() {
     return { data: null, error: null };
   };
 
+  const localObjectUrls: Record<string, string> = {};
+
   const storage = {
     from: (bucket: string) => ({
       upload: async (path: string, file: File) => {
         if (typeof window !== 'undefined') {
-          window.localStorage.setItem(`nutro:${bucket}:${path}`, JSON.stringify({ name: file.name, type: file.type, size: file.size }));
+          const objectUrl = URL.createObjectURL(file);
+          localObjectUrls[path] = objectUrl;
+          window.localStorage.setItem(`nutro:${bucket}:${path}`, JSON.stringify({ name: file.name, type: file.type, size: file.size, objectUrl }));
         }
         return { error: null };
       },
-      getPublicUrl: (path: string) => ({ data: { publicUrl: `https://demo.local/${bucket}/${path}` } }),
+      getPublicUrl: (path: string) => ({ data: { publicUrl: localObjectUrls[path] ?? `https://demo.local/${bucket}/${path}` } }),
     }),
   };
 

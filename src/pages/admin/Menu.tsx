@@ -38,6 +38,7 @@ export default function AdminMenu() {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState<Partial<MenuItem>>({});
   const [uploading, setUploading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [newIngredient, setNewIngredient] = useState({ name: '', grams: 0 });
 
   const filtered = items.filter(item =>
@@ -53,12 +54,14 @@ export default function AdminMenu() {
     setFormData({ available: true, stock: 0, taxRate: 5, portionSize: 'Regular', halal: true, ingredients: [], image: '', category: 'Mains' });
     setEditing(null);
     setShowForm(true);
+    setUploadMessage(null);
   };
 
   const openEditForm = (item: MenuItem) => {
     setFormData({ ...item });
     setEditing(item);
     setShowForm(true);
+    setUploadMessage(null);
   };
 
   const saveForm = () => {
@@ -108,6 +111,41 @@ export default function AdminMenu() {
 
   const toggleDiet = (key: keyof MenuItem) => {
     setFormData(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleImageUpload = async (file: File) => {
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setUploadMessage('Image too large. Maximum size: 2 MB.');
+      return;
+    }
+
+    setUploading(true);
+    setUploadMessage(null);
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `menu-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('menu-images').upload(fileName, file, { contentType: file.type });
+      if (upErr) throw upErr;
+
+      const { data: pub } = supabase.storage.from('menu-images').getPublicUrl(fileName);
+      if (!pub?.publicUrl) throw new Error('No public URL returned by storage');
+
+      setFormData(prev => ({ ...prev, image: pub.publicUrl }));
+      setUploadMessage('Image uploaded and attached to this menu item.');
+    } catch {
+      const previewUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Unable to create image preview'));
+        reader.readAsDataURL(file);
+      });
+
+      setFormData(prev => ({ ...prev, image: previewUrl }));
+      setUploadMessage('Upload was unavailable, so a local preview was used to keep the menu flow moving.');
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -245,28 +283,15 @@ export default function AdminMenu() {
                           onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (!file) return;
-                            if (file.size > 2 * 1024 * 1024) {
-                              alert('Image too large. Maximum size: 2 MB.');
-                              return;
-                            }
-                            setUploading(true);
-                            try {
-                              const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-                              const fileName = `menu-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-                              const { error: upErr } = await supabase.storage
-                                .from('menu-images')
-                                .upload(fileName, file, { contentType: file.type });
-                              if (upErr) throw upErr;
-                              const { data: pub } = supabase.storage.from('menu-images').getPublicUrl(fileName);
-                              setFormData(prev => ({ ...prev, image: pub.publicUrl }));
-                            } catch (err) {
-                              alert(err instanceof Error ? err.message : 'Upload failed');
-                            } finally {
-                              setUploading(false);
-                            }
+                            await handleImageUpload(file);
                           }}
                         />
                       </label>
+                      {uploadMessage && (
+                        <p className="text-xs" style={{ color: theme.primary }}>
+                          {uploadMessage}
+                        </p>
+                      )}
                       <p className="text-xs" style={{ color: theme.textMuted }}>
                         Recommended: 800×600px · Max 2 MB · JPG, PNG, or WebP
                       </p>
