@@ -328,17 +328,17 @@ export default function AdminMenu() {
         </button>
       </div>
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative">
+      <div className="flex items-center gap-3 flex-wrap w-full">
+        <div className="relative w-full sm:w-52">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: theme.textMuted }} />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search menu..."
-            className="pl-9 pr-4 py-2 rounded-xl text-sm outline-none w-52"
+            className="pl-9 pr-4 py-2 rounded-xl text-sm outline-none w-full"
             style={{ background: theme.surface, color: theme.text, border: `1px solid ${theme.border}` }} />
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-1 overflow-x-auto max-w-full pb-1 scrollbar-hide">
           {CATS.map(c => (
             <button key={c} onClick={() => setActiveCat(c)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex-shrink-0"
               style={{ background: activeCat === c ? theme.primary : theme.surface, color: activeCat === c ? '#fff' : theme.textMuted, border: `1px solid ${activeCat === c ? theme.primary : theme.border}` }}>{c}</button>
           ))}
         </div>
@@ -350,7 +350,7 @@ export default function AdminMenu() {
           <span className="text-sm" style={{ color: theme.textMuted }}>Loading menu from database...</span>
         </div>
       ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((item, i) => (
             <motion.div key={item.id} initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.04 }}
               className="rounded-2xl overflow-hidden flex flex-col"
@@ -479,7 +479,7 @@ export default function AdminMenu() {
                 </div>
 
                 {/* Portion size & weight */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Portion Size</label>
                     <select value={formData.portionSize ?? 'Regular'} onChange={e => setFormData(prev => ({ ...prev, portionSize: e.target.value }))}
@@ -496,7 +496,7 @@ export default function AdminMenu() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {[
                     { key: 'price' as keyof MenuItem, label: 'Price ($)' },
                     { key: 'calories' as keyof MenuItem, label: 'Calories' },
