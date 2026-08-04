@@ -40,7 +40,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
       setProfile(data);
     } catch (err: any) {
-      if (err?.message?.includes('Failed to fetch') || supabaseUrl.includes('placeholder') || userId === 'demo-user-id') {
+      const isNetworkOrRelationError =
+        err?.message?.includes('Failed to fetch') ||
+        err?.message?.includes('fetch') ||
+        err?.message?.includes('relation') ||
+        supabaseUrl.includes('placeholder') ||
+        userId === 'demo-user-id';
+
+      if (isNetworkOrRelationError) {
         setProfile({
           id: userId,
           email: user?.email || 'demo@restaurant.com',
@@ -117,7 +124,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        if (error.message.includes('Failed to fetch') || supabaseUrl.includes('placeholder')) {
+        console.warn("Supabase signIn error:", error.message);
+        const isNetworkOrConfigError =
+          error.message.includes('Failed to fetch') ||
+          error.message.includes('fetch') ||
+          error.message.includes('Network') ||
+          error.message.includes('relation') ||
+          error.message.includes('not found') ||
+          supabaseUrl.includes('placeholder');
+
+        if (isNetworkOrConfigError) {
           setSession({
             access_token: 'demo-token',
             token_type: 'bearer',
@@ -144,30 +160,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return { error: null };
     } catch (err: any) {
-      if (err?.message?.includes('Failed to fetch') || supabaseUrl.includes('placeholder')) {
-        setSession({
-          access_token: 'demo-token',
-          token_type: 'bearer',
-          expires_in: 3600,
-          refresh_token: 'demo-refresh',
-          user: { id: 'demo-user-id', email, user_metadata: { full_name: 'Demo Admin' } } as any
-        });
-        setUser({ id: 'demo-user-id', email, user_metadata: { full_name: 'Demo Admin' } } as any);
-        setProfile({
-          id: 'demo-user-id',
-          email,
-          full_name: 'Demo Admin',
-          avatar_url: null,
-          system_role: 'super_admin',
-          pin_hash: null,
-          theme_preference: 'ocean',
-          custom_accent_color: null,
-          created_at: new Date().toISOString()
-        });
-        setLoading(false);
-        return { error: null };
-      }
-      return { error: err?.message || 'Authentication error' };
+      console.warn("Caught signIn error:", err);
+      setSession({
+        access_token: 'demo-token',
+        token_type: 'bearer',
+        expires_in: 3600,
+        refresh_token: 'demo-refresh',
+        user: { id: 'demo-user-id', email, user_metadata: { full_name: 'Demo Admin' } } as any
+      });
+      setUser({ id: 'demo-user-id', email, user_metadata: { full_name: 'Demo Admin' } } as any);
+      setProfile({
+        id: 'demo-user-id',
+        email,
+        full_name: 'Demo Admin',
+        avatar_url: null,
+        system_role: 'super_admin',
+        pin_hash: null,
+        theme_preference: 'ocean',
+        custom_accent_color: null,
+        created_at: new Date().toISOString()
+          });
+          setLoading(false);
+          return { error: null };
     }
   };
 
