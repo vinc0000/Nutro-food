@@ -99,7 +99,19 @@ export default function AdminOrders() {
 
       setOrders(mapped);
     } catch (err) {
-      console.error('Error fetching orders:', err);
+      console.warn('Database orders fetch failed, falling back to mock data:', err);
+      const mockMapped: OrderRow[] = DEFAULT_ORDERS.map((o, i) => ({
+        id: `mock-order-${i}`,
+        table: o.table_name || 'Table 4',
+        table_id: `table-${i}`,
+        type: o.order_type || 'dine_in',
+        items: 3,
+        total: o.total_amount,
+        status: o.status,
+        payment: o.payment_status,
+        time: new Date(Date.now() - i * 15 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }));
+      setOrders(mockMapped);
     } finally {
       setLoading(false);
     }

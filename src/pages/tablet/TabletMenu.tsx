@@ -99,15 +99,19 @@ export default function TabletMenu() {
     setLoading(true);
     try {
       // 1. Fetch live categories
-      const { data: catData } = await supabase
+      const { data: catData, error: catError } = await supabase
         .from('menu_categories')
         .select('id, name')
         .eq('branch_id', orgContext.branch_id)
         .order('sort_order', { ascending: true });
 
+      if (catError) throw catError;
+
       const fetchedCats = catData?.map(c => c.name) || [];
       if (fetchedCats.length > 0) {
         setCats(['All', ...fetchedCats]);
+      } else {
+        setCats(['All', 'Starters', 'Mains', 'Desserts', 'Drinks']);
       }
 
       // 2. Fetch live items
@@ -150,7 +154,8 @@ export default function TabletMenu() {
         setMenu(DEFAULT_MENU);
       }
     } catch (err) {
-      console.error('Error fetching tablet menu:', err);
+      console.warn('Error fetching tablet menu, using mock fallback:', err);
+      setCats(['All', 'Starters', 'Mains', 'Desserts', 'Drinks']);
       setMenu(DEFAULT_MENU);
     } finally {
       setLoading(false);

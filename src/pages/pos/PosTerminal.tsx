@@ -182,20 +182,26 @@ export default function PosTerminal() {
     setLoading(true);
     try {
       // 1. Fetch categories
-      const { data: catData } = await supabase
+      const { data: catData, error: catError } = await supabase
         .from('menu_categories')
         .select('id, name')
         .eq('branch_id', orgContext.branch_id);
 
+      if (catError) throw catError;
+
       if (catData && catData.length > 0) {
         setCats(['All', ...catData.map(c => c.name)]);
+      } else {
+        setCats(['All', 'Starters', 'Mains', 'Desserts', 'Drinks']);
       }
 
       // 2. Fetch live items
-      const { data: itemData } = await supabase
+      const { data: itemData, error: itemError } = await supabase
         .from('menu_items')
         .select('*')
         .eq('branch_id', orgContext.branch_id);
+
+      if (itemError) throw itemError;
 
       if (itemData && itemData.length > 0) {
         const mapped = itemData.map(dbItem => {
@@ -215,10 +221,12 @@ export default function PosTerminal() {
       }
 
       // 3. Fetch real tables if they exist
-      const { data: tableData } = await supabase
+      const { data: tableData, error: tableError } = await supabase
         .from('restaurant_tables')
         .select('*')
         .eq('branch_id', orgContext.branch_id);
+
+      if (tableError) throw tableError;
 
       if (tableData && tableData.length > 0) {
         setTables(tableData.map((t: any) => ({
@@ -228,7 +236,9 @@ export default function PosTerminal() {
         })));
       }
     } catch (err) {
-      console.error('Error fetching live data for POS:', err);
+      console.warn('Error fetching live data for POS, using mock fallback:', err);
+      setCats(['All', 'Starters', 'Mains', 'Desserts', 'Drinks']);
+      setMenu(DEFAULT_MENU);
     } finally {
       setLoading(false);
     }

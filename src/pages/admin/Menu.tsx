@@ -154,7 +154,45 @@ export default function AdminMenu() {
 
       setItems(mapped);
     } catch (err) {
-      console.error('Error fetching menu:', err);
+      console.warn("Database menu fetch failed, falling back to mock data:", err);
+      // Fallback categories
+      const mockCats = [
+        { id: 'cat-1', name: 'Starters' },
+        { id: 'cat-2', name: 'Mains' },
+        { id: 'cat-3', name: 'Desserts' },
+        { id: 'cat-4', name: 'Drinks' }
+      ];
+      setCategories(mockCats);
+
+      // Fallback mapped items
+      const mockMapped: MenuItem[] = DEFAULT_ITEMS.map((item, i) => ({
+        id: `mock-item-${i}`,
+        name: item.name,
+        category: item.category,
+        category_id: `cat-${item.category === 'Starters' ? 1 : item.category === 'Mains' ? 2 : item.category === 'Desserts' ? 3 : 4}`,
+        price: item.price,
+        calories: item.calories,
+        protein: item.protein,
+        carbs: item.carbs,
+        fats: item.fats,
+        fiber: 0,
+        halal: item.halal,
+        vegan: item.vegan,
+        glutenFree: item.glutenFree,
+        keto: item.keto,
+        nutFree: item.nutFree,
+        spicy: item.spicy,
+        description: item.description,
+        image: item.image,
+        available: item.available,
+        stock: 50,
+        allergens: [],
+        ingredients: [],
+        weight: item.weight,
+        portionSize: 'Standard',
+        is_active: true
+      }));
+      setItems(mockMapped);
     } finally {
       setLoading(false);
     }
