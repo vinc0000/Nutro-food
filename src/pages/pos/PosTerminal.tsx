@@ -9,6 +9,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useNavigate } from 'react-router-dom';
+import { useSharedMenu } from '@/lib/menuStore';
 
 interface CartItem { id: string; name: string; price: number; qty: number; }
 interface TabletOrder {
@@ -17,21 +18,6 @@ interface TabletOrder {
 }
 
 const CATEGORIES = ['All', 'Starters', 'Mains', 'Desserts', 'Drinks'];
-
-const MENU: { id: string; name: string; price: number; cat: string; calories: number; available: boolean }[] = [
-  { id: '1', name: 'Wagyu Burger', price: 24, cat: 'Mains', calories: 820, available: true },
-  { id: '2', name: 'Truffle Fries', price: 9, cat: 'Starters', calories: 380, available: true },
-  { id: '3', name: 'Caesar Salad', price: 12, cat: 'Starters', calories: 320, available: true },
-  { id: '4', name: 'Margherita Pizza', price: 18, cat: 'Mains', calories: 680, available: true },
-  { id: '5', name: 'Seafood Pasta', price: 22, cat: 'Mains', calories: 740, available: true },
-  { id: '6', name: 'Cheesecake', price: 9, cat: 'Desserts', calories: 420, available: true },
-  { id: '7', name: 'Lava Cake', price: 11, cat: 'Desserts', calories: 460, available: true },
-  { id: '8', name: 'Fresh Juice', price: 6, cat: 'Drinks', calories: 120, available: true },
-  { id: '9', name: 'Sparkling Water', price: 3, cat: 'Drinks', calories: 0, available: true },
-  { id: '10', name: 'Grilled Salmon', price: 28, cat: 'Mains', calories: 560, available: true },
-  { id: '11', name: 'Calamari', price: 14, cat: 'Starters', calories: 320, available: true },
-  { id: '12', name: 'Creme Brulee', price: 10, cat: 'Desserts', calories: 390, available: false },
-];
 
 const PLAN_TABLE_LIMIT = 10;
 const tableColor: Record<string, string> = { available: '#22c55e', occupied: '#ef4444', reserved: '#eab308', cleaning: '#94a3b8' };
@@ -134,6 +120,7 @@ export default function PosTerminal() {
   const { theme } = useTheme();
   const { profile } = useAuth();
   const { t } = useLocale();
+  const { menuItems } = useSharedMenu();
   const navigate = useNavigate();
   const [unlocked, setUnlocked] = useState(false);
   const [cat, setCat] = useState('All');
@@ -166,14 +153,15 @@ export default function PosTerminal() {
     { id: 'to2', tableNum: '3', items: [{ name: 'Margherita Pizza', qty: 1, price: 18 }, { name: 'Fresh Juice', qty: 2, price: 6 }], total: 30, status: 'pending', time: '5 min ago' },
   ]);
 
-  const filtered = MENU.filter(i => (cat === 'All' || i.cat === cat) && i.name.toLowerCase().includes(search.toLowerCase()));
+  const posMenu = menuItems.map(item => ({ id: item.id, name: item.name, price: item.price, cat: item.category, calories: item.calories, available: item.available && item.stock > 0 }));
+  const filtered = posMenu.filter(i => (cat === 'All' || i.cat === cat) && i.name.toLowerCase().includes(search.toLowerCase()));
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const tax = subtotal * 0.05;
   const total = subtotal + tax;
   const change = cashGiven ? Math.max(0, parseFloat(cashGiven) - total) : 0;
   const pendingTabletOrders = tabletOrders.filter(o => o.status === 'pending');
 
-  const addItem = (item: typeof MENU[0]) => {
+  const addItem = (item: typeof posMenu[number]) => {
     if (!item.available) return;
     setCart(prev => {
       const existing = prev.find(c => c.id === item.id);

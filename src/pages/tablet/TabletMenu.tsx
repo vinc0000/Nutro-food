@@ -8,6 +8,7 @@ import {
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSearchParams } from 'react-router-dom';
+import { useSharedMenu } from '@/lib/menuStore';
 
 const CURRENCIES = ['USD', 'EUR', 'AED', 'XAF', 'NGN', 'GBP'];
 const CURRENCY_RATES: Record<string, number> = { USD: 1, EUR: 0.92, AED: 3.67, XAF: 600, NGN: 1500, GBP: 0.79 };
@@ -19,39 +20,6 @@ interface MenuItem {
   halal: boolean; vegan: boolean; glutenFree: boolean; nutFree: boolean; spicy: boolean;
   ingredients: string[]; allergens: string[]; stock: number; portionSize: string;
 }
-
-const MENU: MenuItem[] = [
-  { id: '1', name: 'Wagyu Beef Burger', category: 'Mains', price: 24, calories: 820, protein: 48, carbs: 42, fats: 52, weight: 380, portionSize: 'Regular',
-    description: 'Premium A5 Wagyu patty, aged cheddar, truffle aioli on brioche bun.',
-    image: 'https://images.pexels.com/photos/1639557/pexels-photo-1639557.jpeg?w=400',
-    halal: true, vegan: false, glutenFree: false, nutFree: true, spicy: false,
-    ingredients: ['Wagyu beef', 'Brioche bun', 'Aged cheddar', 'Truffle aioli', 'Lettuce', 'Tomato'], allergens: ['Gluten', 'Dairy', 'Egg'], stock: 15 },
-  { id: '2', name: 'Truffle Fries', category: 'Starters', price: 9, calories: 380, protein: 6, carbs: 48, fats: 18, weight: 200, portionSize: 'Large',
-    description: 'Hand-cut fries tossed in premium truffle oil and aged parmesan.',
-    image: 'https://images.pexels.com/photos/1583884/pexels-photo-1583884.jpeg?w=400',
-    halal: true, vegan: true, glutenFree: true, nutFree: true, spicy: false,
-    ingredients: ['Potatoes', 'Truffle oil', 'Parmesan', 'Sea salt', 'Fresh herbs'], allergens: ['Dairy'], stock: 30 },
-  { id: '3', name: 'Vegan Buddha Bowl', category: 'Mains', price: 18, calories: 540, protein: 22, carbs: 68, fats: 16, weight: 420, portionSize: 'Regular',
-    description: 'Quinoa, roasted veggies, avocado, tahini dressing, and mixed greens.',
-    image: 'https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg?w=400',
-    halal: true, vegan: true, glutenFree: true, nutFree: false, spicy: false,
-    ingredients: ['Quinoa', 'Avocado', 'Roasted peppers', 'Chickpeas', 'Tahini', 'Mixed greens'], allergens: ['Sesame'], stock: 8 },
-  { id: '4', name: 'Grilled Salmon', category: 'Mains', price: 28, calories: 560, protein: 42, carbs: 8, fats: 28, weight: 300, portionSize: 'Regular',
-    description: 'Atlantic salmon fillet, lemon butter sauce, seasonal vegetables.',
-    image: 'https://images.pexels.com/photos/3655916/pexels-photo-3655916.jpeg?w=400',
-    halal: false, vegan: false, glutenFree: true, nutFree: true, spicy: false,
-    ingredients: ['Atlantic salmon', 'Lemon butter', 'Asparagus', 'Cherry tomatoes', 'Capers'], allergens: ['Fish', 'Dairy'], stock: 12 },
-  { id: '5', name: 'Chocolate Lava Cake', category: 'Desserts', price: 11, calories: 460, protein: 7, carbs: 62, fats: 22, weight: 180, portionSize: 'Small',
-    description: 'Warm molten dark chocolate cake with vanilla bean ice cream.',
-    image: 'https://images.pexels.com/photos/291528/pexels-photo-291528.jpeg?w=400',
-    halal: true, vegan: false, glutenFree: false, nutFree: false, spicy: false,
-    ingredients: ['Dark chocolate', 'Butter', 'Eggs', 'Flour', 'Vanilla ice cream'], allergens: ['Gluten', 'Dairy', 'Egg', 'May contain nuts'], stock: 0 },
-  { id: '6', name: 'Fresh Lemonade', category: 'Drinks', price: 6, calories: 120, protein: 0, carbs: 28, fats: 0, weight: 350, portionSize: 'Large',
-    description: 'House-squeezed lemonade with fresh mint and crushed ice.',
-    image: 'https://images.pexels.com/photos/1998635/pexels-photo-1998635.jpeg?w=400',
-    halal: true, vegan: true, glutenFree: true, nutFree: true, spicy: false,
-    ingredients: ['Lemon juice', 'Sugar syrup', 'Mint', 'Sparkling water'], allergens: [], stock: 50 },
-];
 
 const CATS = ['All', 'Starters', 'Mains', 'Desserts', 'Drinks'];
 
@@ -75,6 +43,7 @@ type PayMethod = 'cash' | 'card' | 'tablet_pay';
 export default function TabletMenu() {
   const { theme } = useTheme();
   const { t } = useLocale();
+  const { menuItems } = useSharedMenu();
   const [searchParams] = useSearchParams();
   const tableNum = searchParams.get('table') ?? '1';
 
@@ -102,7 +71,13 @@ export default function TabletMenu() {
 
   const toggleDiet = (key: string) => setActiveDietFilters(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
 
-  const filtered = MENU.filter(item => {
+  const sharedMenu = menuItems.map(item => ({
+    ...item,
+    ingredients: item.ingredients.map(ingredient => ingredient.name),
+    allergens: item.allergens ?? [],
+  })) as MenuItem[];
+
+  const filtered = sharedMenu.filter(item => {
     if (activeCat !== 'All' && item.category !== activeCat) return false;
     if (search && !item.name.toLowerCase().includes(search.toLowerCase())) return false;
     for (const f of activeDietFilters) { if (!item[f as keyof MenuItem]) return false; }

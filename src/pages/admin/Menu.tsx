@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Search, Edit2, Trash2, X, Check, Package, AlertTriangle, Image as ImageIcon, Upload, Loader2 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -31,7 +31,8 @@ function DietBadge({ label, color }: { label: string; color: string }) {
 
 export default function AdminMenu() {
   const { theme } = useTheme();
-  const [items, setItems] = useState<MenuItem[]>(ITEMS);
+  const { menuItems, setMenuItems } = useSharedMenu();
+  const [items, setItems] = useState<MenuItem[]>(menuItems);
   const [search, setSearch] = useState('');
   const [activeCat, setActiveCat] = useState('All');
   const [editing, setEditing] = useState<MenuItem | null>(null);
@@ -41,14 +42,30 @@ export default function AdminMenu() {
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [newIngredient, setNewIngredient] = useState({ name: '', grams: 0 });
 
+  useEffect(() => {
+    setItems(menuItems);
+  }, [menuItems]);
+
   const filtered = items.filter(item =>
     (activeCat === 'All' || item.category === activeCat) &&
     item.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const toggleAvailable = (id: string) => setItems(prev => prev.map(i => i.id === id ? { ...i, available: !i.available } : i));
-  const deleteItem = (id: string) => setItems(prev => prev.filter(i => i.id !== id));
-  const adjustStock = (id: string, delta: number) => setItems(prev => prev.map(i => i.id === id ? { ...i, stock: Math.max(0, i.stock + delta) } : i));
+  const toggleAvailable = (id: string) => {
+    const next = items.map(i => i.id === id ? { ...i, available: !i.available } : i);
+    setItems(next);
+    setMenuItems(next);
+  };
+  const deleteItem = (id: string) => {
+    const next = items.filter(i => i.id !== id);
+    setItems(next);
+    setMenuItems(next);
+  };
+  const adjustStock = (id: string, delta: number) => {
+    const next = items.map(i => i.id === id ? { ...i, stock: Math.max(0, i.stock + delta) } : i);
+    setItems(next);
+    setMenuItems(next);
+  };
 
   const openAddForm = () => {
     setFormData({ available: true, stock: 0, taxRate: 5, portionSize: 'Regular', halal: true, ingredients: [], image: '', category: 'Mains' });
@@ -65,8 +82,9 @@ export default function AdminMenu() {
   };
 
   const saveForm = () => {
+    let nextItems: MenuItem[];
     if (editing) {
-      setItems(prev => prev.map(i => i.id === editing.id ? { ...i, ...formData } as MenuItem : i));
+      nextItems = items.map(i => i.id === editing.id ? { ...i, ...formData } as MenuItem : i);
     } else {
       const newItem: MenuItem = {
         id: Date.now().toString(),
@@ -88,13 +106,16 @@ export default function AdminMenu() {
         description: formData.description ?? '',
         stock: formData.stock ?? 0,
         ingredients: formData.ingredients ?? [],
+        allergens: formData.allergens ?? [],
         taxRate: formData.taxRate ?? 5,
         image: formData.image ?? '',
         portionSize: formData.portionSize ?? 'Regular',
         weight: formData.weight ?? 0,
       };
-      setItems(prev => [...prev, newItem]);
+      nextItems = [...items, newItem];
     }
+    setItems(nextItems);
+    setMenuItems(nextItems);
     setShowForm(false);
     setFormData({});
   };
