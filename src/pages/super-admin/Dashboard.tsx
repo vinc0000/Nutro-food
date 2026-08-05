@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Building2, TrendingUp, DollarSign, Activity, Tablet, ShieldAlert, Globe, Users,
@@ -50,10 +50,10 @@ export default function SuperAdminDashboard() {
   const [toast, setToast] = useState<string | null>(null);
   const [viewTenant, setViewTenant] = useState<typeof DEMO_TENANTS[0] | null>(null);
 
-  useState(() => {
+  useEffect(() => {
     supabase.from('platform_metrics').select('*').order('date', { ascending: true })
-      .then(({ data }) => setMetrics(data ?? []));
-  });
+      .then(({ data }: any) => setMetrics((data as unknown as Metric[]) ?? []));
+  }, []);
 
   const latest = metrics[metrics.length - 1];
   const prev = metrics[metrics.length - 2];
