@@ -43,9 +43,6 @@ export function SuperAdminGuard({ children }: { children: ReactNode }) {
 }
 
 export function TabletGuard({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth();
-  if (loading) return <LoadingScreen />;
-  if (!user) return <Navigate to="/auth/login" replace />;
   return <>{children}</>;
 }
 
