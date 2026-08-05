@@ -8,11 +8,89 @@ import { useOrgContext } from '@/hooks/useOrgContext';
 
 export default function AdminSettings() {
   const { theme, themeName, setTheme } = useTheme();
+  const { orgContext } = useOrgContext();
   const [activeTab, setActiveTab] = useState('general');
-  const [country, setCountry] = useState('AE');
   const [savedMsg, setSavedMsg] = useState('');
 
   const showSaved = (msg: string) => { setSavedMsg(msg); setTimeout(() => setSavedMsg(''), 2500); };
+
+  // General settings state
+  const [restaurantName, setRestaurantName] = useState(() => localStorage.getItem('nutro:settings:name') ?? orgContext?.org_name ?? 'Le Dubai Maison');
+  const [address, setAddress] = useState(() => localStorage.getItem('nutro:settings:address') ?? '123 Main St, Dubai');
+  const [email, setEmail] = useState(() => localStorage.getItem('nutro:settings:email') ?? 'info@restaurant.com');
+  const [phone, setPhone] = useState(() => localStorage.getItem('nutro:settings:phone') ?? '+971 XX XXX XXXX');
+
+  // Localization settings state
+  const [country, setCountry] = useState(() => localStorage.getItem('nutro:settings:country') ?? 'AE');
+  const [stateRegion, setStateRegion] = useState(() => localStorage.getItem('nutro:settings:state') ?? 'Dubai');
+  const [city, setCity] = useState(() => localStorage.getItem('nutro:settings:city') ?? 'Dubai');
+  const [sector, setSector] = useState(() => localStorage.getItem('nutro:settings:sector') ?? 'Downtown');
+  const [landmark, setLandmark] = useState(() => localStorage.getItem('nutro:settings:landmark') ?? 'Near Burj Khalifa');
+  const [currency, setCurrency] = useState(() => localStorage.getItem('nutro:settings:currency') ?? 'AED');
+  const [language, setLanguage] = useState(() => localStorage.getItem('nutro:settings:language') ?? 'en');
+
+  // Social & Stamp state
+  const [instagram, setInstagram] = useState(() => localStorage.getItem('nutro:settings:instagram') ?? 'https://instagram.com/yourrestaurant');
+  const [tiktok, setTiktok] = useState(() => localStorage.getItem('nutro:settings:tiktok') ?? 'https://tiktok.com/@yourrestaurant');
+  const [facebook, setFacebook] = useState(() => localStorage.getItem('nutro:settings:facebook') ?? 'https://facebook.com/yourrestaurant');
+  const [whatsapp, setWhatsapp] = useState(() => localStorage.getItem('nutro:settings:whatsapp') ?? '+971 XX XXX XXXX');
+  const [googleReviews, setGoogleReviews] = useState(() => localStorage.getItem('nutro:settings:googleReviews') ?? 'https://g.page/r/yourrestaurant');
+  const [stampUrl, setStampUrl] = useState(() => localStorage.getItem('nutro:settings:stampUrl') ?? '');
+  const [logoUrl, setLogoUrl] = useState(() => localStorage.getItem('nutro:settings:logoUrl') ?? '');
+
+  // Notifications state
+  const [notifNewOrder, setNotifNewOrder] = useState(() => JSON.parse(localStorage.getItem('nutro:settings:notifNewOrder') ?? 'true'));
+  const [notifKdsOverdue, setNotifKdsOverdue] = useState(() => JSON.parse(localStorage.getItem('nutro:settings:notifKdsOverdue') ?? 'true'));
+  const [notifServiceReq, setNotifServiceReq] = useState(() => JSON.parse(localStorage.getItem('nutro:settings:notifServiceReq') ?? 'true'));
+  const [notifLowStock, setNotifLowStock] = useState(() => JSON.parse(localStorage.getItem('nutro:settings:notifLowStock') ?? 'true'));
+  const [notifDailyRev, setNotifDailyRev] = useState(() => JSON.parse(localStorage.getItem('nutro:settings:notifDailyRev') ?? 'true'));
+  const [notifStaffClock, setNotifStaffClock] = useState(() => JSON.parse(localStorage.getItem('nutro:settings:notifStaffClock') ?? 'true'));
+
+  useEffect(() => {
+    if (orgContext) {
+      if (!localStorage.getItem('nutro:settings:name')) setRestaurantName(orgContext.org_name);
+      if (!localStorage.getItem('nutro:settings:country')) setCountry(orgContext.country === 'United Arab Emirates' ? 'AE' : 'US');
+      if (!localStorage.getItem('nutro:settings:city')) setCity(orgContext.city ?? 'Dubai');
+      if (!localStorage.getItem('nutro:settings:currency')) setCurrency(orgContext.currency ?? 'AED');
+    }
+  }, [orgContext]);
+
+  const saveGeneral = () => {
+    localStorage.setItem('nutro:settings:name', restaurantName);
+    localStorage.setItem('nutro:settings:address', address);
+    localStorage.setItem('nutro:settings:email', email);
+    localStorage.setItem('nutro:settings:phone', phone);
+    showSaved('Restaurant profile saved successfully');
+  };
+
+  const saveLocalization = () => {
+    localStorage.setItem('nutro:settings:country', country);
+    localStorage.setItem('nutro:settings:state', stateRegion);
+    localStorage.setItem('nutro:settings:city', city);
+    localStorage.setItem('nutro:settings:sector', sector);
+    localStorage.setItem('nutro:settings:landmark', landmark);
+    localStorage.setItem('nutro:settings:currency', currency);
+    localStorage.setItem('nutro:settings:language', language);
+    showSaved('Localization settings saved successfully');
+  };
+
+  const saveSocial = () => {
+    localStorage.setItem('nutro:settings:instagram', instagram);
+    localStorage.setItem('nutro:settings:tiktok', tiktok);
+    localStorage.setItem('nutro:settings:facebook', facebook);
+    localStorage.setItem('nutro:settings:whatsapp', whatsapp);
+    localStorage.setItem('nutro:settings:googleReviews', googleReviews);
+    localStorage.setItem('nutro:settings:stampUrl', stampUrl);
+    localStorage.setItem('nutro:settings:logoUrl', logoUrl);
+    showSaved('Social and branding options saved successfully');
+  };
+
+  const toggleNotif = (key: string, currentVal: boolean, setter: (v: boolean) => void) => {
+    const nextVal = !currentVal;
+    setter(nextVal);
+    localStorage.setItem(`nutro:settings:${key}`, JSON.stringify(nextVal));
+    showSaved('Notification settings updated');
+  };
 
   const TABS = [
     { id: 'general', label: 'General', icon: Building2 },
@@ -47,19 +125,27 @@ export default function AdminSettings() {
         {activeTab === 'general' && (
           <div className="space-y-5">
             <h2 className="font-extrabold" style={{ color: theme.text }}>Restaurant Profile</h2>
-            {[
-              { label: 'Restaurant Name', placeholder: 'My Restaurant' },
-              { label: 'Address', placeholder: '123 Main St, Dubai' },
-              { label: 'Business Email', placeholder: 'info@restaurant.com' },
-              { label: 'Phone Number', placeholder: '+971 XX XXX XXXX' },
-            ].map(f => (
-              <div key={f.label}>
-                <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>{f.label}</label>
-                <input placeholder={f.placeholder} className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
-                  style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
-              </div>
-            ))}
-            <button onClick={() => showSaved('Restaurant profile saved')} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>Save Changes</button>
+            <div>
+              <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Restaurant Name</label>
+              <input value={restaurantName} onChange={e => setRestaurantName(e.target.value)} placeholder="My Restaurant" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+            </div>
+            <div>
+              <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Address</label>
+              <input value={address} onChange={e => setAddress(e.target.value)} placeholder="123 Main St, Dubai" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+            </div>
+            <div>
+              <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Business Email</label>
+              <input value={email} onChange={e => setEmail(e.target.value)} placeholder="info@restaurant.com" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+            </div>
+            <div>
+              <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Phone Number</label>
+              <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+971 XX XXX XXXX" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+            </div>
+            <button onClick={saveGeneral} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>Save Changes</button>
           </div>
         )}
 
@@ -87,7 +173,7 @@ export default function AdminSettings() {
             <h2 className="font-extrabold" style={{ color: theme.text }}>Geographic Localization</h2>
             <div>
               <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Country (auto-sets currency)</label>
-              <select value={country} onChange={e => setCountry(e.target.value)}
+              <select value={country} onChange={e => { setCountry(e.target.value); const c = COUNTRIES.find(x => x.code === e.target.value); if (c) setCurrency(c.currency); }}
                 className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
                 style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>
                 {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}
@@ -96,48 +182,48 @@ export default function AdminSettings() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>State / Region</label>
-                <input placeholder="Auto-cascaded" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                <input value={stateRegion} onChange={e => setStateRegion(e.target.value)} placeholder="Dubai" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
                   style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
               </div>
               <div>
                 <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>City</label>
-                <input placeholder="Auto-cascaded" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                <input value={city} onChange={e => setCity(e.target.value)} placeholder="Dubai" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
                   style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
               </div>
               <div>
                 <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Sector / District</label>
-                <input placeholder="Auto-cascaded" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                <input value={sector} onChange={e => setSector(e.target.value)} placeholder="Downtown" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
                   style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
               </div>
               <div>
                 <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Landmark</label>
-                <input placeholder="Manual override" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                <input value={landmark} onChange={e => setLandmark(e.target.value)} placeholder="Near Burj Khalifa" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
                   style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
               </div>
             </div>
             <div className="flex items-center gap-2 p-3 rounded-xl" style={{ background: theme.primary + '10' }}>
               <MapPin size={14} style={{ color: theme.primary }} />
               <span className="text-xs" style={{ color: theme.textMuted }}>
-                Currency auto-set to <strong style={{ color: theme.primary }}>{selectedCountry?.currency}</strong> for {selectedCountry?.flag} {selectedCountry?.name}. You can override this manually.
+                Currency auto-set to <strong style={{ color: theme.primary }}>{currency}</strong> for {selectedCountry?.flag} {selectedCountry?.name}. You can override this manually.
               </span>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Default Currency</label>
-                <select className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
-                  style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} defaultValue={selectedCountry?.currency}>
+                <select value={currency} onChange={e => setCurrency(e.target.value)} className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                  style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>
                   {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.symbol} {c.code} - {c.name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Default Language</label>
-                <select className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                <select value={language} onChange={e => setLanguage(e.target.value)} className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
                   style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>
                   {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.flag} {l.name} ({l.nativeName})</option>)}
                 </select>
               </div>
             </div>
-            <button onClick={() => showSaved('Localization settings saved')} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>Save</button>
+            <button onClick={saveLocalization} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>Save Localization</button>
           </div>
         )}
 
@@ -146,19 +232,31 @@ export default function AdminSettings() {
             <div>
               <h2 className="font-extrabold mb-1" style={{ color: theme.text }}>Social Media Links</h2>
               <p className="text-sm mb-4" style={{ color: theme.textMuted }}>Displayed as QR codes & icons on customer tablets</p>
-              {[
-                { label: 'Instagram', placeholder: 'https://instagram.com/yourrestaurant' },
-                { label: 'TikTok', placeholder: 'https://tiktok.com/@yourrestaurant' },
-                { label: 'Facebook', placeholder: 'https://facebook.com/yourrestaurant' },
-                { label: 'WhatsApp', placeholder: '+971 XX XXX XXXX' },
-                { label: 'Google Maps Review URL', placeholder: 'https://g.page/r/yourrestaurant' },
-              ].map(f => (
-                <div key={f.label} className="mb-3">
-                  <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>{f.label}</label>
-                  <input placeholder={f.placeholder} className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
-                    style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
-                </div>
-              ))}
+              <div className="mb-3">
+                <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Instagram</label>
+                <input value={instagram} onChange={e => setInstagram(e.target.value)} placeholder="https://instagram.com/yourrestaurant" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                  style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+              </div>
+              <div className="mb-3">
+                <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>TikTok</label>
+                <input value={tiktok} onChange={e => setTiktok(e.target.value)} placeholder="https://tiktok.com/@yourrestaurant" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                  style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+              </div>
+              <div className="mb-3">
+                <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Facebook</label>
+                <input value={facebook} onChange={e => setFacebook(e.target.value)} placeholder="https://facebook.com/yourrestaurant" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                  style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+              </div>
+              <div className="mb-3">
+                <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>WhatsApp</label>
+                <input value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="+971 XX XXX XXXX" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                  style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+              </div>
+              <div className="mb-3">
+                <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Google Maps Review URL</label>
+                <input value={googleReviews} onChange={e => setGoogleReviews(e.target.value)} placeholder="https://g.page/r/yourrestaurant" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                  style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+              </div>
             </div>
             <div className="pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>
               <h3 className="font-bold mb-1 flex items-center gap-2" style={{ color: theme.text }}>
@@ -166,23 +264,29 @@ export default function AdminSettings() {
               </h3>
               <p className="text-sm mb-3" style={{ color: theme.textMuted }}>Upload your restaurant's official rubber stamp or digital signature for receipts & invoices</p>
               <div className="flex items-center gap-4">
-                <div className="w-24 h-24 rounded-xl flex items-center justify-center" style={{ background: theme.bg, border: `2px dashed ${theme.border}` }}>
-                  <Stamp size={28} style={{ color: theme.textMuted }} />
+                <div className="w-24 h-24 rounded-xl flex items-center justify-center overflow-hidden" style={{ background: theme.bg, border: `2px dashed ${theme.border}` }}>
+                  {stampUrl ? <img src={stampUrl} alt="Stamp" className="w-full h-full object-cover" /> : <Stamp size={28} style={{ color: theme.textMuted }} />}
                 </div>
-                <button onClick={() => showSaved('Stamp upload dialog opened')} className="px-4 py-2.5 rounded-xl text-sm font-bold" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>Upload Stamp</button>
+                <button onClick={() => {
+                  const url = prompt('Enter Stamp Image URL:', stampUrl);
+                  if (url !== null) setStampUrl(url);
+                }} className="px-4 py-2.5 rounded-xl text-sm font-bold" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>Upload Stamp</button>
               </div>
             </div>
             <div className="pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>
               <h3 className="font-bold mb-1" style={{ color: theme.text }}>Restaurant Logo</h3>
               <p className="text-sm mb-3" style={{ color: theme.textMuted }}>Used on tablet menus, receipts, and invoices</p>
               <div className="flex items-center gap-4">
-                <div className="w-24 h-24 rounded-xl flex items-center justify-center" style={{ background: theme.bg, border: `2px dashed ${theme.border}` }}>
-                  <Building2 size={28} style={{ color: theme.textMuted }} />
+                <div className="w-24 h-24 rounded-xl flex items-center justify-center overflow-hidden" style={{ background: theme.bg, border: `2px dashed ${theme.border}` }}>
+                  {logoUrl ? <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" /> : <Building2 size={28} style={{ color: theme.textMuted }} />}
                 </div>
-                <button onClick={() => showSaved('Logo upload dialog opened')} className="px-4 py-2.5 rounded-xl text-sm font-bold" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>Upload Logo</button>
+                <button onClick={() => {
+                  const url = prompt('Enter Logo Image URL:', logoUrl);
+                  if (url !== null) setLogoUrl(url);
+                }} className="px-4 py-2.5 rounded-xl text-sm font-bold" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>Upload Logo</button>
               </div>
             </div>
-            <button onClick={() => showSaved('Social & branding saved')} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>Save Social & Branding</button>
+            <button onClick={saveSocial} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>Save Social & Branding</button>
           </div>
         )}
 
@@ -194,19 +298,19 @@ export default function AdminSettings() {
           <div className="space-y-4">
             <h2 className="font-extrabold" style={{ color: theme.text }}>Notification Preferences</h2>
             {[
-              { label: 'New Order Alerts', desc: 'Notify when a new order is placed' },
-              { label: 'KDS Overdue Alerts', desc: 'Alert when a ticket exceeds 15 minutes' },
-              { label: 'Service Request Alerts', desc: 'Sound/visual alert for Call Waiter, Water, Bill requests' },
-              { label: 'Low Stock Warnings', desc: 'Notify when menu items reach 0 portions' },
-              { label: 'Daily Revenue Summary', desc: 'Email summary at end of day' },
-              { label: 'Staff Clock-in Alerts', desc: 'Notify on shift start/end' },
+              { label: 'New Order Alerts', desc: 'Notify when a new order is placed', state: notifNewOrder, setter: setNotifNewOrder, key: 'notifNewOrder' },
+              { label: 'KDS Overdue Alerts', desc: 'Alert when a ticket exceeds 15 minutes', state: notifKdsOverdue, setter: setNotifKdsOverdue, key: 'notifKdsOverdue' },
+              { label: 'Service Request Alerts', desc: 'Sound/visual alert for Call Waiter, Water, Bill requests', state: notifServiceReq, setter: setNotifServiceReq, key: 'notifServiceReq' },
+              { label: 'Low Stock Warnings', desc: 'Notify when menu items reach 0 portions', state: notifLowStock, setter: setNotifLowStock, key: 'notifLowStock' },
+              { label: 'Daily Revenue Summary', desc: 'Email summary at end of day', state: notifDailyRev, setter: setNotifDailyRev, key: 'notifDailyRev' },
+              { label: 'Staff Clock-in Alerts', desc: 'Notify on shift start/end', state: notifStaffClock, setter: setNotifStaffClock, key: 'notifStaffClock' },
             ].map(n => (
               <div key={n.label} className="flex items-center justify-between py-3" style={{ borderBottom: `1px solid ${theme.border}` }}>
                 <div>
                   <div className="text-sm font-semibold" style={{ color: theme.text }}>{n.label}</div>
                   <div className="text-xs" style={{ color: theme.textMuted }}>{n.desc}</div>
                 </div>
-                <input type="checkbox" defaultChecked style={{ accentColor: theme.primary }} />
+                <input type="checkbox" checked={n.state} onChange={() => toggleNotif(n.key, n.state, n.setter)} style={{ accentColor: theme.primary }} />
               </div>
             ))}
           </div>
@@ -221,44 +325,44 @@ export default function AdminSettings() {
   );
 }
 
-function TrialStatusCard() {
-  const { theme } = useTheme();
-  const { isTrialActive, daysLeft, isTrialExpired, isSuspended, plan, planStatus } = usePlanInfo();
-
-  if (isTrialExpired || isSuspended) {
-    return (
-      <div className="p-4 rounded-xl" style={{ background: '#ef444410', border: '1px solid #ef444430' }}>
-        <div className="flex items-center justify-between mb-1">
-          <span className="font-bold" style={{ color: '#ef4444' }}>Trial Expired</span>
-          <span className="text-xs font-bold uppercase" style={{ color: theme.textMuted }}>{plan}</span>
-        </div>
-        <p className="text-sm" style={{ color: theme.textMuted }}>Your free trial has ended. Choose a plan below to reactivate your account and restore access to all features.</p>
-      </div>
-    );
-  }
-
-  if (isTrialActive) {
-    return (
-      <div className="p-4 rounded-xl" style={{ background: daysLeft <= 3 ? '#eab30810' : theme.primary + '08', border: `1px solid ${daysLeft <= 3 ? '#eab30830' : theme.primary + '20'}` }}>
-        <div className="flex items-center justify-between mb-1">
-          <span className="font-bold" style={{ color: daysLeft <= 3 ? '#eab308' : theme.primary }}>Free Trial Active</span>
-          <span className="text-xs font-bold" style={{ color: daysLeft <= 3 ? '#eab308' : theme.primary }}>{daysLeft} days left</span>
-        </div>
-        <p className="text-sm" style={{ color: theme.textMuted }}>You're on the {plan} plan trial. All features unlocked until your trial expires. Choose a plan below to continue after your trial ends.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-4 rounded-xl" style={{ background: '#22c55e10', border: '1px solid #22c55e30' }}>
-      <div className="flex items-center justify-between mb-1">
-        <span className="font-bold" style={{ color: '#22c55e' }}>Active Subscription</span>
-        <span className="text-xs font-bold uppercase" style={{ color: theme.textMuted }}>{plan} · {planStatus}</span>
-      </div>
-      <p className="text-sm" style={{ color: theme.textMuted }}>Your subscription is active. You can change or cancel your plan at any time.</p>
-    </div>
-  );
-}
+// function TrialStatusCard() {
+//   const { theme } = useTheme();
+//   const { isTrialActive, daysLeft, isTrialExpired, isSuspended, plan, planStatus } = usePlanInfo();
+//
+//   if (isTrialExpired || isSuspended) {
+//     return (
+//       <div className="p-4 rounded-xl" style={{ background: '#ef444410', border: '1px solid #ef444430' }}>
+//         <div className="flex items-center justify-between mb-1">
+//           <span className="font-bold" style={{ color: '#ef4444' }}>Trial Expired</span>
+//           <span className="text-xs font-bold uppercase" style={{ color: theme.textMuted }}>{plan}</span>
+//         </div>
+//         <p className="text-sm" style={{ color: theme.textMuted }}>Your free trial has ended. Choose a plan below to reactivate your account and restore access to all features.</p>
+//       </div>
+//     );
+//   }
+//
+//   if (isTrialActive) {
+//     return (
+//       <div className="p-4 rounded-xl" style={{ background: daysLeft <= 3 ? '#eab30810' : theme.primary + '08', border: `1px solid ${daysLeft <= 3 ? '#eab30830' : theme.primary + '20'}` }}>
+//         <div className="flex items-center justify-between mb-1">
+//           <span className="font-bold" style={{ color: daysLeft <= 3 ? '#eab308' : theme.primary }}>Free Trial Active</span>
+//           <span className="text-xs font-bold" style={{ color: daysLeft <= 3 ? '#eab308' : theme.primary }}>{daysLeft} days left</span>
+//         </div>
+//         <p className="text-sm" style={{ color: theme.textMuted }}>You're on the {plan} plan trial. All features unlocked until your trial expires. Choose a plan below to continue after your trial ends.</p>
+//       </div>
+//     );
+//   }
+//
+//   return (
+//     <div className="p-4 rounded-xl" style={{ background: '#22c55e10', border: '1px solid #22c55e30' }}>
+//       <div className="flex items-center justify-between mb-1">
+//         <span className="font-bold" style={{ color: '#22c55e' }}>Active Subscription</span>
+//         <span className="text-xs font-bold uppercase" style={{ color: theme.textMuted }}>{plan} · {planStatus}</span>
+//       </div>
+//       <p className="text-sm" style={{ color: theme.textMuted }}>Your subscription is active. You can change or cancel your plan at any time.</p>
+//     </div>
+//   );
+// }
 
 function PosSecurityTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['theme']; showSaved: (msg: string) => void }) {
   const { orgContext } = useOrgContext();

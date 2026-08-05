@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UtensilsCrossed, Mail, Lock, Eye, EyeOff, AlertCircle, Check, ArrowLeft } from 'lucide-react';
@@ -24,6 +24,14 @@ export default function LoginPage() {
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
 
+  useEffect(() => {
+    const remembered = localStorage.getItem('nutro:remembered-email');
+    if (remembered) {
+      setEmail(remembered);
+      setRemember(true);
+    }
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -31,6 +39,28 @@ export default function LoginPage() {
     const { error } = await signIn(email, password);
     setLoading(false);
     if (error) { setError(error); return; }
+
+    // Save User Connection Log
+    try {
+      const connections = JSON.parse(localStorage.getItem('nutro:user-connections') || '[]');
+      connections.unshift({
+        id: 'conn-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+        email: email,
+        loggedAt: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+      });
+      localStorage.setItem('nutro:user-connections', JSON.stringify(connections.slice(0, 50)));
+    } catch (err) {
+      console.error('Failed to log connection:', err);
+    }
+
+    // Save/Clear Remembered Email
+    if (remember) {
+      localStorage.setItem('nutro:remembered-email', email);
+    } else {
+      localStorage.removeItem('nutro:remembered-email');
+    }
+
     navigate(from, { replace: true });
   };
 

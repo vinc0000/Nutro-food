@@ -11,6 +11,7 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { useNavigate } from 'react-router-dom';
 import { useSharedMenu } from '@/lib/menuStore';
 import { useSharedOrders, SharedOrder } from '@/lib/ordersStore';
+import { usePlanInfo } from '@/hooks/useOrgContext';
 
 interface CartItem { id: string; name: string; price: number; qty: number; }
 interface TabletOrder {
@@ -18,9 +19,8 @@ interface TabletOrder {
   total: number; status: 'pending' | 'accepted' | 'rejected'; time: string;
 }
 
-const CATEGORIES = ['All', 'Starters', 'Mains', 'Desserts', 'Drinks'];
+const CATEGORIES = ['All', 'Starters', 'Mains', 'Desserts', 'Drinks', 'Snacks'];
 
-const PLAN_TABLE_LIMIT = 10;
 const tableColor: Record<string, string> = { available: '#22c55e', occupied: '#ef4444', reserved: '#eab308', cleaning: '#94a3b8' };
 type PayMethod = 'cash' | 'card' | 'tap' | 'gift_card' | 'flutterwave';
 
@@ -123,6 +123,9 @@ export default function PosTerminal() {
   const { t } = useLocale();
   const { menuItems } = useSharedMenu();
   const navigate = useNavigate();
+  const { plan } = usePlanInfo();
+  const PLAN_TABLE_LIMIT = plan === 'starter' ? 10 : (plan === 'premium' ? 30 : 999);
+
   const [unlocked, setUnlocked] = useState(false);
   const [cat, setCat] = useState('All');
   const [search, setSearch] = useState('');
