@@ -11,7 +11,8 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { useNavigate } from 'react-router-dom';
 import { useSharedMenu } from '@/lib/menuStore';
 import { useSharedOrders, SharedOrder } from '@/lib/ordersStore';
-import { usePlanInfo } from '@/hooks/useOrgContext';
+import { usePlanInfo, useOrgContext } from '@/hooks/useOrgContext';
+import { CURRENCIES } from '@/lib/countries';
 
 interface CartItem { id: string; name: string; price: number; qty: number; }
 interface TabletOrder {
@@ -124,7 +125,11 @@ export default function PosTerminal() {
   const { menuItems } = useSharedMenu();
   const navigate = useNavigate();
   const { plan } = usePlanInfo();
+  const { orgContext } = useOrgContext();
   const PLAN_TABLE_LIMIT = plan === 'starter' ? 10 : (plan === 'premium' ? 30 : 999);
+
+  const currencyCode = localStorage.getItem('nutro:settings:currency') ?? orgContext?.currency ?? 'USD';
+  const currencySymbol = CURRENCIES.find(c => c.code === currencyCode)?.symbol ?? '$';
 
   const [unlocked, setUnlocked] = useState(false);
   const [cat, setCat] = useState('All');
@@ -268,7 +273,7 @@ export default function PosTerminal() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2 text-xs rounded-full px-3 py-1.5" style={{ color: theme.textMuted, background: theme.bg, border: `1px solid ${theme.border}` }}>
-              <Clock size={12} /><span>{Math.floor((Date.now() - sessionStart.getTime()) / 60000)}{t('pos.minutes')}</span><span>· {orderCount} {t('common.orders')}</span><span>· ${sessionSales.toFixed(2)}</span>
+              <Clock size={12} /><span>{Math.floor((Date.now() - sessionStart.getTime()) / 60000)}{t('pos.minutes')}</span><span>· {orderCount} {t('common.orders')}</span><span>· {currencySymbol}{sessionSales.toFixed(2)}</span>
             </div>
             <button onClick={() => setShowTabletOrders(true)} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-full relative" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>
               <Tablet size={12} /> {t('pos.tabletOrders')}
@@ -359,7 +364,7 @@ export default function PosTerminal() {
                     style={{ background: inCart ? theme.primary + '15' : theme.surface, border: `1px solid ${inCart ? theme.primary : theme.border}` }}>
                     <div className="text-sm font-bold leading-tight mb-1" style={{ color: theme.text }}>{item.name}</div>
                     <div className="text-xs" style={{ color: theme.textMuted }}>{item.calories} kcal</div>
-                    <div className="text-base font-extrabold mt-2" style={{ color: theme.primary }}>${item.price}</div>
+                    <div className="text-base font-extrabold mt-2" style={{ color: theme.primary }}>{currencySymbol}{item.price}</div>
                     {!item.available && <div className="absolute inset-0 flex items-center justify-center rounded-xl" style={{ background: 'rgba(0,0,0,0.4)' }}><span className="text-[10px] font-bold text-white">SOLD OUT</span></div>}
                     {inCart && <div className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-extrabold text-white" style={{ background: theme.primary }}>{inCart.qty}</div>}
                   </motion.button>
@@ -384,7 +389,7 @@ export default function PosTerminal() {
               <div key={item.id} className="flex items-center gap-2 py-2 px-2 rounded-xl" style={{ background: theme.bg, border: `1px solid ${theme.border}` }}>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold truncate" style={{ color: theme.text }}>{item.name}</div>
-                  <div className="text-xs" style={{ color: theme.primary }}>${(item.price * item.qty).toFixed(2)}</div>
+                  <div className="text-xs" style={{ color: theme.primary }}>{currencySymbol}{(item.price * item.qty).toFixed(2)}</div>
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => updateQty(item.id, -1)} className="w-6 h-6 rounded flex items-center justify-center" style={{ background: theme.bg, color: theme.textMuted }}><Minus size={10} /></button>
@@ -396,10 +401,10 @@ export default function PosTerminal() {
           </div>
           <div className="p-3 sm:p-4 space-y-2 flex-shrink-0" style={{ borderTop: `1px solid ${theme.border}` }}>
             <div className="rounded-2xl p-3" style={{ background: theme.bg, border: `1px solid ${theme.border}` }}>
-              <div className="flex justify-between text-xs" style={{ color: theme.textMuted }}><span>Subtotal</span><span>${subtotal.toFixed(2)}</span></div>
-              <div className="flex justify-between text-xs mt-1" style={{ color: theme.textMuted }}><span>Tax (5%)</span><span>${tax.toFixed(2)}</span></div>
+              <div className="flex justify-between text-xs" style={{ color: theme.textMuted }}><span>Subtotal</span><span>{currencySymbol}{subtotal.toFixed(2)}</span></div>
+              <div className="flex justify-between text-xs mt-1" style={{ color: theme.textMuted }}><span>Tax (5%)</span><span>{currencySymbol}{tax.toFixed(2)}</span></div>
               <div className="flex justify-between font-extrabold text-base mt-2" style={{ color: theme.text }}>
-                <span>Total</span><span style={{ color: theme.primary }}>${total.toFixed(2)}</span>
+                <span>Total</span><span style={{ color: theme.primary }}>{currencySymbol}{total.toFixed(2)}</span>
               </div>
             </div>
             {isPaid && (
@@ -410,7 +415,7 @@ export default function PosTerminal() {
             )}
             <button onClick={() => cart.length > 0 && setShowPayment(true)} disabled={cart.length === 0 || isPaid}
               className="w-full py-3 rounded-2xl font-bold text-sm text-white transition-all disabled:opacity-40" style={{ background: theme.primary }}>
-              {isPaid ? 'Paid' : `Charge $${total.toFixed(2)}`}
+              {isPaid ? 'Paid' : `Charge ${currencySymbol}${total.toFixed(2)}`}
             </button>
             <div className="flex gap-2">
               <button onClick={() => cart.length > 0 && isPaid && setShowReceipt(true)} disabled={cart.length === 0 || !isPaid}
@@ -442,7 +447,7 @@ export default function PosTerminal() {
                     <Check size={32} style={{ color: '#22c55e' }} />
                   </div>
                   <h2 className="text-xl font-extrabold mb-1" style={{ color: theme.text }}>Payment Successful!</h2>
-                  <p className="text-sm" style={{ color: theme.textMuted }}>${total.toFixed(2)} charged via {payMethod}</p>
+                  <p className="text-sm" style={{ color: theme.textMuted }}>{currencySymbol}{total.toFixed(2)} charged via {payMethod}</p>
                   <p className="text-xs mt-2" style={{ color: theme.primary }}>Receipt is now printable</p>
                 </div>
               ) : (
@@ -452,7 +457,7 @@ export default function PosTerminal() {
                     <button onClick={() => setShowPayment(false)} style={{ color: theme.textMuted }}><X size={18} /></button>
                   </div>
                   <div className="text-center mb-5">
-                    <div className="text-4xl font-extrabold" style={{ color: theme.primary }}>${total.toFixed(2)}</div>
+                    <div className="text-4xl font-extrabold" style={{ color: theme.primary }}>{currencySymbol}{total.toFixed(2)}</div>
                     <div className="text-xs mt-1" style={{ color: theme.textMuted }}>{cart.length} items · Tax included</div>
                     <div className="text-xs mt-1" style={{ color: '#eab308' }}>Receipt locked until payment confirmed</div>
                   </div>
@@ -505,13 +510,13 @@ export default function PosTerminal() {
                         {[total, Math.ceil(total / 5) * 5, Math.ceil(total / 10) * 10, Math.ceil(total / 20) * 20, Math.ceil(total / 50) * 50].filter((v, i, a) => a.indexOf(v) === i).map(v => (
                           <button key={v} onClick={() => setCashGiven(v.toFixed(2))}
                             className="px-3 py-1.5 rounded-lg text-xs font-bold"
-                            style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>${v.toFixed(2)}</button>
+                            style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>{currencySymbol}{v.toFixed(2)}</button>
                         ))}
                       </div>
                       {cashGiven && (
                         <div className="p-3 rounded-xl text-center" style={{ background: '#22c55e15', border: '1px solid #22c55e30' }}>
                           <div className="text-xs font-semibold" style={{ color: theme.textMuted }}>CHANGE TO GIVE</div>
-                          <div className="text-3xl font-extrabold" style={{ color: '#22c55e' }}>${change.toFixed(2)}</div>
+                          <div className="text-3xl font-extrabold" style={{ color: '#22c55e' }}>{currencySymbol}{change.toFixed(2)}</div>
                         </div>
                       )}
                     </div>
@@ -549,16 +554,16 @@ export default function PosTerminal() {
                 {cart.map(item => (
                   <div key={item.id} className="flex justify-between">
                     <span>{item.qty}x {item.name}</span>
-                    <span>${(item.price * item.qty).toFixed(2)}</span>
+                    <span>{currencySymbol}{(item.price * item.qty).toFixed(2)}</span>
                   </div>
                 ))}
               </div>
               <div className="border-t border-dashed border-gray-300 pt-3 text-xs space-y-1">
-                <div className="flex justify-between"><span>Subtotal</span><span>${subtotal.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span>Tax (5%)</span><span>${tax.toFixed(2)}</span></div>
-                <div className="flex justify-between font-bold text-sm"><span>TOTAL</span><span>${total.toFixed(2)}</span></div>
-                {payMethod === 'cash' && cashGiven && <div className="flex justify-between"><span>Cash</span><span>${parseFloat(cashGiven).toFixed(2)}</span></div>}
-                {payMethod === 'cash' && <div className="flex justify-between"><span>Change</span><span>${change.toFixed(2)}</span></div>}
+                <div className="flex justify-between"><span>Subtotal</span><span>{currencySymbol}{subtotal.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>Tax (5%)</span><span>{currencySymbol}{tax.toFixed(2)}</span></div>
+                <div className="flex justify-between font-bold text-sm"><span>TOTAL</span><span>{currencySymbol}{total.toFixed(2)}</span></div>
+                {payMethod === 'cash' && cashGiven && <div className="flex justify-between"><span>Cash</span><span>{currencySymbol}{parseFloat(cashGiven).toFixed(2)}</span></div>}
+                {payMethod === 'cash' && <div className="flex justify-between"><span>Change</span><span>{currencySymbol}{change.toFixed(2)}</span></div>}
               </div>
               <div className="text-center mt-4 text-xs text-gray-500">
                 <p>Thank you for dining with us!</p>
@@ -592,7 +597,7 @@ export default function PosTerminal() {
                   <span style={{ color: theme.textMuted }}>Total Orders</span><span className="font-bold" style={{ color: theme.text }}>{orderCount}</span>
                 </div>
                 <div className="flex justify-between p-3 rounded-xl" style={{ background: theme.bg }}>
-                  <span style={{ color: theme.textMuted }}>Total Sales</span><span className="font-bold" style={{ color: theme.primary }}>${sessionSales.toFixed(2)}</span>
+                  <span style={{ color: theme.textMuted }}>Total Sales</span><span className="font-bold" style={{ color: theme.primary }}>{currencySymbol}{sessionSales.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between p-3 rounded-xl" style={{ background: theme.bg }}>
                   <span style={{ color: theme.textMuted }}>Session Duration</span><span className="font-bold" style={{ color: theme.text }}>{Math.floor((Date.now() - sessionStart.getTime()) / 60000)} min</span>
@@ -644,12 +649,12 @@ export default function PosTerminal() {
                     <div className="space-y-1 mb-3">
                       {order.items.map((it, i) => (
                         <div key={i} className="flex justify-between text-xs" style={{ color: theme.textMuted }}>
-                          <span>{it.qty}x {it.name}</span><span>${(it.price * it.qty).toFixed(2)}</span>
+                          <span>{it.qty}x {it.name}</span><span>{currencySymbol}{(it.price * it.qty).toFixed(2)}</span>
                         </div>
                       ))}
                     </div>
                     <div className="flex justify-between text-sm font-bold mb-3" style={{ color: theme.text }}>
-                      <span>Total</span><span style={{ color: theme.primary }}>${order.total.toFixed(2)}</span>
+                      <span>Total</span><span style={{ color: theme.primary }}>{currencySymbol}{order.total.toFixed(2)}</span>
                     </div>
                     {order.status === 'pending' ? (
                       <div className="flex gap-2">

@@ -518,6 +518,9 @@ function PosSecurityTab({ theme, showSaved }: { theme: ReturnType<typeof useThem
   );
 }
 
+import { AnimatePresence, motion } from 'framer-motion';
+import { CreditCard as CardIcon, X as CloseIcon } from 'lucide-react';
+
 function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['theme']; showSaved: (msg: string) => void }) {
   const { plan, planStatus, isTrialActive, daysLeft, refresh } = usePlanInfo();
   const { orgContext } = useOrgContext();
@@ -527,6 +530,13 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
   const [error, setError] = useState<string | null>(null);
   const [latestTxRef, setLatestTxRef] = useState<string | null>(null);
 
+  // Simulated Flutterwave Checkout state
+  const [showFwModal, setShowFwModal] = useState(false);
+  const [fwPlan, setFwPlan] = useState('');
+  const [fwStep, setFwStep] = useState<'details' | 'otp' | 'success'>('details');
+  const [fwCard, setFwCard] = useState('');
+  const [fwOtp, setFwOtp] = useState('');
+
   const PLANS = [
     { name: 'starter', label: 'Starter', price: 29, color: '#94a3b8', features: '10 tables, 3 staff, basic reports' },
     { name: 'premium', label: 'Premium', price: 69, color: '#10B981', features: '30 tables, 10 staff, advanced reports' },
@@ -535,42 +545,33 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
 
   const handleSubscribe = async (planName: string) => {
     setError(null);
-    setPaying(true);
+    setFwPlan(planName);
+    setShowFwModal(true);
+    setFwStep('details');
+    setFwCard('');
+    setFwOtp('');
+  };
+
+  const completeSimulatedSubscription = async () => {
+    setVerifying(true);
     try {
-      const { data: session } = await supabase.auth.getSession();
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flutterwave-pay`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.session?.access_token}`,
-        },
-        body: JSON.stringify({
-          action: 'initialize',
-          plan: planName,
-          billing_period: selectedPeriod,
-          tenant_org_id: orgContext?.org_id,
-        }),
-      });
-      const result = await response.json();
-      if (result.error) {
-        setError(result.error);
-        return;
+      const STORAGE_KEY = 'nutro-demo-store';
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const store = JSON.parse(raw);
+        if (store.organizations && store.organizations[0]) {
+          store.organizations[0].plan = fwPlan.toLowerCase();
+          store.organizations[0].plan_status = 'active';
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+          window.dispatchEvent(new Event('nutro-auth-change'));
+        }
       }
-      if (result.tx_ref) {
-        setLatestTxRef(result.tx_ref);
-      }
-      if (result.payment_link) {
-        window.open(result.payment_link, '_blank');
-        showSaved('Redirecting to Flutterwave payment...');
-      } else if (result.demo_mode) {
-        showSaved('Demo billing flow accepted. Verification can be completed below.');
-      } else {
-        setError('Payment link not available. Flutterwave may not be configured yet.');
-      }
+      await refresh();
+      showSaved(`Subscribed to ${fwPlan} plan successfully!`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Payment failed');
+      console.error(err);
     } finally {
-      setPaying(false);
+      setVerifying(false);
     }
   };
 
@@ -688,6 +689,86 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
           </div>
         </div>
       </div>
+
+      {/* Flutterwave simulated subscription checkout */}
+      <AnimatePresence>
+        {showFwModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl bg-white text-gray-800">
+              <div className="p-6 text-center bg-[#f5a623] text-white">
+                <div className="text-xs font-bold uppercase tracking-wider opacity-90">Flutterwave Merchant API</div>
+                <div className="text-3xl font-extrabold mt-1">
+                  ${selectedPeriod === 'annual'
+                    ? Math.round((PLANS.find(p => p.name === fwPlan)?.price ?? 0) * 10)
+                    : (PLANS.find(p => p.name === fwPlan)?.price ?? 0)
+                  }
+                  <span className="text-sm font-normal">/{selectedPeriod === 'annual' ? 'yr' : 'mo'}</span>
+                </div>
+                <div className="text-[10px] opacity-80 mt-1">Subscription Ref: SUB-FLW-{Date.now().toString().slice(-6)}</div>
+              </div>
+              <div className="p-6 space-y-4">
+                {fwStep === 'details' && (
+                  <>
+                    <h3 className="text-sm font-extrabold text-gray-800">Enter Subscription Payment Details</h3>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Card Number</label>
+                      <input value={fwCard} onChange={e => setFwCard(e.target.value)} placeholder="4000 1234 5678 9010"
+                        className="w-full px-4 py-2.5 rounded-xl text-sm border border-gray-300 outline-none text-gray-800 focus:border-[#f5a623]" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Expiry Date</label>
+                        <input placeholder="MM/YY" className="w-full px-4 py-2.5 rounded-xl text-sm border border-gray-300 outline-none text-gray-800 focus:border-[#f5a623]" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">CVV</label>
+                        <input placeholder="123" className="w-full px-4 py-2.5 rounded-xl text-sm border border-gray-300 outline-none text-gray-800 focus:border-[#f5a623]" />
+                      </div>
+                    </div>
+                    <button onClick={() => setFwStep('otp')} className="w-full py-3 rounded-xl font-bold text-sm text-white bg-[#f5a623]">
+                      Proceed to OTP verification
+                    </button>
+                  </>
+                )}
+                {fwStep === 'otp' && (
+                  <>
+                    <div className="text-center">
+                      <div className="text-xs font-bold text-gray-500 mb-1 uppercase">Enter 6-Digit OTP</div>
+                      <p className="text-xs text-gray-400 mb-4">A simulated OTP has been sent to your phone</p>
+                      <input value={fwOtp} onChange={e => setFwOtp(e.target.value)} placeholder="123456" maxLength={6}
+                        className="w-32 px-4 py-2.5 rounded-xl text-center text-lg font-bold border border-gray-300 outline-none text-gray-800 focus:border-[#22c55e]" />
+                    </div>
+                    <button
+                      onClick={async () => {
+                        setFwStep('success');
+                        await completeSimulatedSubscription();
+                        setTimeout(() => {
+                          setShowFwModal(false);
+                        }, 2000);
+                      }}
+                      className="w-full py-3 rounded-xl font-bold text-sm text-white bg-[#22c55e] mt-4">
+                      Verify & Activate Subscription
+                    </button>
+                  </>
+                )}
+                {fwStep === 'success' && (
+                  <div className="text-center py-6">
+                    <div className="w-12 h-12 rounded-full bg-green-100 text-green-500 flex items-center justify-center mx-auto mb-3">
+                      <Check size={24} />
+                    </div>
+                    <h4 className="text-base font-extrabold text-gray-800">SaaS Subscription Activated</h4>
+                    <p className="text-xs text-gray-400 mt-1">Connecting back to Nutro SaaS...</p>
+                  </div>
+                )}
+                <div className="text-center pt-2">
+                  <button onClick={() => setShowFwModal(false)} className="text-xs text-gray-400 font-semibold hover:underline">Cancel Payment</button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

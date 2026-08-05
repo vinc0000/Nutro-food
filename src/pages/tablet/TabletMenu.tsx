@@ -49,7 +49,9 @@ export default function TabletMenu() {
   const [searchParams] = useSearchParams();
   const tableNum = searchParams.get('table') ?? '1';
 
-  const [currency, setCurrency] = useState('USD');
+  const [currency, setCurrency] = useState(() => {
+    return localStorage.getItem('nutro:settings:currency') ?? 'USD';
+  });
   const [activeCat, setActiveCat] = useState('All');
   const [search, setSearch] = useState('');
   const [activeDietFilters, setActiveDietFilters] = useState<string[]>([]);
