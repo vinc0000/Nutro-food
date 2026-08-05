@@ -119,8 +119,10 @@ export default function KdsView() {
 
   void playSound;
 
-  // Map shared orders into KDS tickets dynamically
-  const tickets: KdsTicket[] = orders.map(o => {
+  // Map shared orders into KDS tickets dynamically, excluding pending tablet orders (validated at POS first)
+  const tickets: KdsTicket[] = orders
+    .filter(o => o.status !== 'pending')
+    .map(o => {
     let kdsStatus: KdsTicket['status'] = 'new';
     if (o.status === 'preparing') kdsStatus = 'preparing';
     else if (o.status === 'ready') kdsStatus = 'ready';

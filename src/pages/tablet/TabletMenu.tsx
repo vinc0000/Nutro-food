@@ -39,7 +39,6 @@ const SOCIAL_LINKS = [
 ];
 
 interface CartItem { item: MenuItem; qty: number; }
-type PayMethod = 'cash' | 'card' | 'tablet_pay' | 'flutterwave';
 
 export default function TabletMenu() {
   const { theme } = useTheme();
@@ -62,17 +61,6 @@ export default function TabletMenu() {
   const [serviceRequest, setServiceRequest] = useState<string | null>(null);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [showSocial, setShowSocial] = useState(false);
-  const [showPayment, setShowPayment] = useState(false);
-  const [payMethod, setPayMethod] = useState<PayMethod>('tablet_pay');
-  const [isPaid] = useState(false);
-  void isPaid;
-  const [, setShowReceipt] = useState(false);
-  void setShowReceipt;
-
-  const [showFlutterwaveSim, setShowFlutterwaveSim] = useState(false);
-  const [fwStep, setFwStep] = useState<'details' | 'otp' | 'success'>('details');
-  const [fwCard, setFwCard] = useState('');
-  const [fwOtp, setFwOtp] = useState('');
 
   // Editable Table and Note states
   const [editableTableNum, setEditableTableNum] = useState(() => searchParams.get('table') ?? '1');
@@ -389,137 +377,6 @@ export default function TabletMenu() {
                   </button>
                 </div>
               )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Payment modal - required before order is placed */}
-      <AnimatePresence>
-        {showPayment && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.8)' }}
-            onClick={() => setShowPayment(false)}>
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
-              className="w-full max-w-sm rounded-2xl p-6" style={{ background: theme.surface, border: `1px solid ${theme.border}` }} onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-extrabold" style={{ color: theme.text }}>Payment Required</h2>
-                <button onClick={() => setShowPayment(false)} style={{ color: theme.textMuted }}><X size={18} /></button>
-              </div>
-              <div className="text-center mb-5">
-                <div className="text-4xl font-extrabold" style={{ color: theme.primary }}>{toPrice(cartTotal)}</div>
-                <div className="text-xs mt-1" style={{ color: theme.textMuted }}>{cartCount} items - Table {tableNum}</div>
-                <div className="text-xs mt-1 flex items-center justify-center gap-1" style={{ color: '#eab308' }}>
-                  <Lock size={11} /> Order is sent to kitchen after payment
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                {([
-                  { key: 'tablet_pay', label: 'Pay at Table', icon: CreditCard },
-                  { key: 'card', label: 'Card', icon: CreditCard },
-                  { key: 'cash', label: 'Cash', icon: Banknote },
-                  { key: 'flutterwave', label: 'Flutterwave', icon: CreditCard }
-                ] as { key: PayMethod; label: string; icon: typeof CreditCard }[]).map(m => (
-                  <button key={m.key} onClick={() => setPayMethod(m.key)}
-                    className="flex flex-col items-center gap-1.5 py-3 rounded-xl text-xs font-bold transition-all"
-                    style={{
-                      background: payMethod === m.key ? (m.key === 'flutterwave' ? '#f5a623' : theme.primary) : theme.bg,
-                      color: payMethod === m.key ? '#fff' : theme.textMuted,
-                      border: `1px solid ${payMethod === m.key ? (m.key === 'flutterwave' ? '#f5a623' : theme.primary) : theme.border}`
-                    }}>
-                    <m.icon size={18} />{m.label}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={() => {
-                  if (payMethod === 'flutterwave') {
-                    setShowPayment(false);
-                    setShowFlutterwaveSim(true);
-                    setFwStep('details');
-                  } else {
-                    processPayment();
-                  }
-                }}
-                className="w-full py-3 rounded-xl font-bold text-sm text-white"
-                style={{ background: payMethod === 'flutterwave' ? '#f5a623' : theme.primary }}>
-                {payMethod === 'flutterwave' ? 'Pay with Flutterwave' : 'Confirm Payment & Send Order'}
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Flutterwave Simulation Modal */}
-      <AnimatePresence>
-        {showFlutterwaveSim && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.85)' }}>
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
-              className="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl" style={{ background: '#fff', color: '#333' }}>
-              <div className="p-6 text-center" style={{ background: '#f5a623', color: '#fff' }}>
-                <div className="text-xs font-bold uppercase tracking-wider opacity-90">Flutterwave Checkout</div>
-                <div className="text-3xl font-extrabold mt-1">{toPrice(cartTotal)}</div>
-                <div className="text-[11px] opacity-80 mt-1">Ref: FLW-NUTRO-{Date.now().toString().slice(-6)}</div>
-              </div>
-              <div className="p-6 space-y-4">
-                {fwStep === 'details' && (
-                  <>
-                    <h3 className="text-sm font-extrabold text-gray-800">Enter Payment Details</h3>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Card Number (Simulation)</label>
-                      <input value={fwCard} onChange={e => setFwCard(e.target.value)} placeholder="4000 1234 5678 9010"
-                        className="w-full px-4 py-2.5 rounded-xl text-sm border border-gray-300 outline-none text-gray-800" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Expiry Date</label>
-                        <input placeholder="MM/YY" className="w-full px-4 py-2.5 rounded-xl text-sm border border-gray-300 outline-none text-gray-800" />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">CVV</label>
-                        <input placeholder="123" className="w-full px-4 py-2.5 rounded-xl text-sm border border-gray-300 outline-none text-gray-800" />
-                      </div>
-                    </div>
-                    <button onClick={() => setFwStep('otp')} className="w-full py-3 rounded-xl font-bold text-sm text-white" style={{ background: '#f5a623' }}>
-                      Proceed to OTP
-                    </button>
-                  </>
-                )}
-                {fwStep === 'otp' && (
-                  <>
-                    <div className="text-center">
-                      <div className="text-xs font-bold text-gray-500 mb-1 uppercase">Enter 6-Digit OTP</div>
-                      <p className="text-xs text-gray-400 mb-4">A simulated OTP has been sent to your phone</p>
-                      <input value={fwOtp} onChange={e => setFwOtp(e.target.value)} placeholder="123456" maxLength={6}
-                        className="w-32 px-4 py-2.5 rounded-xl text-center text-lg font-bold border border-gray-300 outline-none text-gray-800" />
-                    </div>
-                    <button
-                      onClick={() => {
-                        setFwStep('success');
-                        setTimeout(() => {
-                          setShowFlutterwaveSim(false);
-                          processPayment();
-                        }, 1500);
-                      }}
-                      className="w-full py-3 rounded-xl font-bold text-sm text-white mt-4" style={{ background: '#22c55e' }}>
-                      Verify & Pay {toPrice(cartTotal)}
-                    </button>
-                  </>
-                )}
-                {fwStep === 'success' && (
-                  <div className="text-center py-6">
-                    <div className="w-12 h-12 rounded-full bg-green-100 text-green-500 flex items-center justify-center mx-auto mb-3">
-                      <Check size={24} />
-                    </div>
-                    <h4 className="text-base font-extrabold text-gray-800">Payment Approved</h4>
-                    <p className="text-xs text-gray-400 mt-1">Connecting back to Nutro SaaS...</p>
-                  </div>
-                )}
-                <div className="text-center pt-2">
-                  <button onClick={() => setShowFlutterwaveSim(false)} className="text-xs text-gray-400 font-semibold hover:underline">Cancel Payment</button>
-                </div>
-              </div>
             </motion.div>
           </motion.div>
         )}

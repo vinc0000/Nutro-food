@@ -53,15 +53,15 @@ function createDemoStore() {
         id: branchId,
         org_id: orgId,
         name: 'Main Branch',
-        address: 'Downtown Dubai',
-        city: 'Dubai',
-        country: 'United Arab Emirates',
+        address: 'Downtown Dubai' as string | null,
+        city: 'Dubai' as string | null,
+        country: 'United Arab Emirates' as string | null,
         currency: 'AED',
         timezone: 'Asia/Dubai',
         is_active: true,
-        tablet_token: 'demo-tablet-token',
-        kds_pin: '1234',
-        pos_pin_hash: '1234',
+        tablet_token: 'demo-tablet-token' as string | null,
+        kds_pin: '1234' as string | null,
+        pos_pin_hash: '1234' as string | null,
         created_at: now,
       },
     ],
@@ -189,8 +189,8 @@ function createMockSupabaseClient() {
     const data = items.filter((item) => filters.every(([field, value]) => item[field] === value));
     if (orderBy) {
       data.sort((a, b) => {
-        const aValue = a[orderBy.field];
-        const bValue = b[orderBy.field];
+        const aValue = a[orderBy.field] as any;
+        const bValue = b[orderBy.field] as any;
         if (aValue === bValue) return 0;
         const comparison = aValue < bValue ? -1 : 1;
         return orderBy.ascending ? comparison : -comparison;
@@ -280,7 +280,7 @@ function createMockSupabaseClient() {
           name: orgName,
           slug: orgName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
           logo_url: null,
-          owner_id: store.session?.user?.id ?? 'demo-admin',
+          owner_id: (store.session as any)?.user?.id ?? 'demo-admin',
           plan: String(params?.p_plan ?? 'premium'),
           plan_status: 'active',
           trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),

@@ -47,6 +47,7 @@ export function useOrgContext() {
       setLoading(false);
       return;
     }
+    setLoading(true);
     try {
       const { data, error: rpcError } = await supabase.rpc('get_user_org_context');
       if (rpcError) throw rpcError;
@@ -64,7 +65,9 @@ export function useOrgContext() {
     refresh();
   }, [refresh]);
 
-  return { orgContext, loading, error, refresh };
+  const isActuallyLoading = loading || (Boolean(user) && !orgContext && !error);
+
+  return { orgContext, loading: isActuallyLoading, error, refresh };
 }
 
 export function usePlanInfo(): PlanInfo & { loading: boolean; refresh: () => Promise<void> } {

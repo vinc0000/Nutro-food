@@ -80,7 +80,7 @@ export default function AdminDashboard() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold mb-3" style={{ background: theme.primary + '14', color: theme.primary }}>
-              <ChefHat size={13} /> Vue d’ensemble du service
+              <ChefHat size={13} /> iPOSsoft Foodics Cloud Dashboard
             </div>
             <h1 className="text-xl font-bold" style={{ color: theme.text }}>
               {new Date().getHours() < 12 ? t('dashboard.greetingMorning') : new Date().getHours() < 17 ? t('dashboard.greetingAfternoon') : t('dashboard.greetingEvening')}, {profile?.full_name?.split(' ')[0] ?? 'Chef'}
@@ -179,7 +179,7 @@ export default function AdminDashboard() {
                   <tr key={o.id}>
                     <td><span className="text-sm font-mono font-bold" style={{ color: theme.primary }}>#{o.order_number}</span></td>
                     <td><span className="text-sm capitalize">{o.order_type.replace('_', ' ')}</span></td>
-                    <td><span className="text-sm font-semibold">${Number(o.total_amount).toFixed(2)}</span></td>
+                    <td><span className="text-sm font-semibold">{formatCurrency(o.total_amount)}</span></td>
                     <td><span className="badge text-[10px]" style={{ background: statusStyle[o.status]?.bg ?? '#6b728020', color: statusStyle[o.status]?.text ?? '#6b7280' }}>{o.status}</span></td>
                     <td><span className="text-xs" style={{ color: theme.textMuted }}>{new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></td>
                   </tr>
