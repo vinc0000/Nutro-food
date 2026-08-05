@@ -93,7 +93,7 @@ def run_verification():
             # In cash modal, let's select a quick-cash button (the first dynamic option)
             print("Selecting quick cash amount in payment modal...")
             # We must scope to .fixed to avoid clicking the hidden background "Charge" button.
-            cash_button = page.locator(".fixed button:has-text('$')").first
+            cash_button = page.locator(".fixed .flex-wrap button").first
             cash_button.click()
             print("Clicked first dynamic cash amount button")
             page.wait_for_timeout(1000)
