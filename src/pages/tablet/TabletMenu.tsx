@@ -74,6 +74,10 @@ export default function TabletMenu() {
   const [fwCard, setFwCard] = useState('');
   const [fwOtp, setFwOtp] = useState('');
 
+  // Editable Table and Note states
+  const [editableTableNum, setEditableTableNum] = useState(() => searchParams.get('table') ?? '1');
+  const [orderNote, setOrderNote] = useState('');
+
   const rate = CURRENCY_RATES[currency];
   const sym = CURRENCY_SYMBOLS[currency];
   const toPrice = (usd: number) => `${sym}${(usd * rate).toFixed(2)}`;
@@ -108,10 +112,15 @@ export default function TabletMenu() {
   const placeOrderDirectly = () => {
     const orderId = 'order-' + Date.now();
     const orderNum = '#' + Math.floor(1000 + Math.random() * 9000);
+    const combinedNotes = [
+      customAllergy ? 'ALLERGY WARNING: ' + customAllergy : '',
+      orderNote ? 'NOTE: ' + orderNote : ''
+    ].filter(Boolean).join(' | ');
+
     const newOrder: SharedOrder = {
       id: orderId,
       orderNumber: orderNum,
-      tableLabel: 'Table ' + tableNum,
+      tableLabel: 'Table ' + (editableTableNum || '1'),
       type: 'dine_in',
       status: 'pending',
       payment: 'unpaid',
@@ -125,7 +134,7 @@ export default function TabletMenu() {
       tax: cartTotal * 0.05,
       total: cartTotal * 1.05,
       source: 'tablet',
-      note: customAllergy ? 'ALLERGY WARNING: ' + customAllergy : undefined,
+      note: combinedNotes || undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -134,6 +143,7 @@ export default function TabletMenu() {
     setOrderPlaced(true);
     setTimeout(() => setOrderPlaced(false), 5000);
     setCart([]);
+    setOrderNote('');
   };
 
   const sendServiceRequest = (req: string) => {
@@ -354,8 +364,24 @@ export default function TabletMenu() {
                 ))}
               </div>
               {cart.length > 0 && (
-                <div className="px-5 pb-5 pt-2" style={{ borderTop: `1px solid ${theme.border}` }}>
-                  <div className="flex justify-between font-extrabold text-base mb-4">
+                <div className="px-5 pb-5 pt-2 space-y-3" style={{ borderTop: `1px solid ${theme.border}` }}>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase mb-1" style={{ color: theme.textMuted }}>Table</label>
+                      <input type="text" value={editableTableNum} onChange={e => setEditableTableNum(e.target.value)}
+                        placeholder="e.g. 5"
+                        className="w-full px-3 py-2 rounded-xl text-xs outline-none"
+                        style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase mb-1" style={{ color: theme.textMuted }}>Instructions</label>
+                      <input type="text" value={orderNote} onChange={e => setOrderNote(e.target.value)}
+                        placeholder="e.g. Pas d'oignon"
+                        className="w-full px-3 py-2 rounded-xl text-xs outline-none"
+                        style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+                    </div>
+                  </div>
+                  <div className="flex justify-between font-extrabold text-base pt-1">
                     <span style={{ color: theme.text }}>Total</span><span style={{ color: theme.primary }}>{toPrice(cartTotal)}</span>
                   </div>
                   <button onClick={() => { setShowCart(false); placeOrderDirectly(); }} className="w-full py-3 rounded-xl font-bold text-white" style={{ background: theme.primary }}>
