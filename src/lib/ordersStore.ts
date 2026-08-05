@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 export type OrderType = 'dine_in' | 'takeaway' | 'delivery';
-export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'served' | 'paid';
+export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'served' | 'paid' | 'cancelled';
 export type PaymentStatus = 'unpaid' | 'paid';
 
 export interface SharedOrderItem {

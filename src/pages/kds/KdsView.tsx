@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChefHat, Clock, AlertTriangle, Check, ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLocale } from '@/contexts/LocaleContext';
+import { useSharedOrders } from '@/lib/ordersStore';
 
 interface KdsTicket {
   id: string;
@@ -95,7 +96,7 @@ const COLUMNS: { key: KdsTicket['status']; label: string; color: string }[] = [
 export default function KdsView() {
   const navigate = useNavigate();
   const { t } = useLocale();
-  const [tickets, setTickets] = useState<KdsTicket[]>(SEED_TICKETS);
+  const { orders, updateOrder } = useSharedOrders();
   const [, setTick] = useState(0);
   const [soundOn, setSoundOn] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -118,19 +119,48 @@ export default function KdsView() {
 
   void playSound;
 
+  // Map shared orders into KDS tickets dynamically
+  const tickets: KdsTicket[] = orders.map(o => {
+    let kdsStatus: KdsTicket['status'] = 'new';
+    if (o.status === 'preparing') kdsStatus = 'preparing';
+    else if (o.status === 'ready') kdsStatus = 'ready';
+    else if (o.status === 'served' || o.status === 'paid') kdsStatus = 'served';
+
+    return {
+      id: o.id,
+      orderNum: o.orderNumber,
+      tableLabel: o.tableLabel,
+      type: o.type,
+      status: kdsStatus,
+      items: o.items.map(it => ({
+        name: it.name,
+        qty: it.qty,
+        mods: [] as string[],
+        note: o.note?.includes('ALLERGY') ? undefined : o.note,
+      })),
+      allergyAlert: o.note?.includes('ALLERGY') ? o.note : undefined,
+      createdAt: new Date(o.createdAt),
+      startedAt: o.createdAt !== o.updatedAt ? new Date(o.updatedAt) : undefined,
+    };
+  });
+
   const advanceTicket = (id: string) => {
-    setTickets((prev) =>
-      prev.map((t) => {
-        if (t.id !== id) return t;
-        const next: KdsTicket['status'] =
-          t.status === 'new' ? 'preparing' : t.status === 'preparing' ? 'ready' : 'served';
-        return { ...t, status: next, startedAt: t.startedAt ?? new Date() };
-      })
-    );
+    const order = orders.find(o => o.id === id);
+    if (!order) return;
+    const nextStatus = order.status === 'pending' ? 'preparing' : 'ready';
+    updateOrder(id, o => ({
+      ...o,
+      status: nextStatus as any,
+      updatedAt: new Date().toISOString()
+    }));
   };
 
   const bumpTicket = (id: string) => {
-    setTimeout(() => setTickets((prev) => prev.filter((t) => t.id !== id)), 400);
+    updateOrder(id, o => ({
+      ...o,
+      status: 'served',
+      updatedAt: new Date().toISOString()
+    }));
   };
 
   const activeTickets = tickets.filter((t) => t.status !== 'served');

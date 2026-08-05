@@ -95,12 +95,12 @@ def run_verification():
             page.wait_for_timeout(1500)
             page.screenshot(path="verification/screenshots/pos_payment_modal.png")
 
-            # In cash modal, let's select a quick-cash button (e.g. $59.85 or first numeric $ button)
+            # In cash modal, let's select a quick-cash button (the first dynamic option)
             print("Selecting quick cash amount in payment modal...")
             # We must scope to .fixed to avoid clicking the hidden background "Charge" button.
-            cash_button = page.locator(".fixed button:has-text('$59.85')").first
+            cash_button = page.locator(".fixed button:has-text('$')").first
             cash_button.click()
-            print("Clicked exact cash amount button ($59.85)")
+            print("Clicked first dynamic cash amount button")
             page.wait_for_timeout(1000)
             page.screenshot(path="verification/screenshots/pos_payment_amount_selected.png")
 

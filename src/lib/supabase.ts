@@ -220,20 +220,28 @@ function createMockSupabaseClient() {
     };
     builder.maybeSingle = async () => {
       const data = computeData()[0] ?? null;
-      return { data };
+      return { data, error: null };
     };
     Object.defineProperty(builder, 'data', {
       get: () => computeData(),
     });
 
-    return builder as {
+    interface SupabaseBuilder {
       data: Array<Record<string, unknown>>;
-      select: () => unknown;
-      eq: (field: string, value: unknown) => unknown;
-      order: (field: string, options?: { ascending?: boolean }) => unknown;
-      limit: (value: number) => unknown;
-      maybeSingle: () => Promise<{ data: Record<string, unknown> | null }>;
+      select: (columns?: string) => SupabaseBuilder;
+      eq: (field: string, value: unknown) => SupabaseBuilder;
+      order: (field: string, options?: { ascending?: boolean }) => SupabaseBuilder;
+      limit: (value: number) => SupabaseBuilder;
+      maybeSingle: <T = Record<string, unknown>>() => Promise<{ data: T | null; error: any }>;
+      then: (callback: (result: { data: any[] }) => void) => Promise<void>;
+    }
+
+    // Support simple promise-like .then() chaining for platform_metrics query
+    (builder as any).then = (callback: any) => {
+      return Promise.resolve({ data: computeData() }).then(callback);
     };
+
+    return builder as unknown as SupabaseBuilder;
   };
 
   const rpc = async (name: string, params?: Record<string, unknown>) => {
@@ -309,11 +317,11 @@ function createMockSupabaseClient() {
 
   const storage = {
     from: (bucket: string) => ({
-      upload: async (path: string, file: File) => {
+      upload: async (path: string, file: File, options?: { contentType?: string }) => {
         if (typeof window !== 'undefined') {
           const objectUrl = URL.createObjectURL(file);
           localObjectUrls[path] = objectUrl;
-          window.localStorage.setItem(`nutro:${bucket}:${path}`, JSON.stringify({ name: file.name, type: file.type, size: file.size, objectUrl }));
+          window.localStorage.setItem(`nutro:${bucket}:${path}`, JSON.stringify({ name: file.name, type: file.type, size: file.size, objectUrl, options }));
         }
         return { error: null };
       },
