@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Building2, Globe, Bell, CreditCard, Palette, Stamp, Share2, MapPin, Check, Lock, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import { Building2, Globe, Bell, CreditCard, Palette, Stamp, Share2, MapPin, Check, Lock, KeyRound, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { usePlanInfo } from '@/hooks/useOrgContext';
 import { useTheme, THEMES, ThemeName } from '@/contexts/ThemeContext';
 import { COUNTRIES, CURRENCIES, LANGUAGES } from '@/lib/countries';
@@ -9,8 +10,17 @@ import { useOrgContext } from '@/hooks/useOrgContext';
 export default function AdminSettings() {
   const { theme, themeName, setTheme } = useTheme();
   const { orgContext } = useOrgContext();
+  const location = useLocation();
+  const expiredAlert = (location.state as any)?.expiredAlert;
+
   const [activeTab, setActiveTab] = useState('general');
   const [savedMsg, setSavedMsg] = useState('');
+
+  useEffect(() => {
+    if (expiredAlert) {
+      setActiveTab('billing');
+    }
+  }, [expiredAlert]);
 
   const showSaved = (msg: string) => { setSavedMsg(msg); setTimeout(() => setSavedMsg(''), 2500); };
 
@@ -106,6 +116,18 @@ export default function AdminSettings() {
 
   return (
     <div className="space-y-6">
+      {expiredAlert && (
+        <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-[#ef444415] border border-[#ef444430] animate-pulse">
+          <AlertTriangle className="mt-0.5 flex-shrink-0" style={{ color: '#ef4444' }} size={20} />
+          <div>
+            <h3 className="text-sm font-bold text-red-500">Période d'essai expirée / Abonnement requis</h3>
+            <p className="text-xs mt-1" style={{ color: theme.textMuted }}>
+              Votre période d'essai gratuite de 7 jours est terminée. Veuillez vous abonner ci-dessous pour débloquer immédiatement l'accès complet à tous vos outils (POS, KDS, Menus, Rapports).
+            </p>
+          </div>
+        </div>
+      )}
+
       <div>
         <h1 className="text-xl font-bold" style={{ color: theme.text }}>Settings</h1>
         <p className="text-sm mt-1" style={{ color: theme.textMuted }}>Configure your restaurant profile, branding, and preferences</p>

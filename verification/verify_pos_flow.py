@@ -111,21 +111,27 @@ def run_verification():
             page.wait_for_timeout(2000)
             page.screenshot(path="verification/screenshots/kds_board_received.png")
 
-            # Let's interact with KDS - Start Preparing
-            print("Interacting with KDS (Start Preparing)...")
-            page.get_by_role("button", name="Start Preparing").first.click()
-            page.wait_for_timeout(1500)
-            page.screenshot(path="verification/screenshots/kds_preparing.png")
-
-            # Mark Ready
+            # Let's interact with KDS - Mark Ready
             print("Interacting with KDS (Mark Ready)...")
-            page.get_by_role("button", name="Mark Ready").first.click()
+            mark_ready_btn = page.get_by_role("button", name="Mark Ready").first
+            if mark_ready_btn.is_visible():
+                mark_ready_btn.click()
+                print("Clicked Mark Ready button.")
+            else:
+                page.locator("button:has-text('Mark Ready')").first.click()
+                print("Clicked Mark Ready button (fallback).")
             page.wait_for_timeout(1500)
             page.screenshot(path="verification/screenshots/kds_ready.png")
 
             # Bump/Done
             print("Bumping the ticket from KDS...")
-            page.get_by_role("button", name="BUMP").first.click()
+            done_btn = page.get_by_role("button", name="Done").first
+            if done_btn.is_visible():
+                done_btn.click()
+                print("Clicked Done button to bump.")
+            else:
+                page.locator("button:has-text('Done')").first.click()
+                print("Clicked Done button to bump (fallback).")
             page.wait_for_timeout(1500)
             page.screenshot(path="verification/screenshots/kds_final.png")
 

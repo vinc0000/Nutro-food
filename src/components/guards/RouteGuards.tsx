@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { ReactNode } from 'react';
+import { usePlanInfo } from '@/hooks/useOrgContext';
 
 export const SUPER_ADMIN_EMAILS = [
   'vincentnogue@yahoo.com',
@@ -18,10 +19,22 @@ function LoadingScreen() {
 }
 
 export function AuthGuard({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { isTrialExpired, isSuspended, planStatus, loading: planLoading } = usePlanInfo();
   const location = useLocation();
-  if (loading) return <LoadingScreen />;
+
+  if (authLoading || planLoading) return <LoadingScreen />;
   if (!user) return <Navigate to="/auth/login" state={{ from: location }} replace />;
+
+  const isBillingPage = location.pathname === '/app/admin/settings';
+  const isExpired = isTrialExpired || (isSuspended && planStatus !== 'active');
+
+  console.log("DEBUG GUARD:", { isTrialExpired, isSuspended, planStatus, isExpired, planLoading, path: location.pathname });
+
+  if (isExpired && !isBillingPage) {
+    return <Navigate to="/app/admin/settings" state={{ expiredAlert: true }} replace />;
+  }
+
   return <>{children}</>;
 }
 

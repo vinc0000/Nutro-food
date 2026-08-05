@@ -171,7 +171,7 @@ export default function PosTerminal() {
       time: 'Just now',
     }));
 
-  const posMenu = menuItems.map(item => ({ id: item.id, name: item.name, price: item.price, cat: item.category, calories: item.calories, available: item.available && item.stock > 0 }));
+  const posMenu = menuItems.map(item => ({ id: item.id, name: item.name, price: item.price, cat: item.category, calories: item.calories, available: item.available && item.stock > 0, image: item.image }));
   const filtered = posMenu.filter(i => (cat === 'All' || i.cat === cat) && i.name.toLowerCase().includes(search.toLowerCase()));
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const tax = subtotal * 0.05;
@@ -360,12 +360,19 @@ export default function PosTerminal() {
                 const inCart = cart.find(c => c.id === item.id);
                 return (
                   <motion.button key={item.id} whileTap={{ scale: 0.96 }} onClick={() => addItem(item)} disabled={!item.available}
-                    className="p-3 rounded-2xl text-left transition-all relative disabled:opacity-40 shadow-sm"
+                    className="p-3 rounded-2xl text-left transition-all relative disabled:opacity-40 shadow-sm flex gap-3 items-center"
                     style={{ background: inCart ? theme.primary + '15' : theme.surface, border: `1px solid ${inCart ? theme.primary : theme.border}` }}>
-                    <div className="text-sm font-bold leading-tight mb-1" style={{ color: theme.text }}>{item.name}</div>
-                    <div className="text-xs" style={{ color: theme.textMuted }}>{item.calories} kcal</div>
-                    <div className="text-base font-extrabold mt-2" style={{ color: theme.primary }}>{currencySymbol}{item.price}</div>
-                    {!item.available && <div className="absolute inset-0 flex items-center justify-center rounded-xl" style={{ background: 'rgba(0,0,0,0.4)' }}><span className="text-[10px] font-bold text-white">SOLD OUT</span></div>}
+                    {item.image && (
+                      <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-bold leading-tight truncate" style={{ color: theme.text }}>{item.name}</div>
+                      <div className="text-[10px]" style={{ color: theme.textMuted }}>{item.calories} kcal</div>
+                      <div className="text-sm font-extrabold mt-1" style={{ color: theme.primary }}>{currencySymbol}{item.price}</div>
+                    </div>
+                    {!item.available && <div className="absolute inset-0 flex items-center justify-center rounded-2xl" style={{ background: 'rgba(0,0,0,0.4)' }}><span className="text-[10px] font-bold text-white">SOLD OUT</span></div>}
                     {inCart && <div className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-extrabold text-white" style={{ background: theme.primary }}>{inCart.qty}</div>}
                   </motion.button>
                 );

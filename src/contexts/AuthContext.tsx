@@ -36,26 +36,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
-    setProfile(data);
+    setProfile(data as Profile | null);
   };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id).finally(() => setLoading(false));
+      const s = session as Session | null;
+      setSession(s);
+      setUser(s?.user ?? null);
+      if (s?.user) {
+        fetchProfile(s.user.id).finally(() => setLoading(false));
       } else {
         setLoading(false);
       }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
+      const s = session as Session | null;
+      setSession(s);
+      setUser(s?.user ?? null);
+      if (s?.user) {
         (async () => {
-          await fetchProfile(session.user.id);
+          await fetchProfile(s.user.id);
           setLoading(false);
         })();
       } else {
