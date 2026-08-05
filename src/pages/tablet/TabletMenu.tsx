@@ -22,7 +22,7 @@ interface MenuItem {
   ingredients: string[]; allergens: string[]; stock: number; portionSize: string;
 }
 
-const CATS = ['All', 'Starters', 'Mains', 'Desserts', 'Drinks'];
+const CATS = ['All', 'Starters', 'Mains', 'Desserts', 'Drinks', 'Snacks'];
 
 const DIET_FILTERS = [
   { key: 'halal', label: 'Halal', color: '#22c55e' },
@@ -62,7 +62,7 @@ export default function TabletMenu() {
   const [showSocial, setShowSocial] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [payMethod, setPayMethod] = useState<PayMethod>('tablet_pay');
-  const [isPaid, setIsPaid] = useState(false);
+  const [isPaid] = useState(false);
   void isPaid;
   const [, setShowReceipt] = useState(false);
   void setShowReceipt;
@@ -103,7 +103,7 @@ export default function TabletMenu() {
   const cartTotal = cart.reduce((s, c) => s + c.item.price * c.qty, 0);
   const cartCount = cart.reduce((s, c) => s + c.qty, 0);
 
-  const processPayment = () => {
+  const placeOrderDirectly = () => {
     const orderId = 'order-' + Date.now();
     const orderNum = '#' + Math.floor(1000 + Math.random() * 9000);
     const newOrder: SharedOrder = {
@@ -112,7 +112,7 @@ export default function TabletMenu() {
       tableLabel: 'Table ' + tableNum,
       type: 'dine_in',
       status: 'pending',
-      payment: payMethod === 'tablet_pay' ? 'unpaid' : 'paid',
+      payment: 'unpaid',
       items: cart.map(c => ({
         id: c.item.id,
         name: c.item.name,
@@ -129,12 +129,9 @@ export default function TabletMenu() {
     };
     addOrder(newOrder);
 
-    setIsPaid(true);
-    setShowPayment(false);
     setOrderPlaced(true);
-    setTimeout(() => setOrderPlaced(false), 4000);
+    setTimeout(() => setOrderPlaced(false), 5000);
     setCart([]);
-    setIsPaid(false);
   };
 
   const sendServiceRequest = (req: string) => {
@@ -359,8 +356,8 @@ export default function TabletMenu() {
                   <div className="flex justify-between font-extrabold text-base mb-4">
                     <span style={{ color: theme.text }}>Total</span><span style={{ color: theme.primary }}>{toPrice(cartTotal)}</span>
                   </div>
-                  <button onClick={() => { setShowCart(false); setShowPayment(true); }} className="w-full py-3 rounded-xl font-bold text-white" style={{ background: theme.primary }}>
-                    Pay & Place Order
+                  <button onClick={() => { setShowCart(false); placeOrderDirectly(); }} className="w-full py-3 rounded-xl font-bold text-white" style={{ background: theme.primary }}>
+                    Passer la commande (Règlement à la caisse)
                   </button>
                 </div>
               )}
@@ -544,8 +541,8 @@ export default function TabletMenu() {
         )}
         {orderPlaced && (
           <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl font-semibold text-sm flex items-center gap-2 text-white shadow-2xl"
-            style={{ background: '#22c55e' }}><Check size={16} /> Order placed! Kitchen is preparing your food.</motion.div>
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl font-semibold text-sm flex items-center gap-2 text-white shadow-2xl text-center"
+            style={{ background: '#22c55e' }}><Check size={16} /> Commande envoyée ! Veuillez régler à la caisse (POS).</motion.div>
         )}
       </AnimatePresence>
     </div>

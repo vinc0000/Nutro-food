@@ -39,14 +39,9 @@ def run_verification():
             page.wait_for_timeout(1000)
             page.screenshot(path="verification/screenshots/tablet_cart_opened.png")
 
-            # 4. Click 'Pay & Place Order'
-            print("Clicking 'Pay & Place Order'...")
-            page.get_by_role("button", name="Pay & Place Order").click()
-            page.wait_for_timeout(1000)
-
-            # 5. Confirm Payment & Send Order
-            print("Confirming Payment...")
-            page.get_by_role("button", name="Confirm Payment & Send Order").click()
+            # 4. Click 'Passer la commande (Règlement à la caisse)'
+            print("Clicking 'Passer la commande'...")
+            page.get_by_role("button", name="Passer la commande (Règlement à la caisse)").click()
             page.wait_for_timeout(2000)
             page.screenshot(path="verification/screenshots/tablet_order_placed.png")
             print("Tablet order placed successfully!")

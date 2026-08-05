@@ -15,7 +15,7 @@ interface MenuItem {
   allergens: string[];
 }
 
-const CATS = ['All', 'Starters', 'Mains', 'Desserts', 'Drinks'];
+const CATS = ['All', 'Starters', 'Mains', 'Desserts', 'Drinks', 'Snacks'];
 const PORTION_SIZES = ['Small', 'Regular', 'Large', 'Family'];
 
 
@@ -319,6 +319,17 @@ export default function AdminMenu() {
                   <input value={formData.name ?? ''} onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))} placeholder="e.g. Wagyu Burger"
                     className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
                     style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Category</label>
+                  <select value={formData.category ?? 'Mains'} onChange={e => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                    className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                    style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>
+                    {['Starters', 'Mains', 'Desserts', 'Drinks', 'Snacks'].map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
