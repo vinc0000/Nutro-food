@@ -19,15 +19,18 @@ function LoadingScreen() {
 }
 
 export function AuthGuard({ children }: { children: ReactNode }) {
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const { isTrialExpired, isSuspended, planStatus, loading: planLoading } = usePlanInfo();
   const location = useLocation();
 
   if (authLoading || planLoading) return <LoadingScreen />;
   if (!user) return <Navigate to="/auth/login" state={{ from: location }} replace />;
 
+  const email = user?.email?.toLowerCase() ?? '';
+  const isSuperAdminUser = SUPER_ADMIN_EMAILS.includes(email) || profile?.system_role === 'super_admin';
+
   const isBillingPage = location.pathname === '/app/admin/settings';
-  const isExpired = isTrialExpired || (isSuspended && planStatus !== 'active');
+  const isExpired = isSuperAdminUser ? false : (isTrialExpired || (isSuspended && planStatus !== 'active'));
 
   console.log("DEBUG GUARD:", { isTrialExpired, isSuspended, planStatus, isExpired, planLoading, path: location.pathname });
 
