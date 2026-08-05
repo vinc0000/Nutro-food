@@ -309,11 +309,11 @@ function createMockSupabaseClient() {
 
   const storage = {
     from: (bucket: string) => ({
-      upload: async (path: string, file: File) => {
+      upload: async (path: string, file: File, options?: { contentType?: string }) => {
         if (typeof window !== 'undefined') {
           const objectUrl = URL.createObjectURL(file);
           localObjectUrls[path] = objectUrl;
-          window.localStorage.setItem(`nutro:${bucket}:${path}`, JSON.stringify({ name: file.name, type: file.type, size: file.size, objectUrl }));
+          window.localStorage.setItem(`nutro:${bucket}:${path}`, JSON.stringify({ name: file.name, type: file.type, size: file.size, objectUrl, options }));
         }
         return { error: null };
       },

@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useNavigate } from 'react-router-dom';
 import { useSharedMenu } from '@/lib/menuStore';
+import { useSharedOrders, SharedOrder } from '@/lib/ordersStore';
 
 interface CartItem { id: string; name: string; price: number; qty: number; }
 interface TabletOrder {
@@ -21,7 +22,7 @@ const CATEGORIES = ['All', 'Starters', 'Mains', 'Desserts', 'Drinks'];
 
 const PLAN_TABLE_LIMIT = 10;
 const tableColor: Record<string, string> = { available: '#22c55e', occupied: '#ef4444', reserved: '#eab308', cleaning: '#94a3b8' };
-type PayMethod = 'cash' | 'card' | 'tap' | 'gift_card';
+type PayMethod = 'cash' | 'card' | 'tap' | 'gift_card' | 'flutterwave';
 
 function PinGuard({ onUnlock }: { onUnlock: () => void }) {
   const { theme } = useTheme();
@@ -148,10 +149,19 @@ export default function PosTerminal() {
   const [showManagerPin, setShowManagerPin] = useState(false);
   const [pendingAction, setPendingAction] = useState<null | 'void'>(null);
   const [showTabletOrders, setShowTabletOrders] = useState(false);
-  const [tabletOrders, setTabletOrders] = useState<TabletOrder[]>([
-    { id: 'to1', tableNum: '5', items: [{ name: 'Wagyu Burger', qty: 2, price: 24 }, { name: 'Truffle Fries', qty: 1, price: 9 }], total: 57, status: 'pending', time: '2 min ago' },
-    { id: 'to2', tableNum: '3', items: [{ name: 'Margherita Pizza', qty: 1, price: 18 }, { name: 'Fresh Juice', qty: 2, price: 6 }], total: 30, status: 'pending', time: '5 min ago' },
-  ]);
+  const { orders, updateOrder, addOrder } = useSharedOrders();
+
+  // Dynamically map shared orders to TabletOrder structure
+  const tabletOrders: TabletOrder[] = orders
+    .filter(o => o.source === 'tablet')
+    .map(o => ({
+      id: o.id,
+      tableNum: o.tableLabel.replace('Table ', ''),
+      items: o.items.map(it => ({ name: it.name, qty: it.qty, price: it.price })),
+      total: o.total,
+      status: o.status === 'pending' ? 'pending' : (o.status === 'cancelled' ? 'rejected' : 'accepted'),
+      time: 'Just now',
+    }));
 
   const posMenu = menuItems.map(item => ({ id: item.id, name: item.name, price: item.price, cat: item.category, calories: item.calories, available: item.available && item.stock > 0 }));
   const filtered = posMenu.filter(i => (cat === 'All' || i.cat === cat) && i.name.toLowerCase().includes(search.toLowerCase()));
@@ -175,6 +185,42 @@ export default function PosTerminal() {
   };
 
   const processPayment = () => {
+    // If it is an accepted tablet order, update its payment and keep/ensure status in useSharedOrders
+    const existingTabletOrder = orders.find(o => o.source === 'tablet' && o.tableLabel === 'Table ' + selectedTable && o.status === 'pending');
+    if (existingTabletOrder) {
+      updateOrder(existingTabletOrder.id, o => ({
+        ...o,
+        payment: 'paid',
+        status: 'preparing',
+        updatedAt: new Date().toISOString()
+      }));
+    } else {
+      // Create a brand new POS order
+      const orderId = 'order-' + Date.now();
+      const orderNum = '#' + (1042 + orderCount + 1);
+      const newOrder: SharedOrder = {
+        id: orderId,
+        orderNumber: orderNum,
+        tableLabel: selectedTable ? 'Table ' + selectedTable : (orderType === 'takeaway' ? 'Takeaway' : 'Delivery'),
+        type: orderType,
+        status: 'preparing', // Send to KDS immediately
+        payment: 'paid',
+        items: cart.map(c => ({
+          id: c.id,
+          name: c.name,
+          price: c.price,
+          qty: c.qty
+        })),
+        subtotal,
+        tax,
+        total,
+        source: 'pos',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      addOrder(newOrder);
+    }
+
     setPaidSuccess(true);
     setIsPaid(true);
     setOrderCount(c => c + 1);
@@ -183,17 +229,18 @@ export default function PosTerminal() {
   };
 
   const acceptTabletOrder = (id: string) => {
-    setTabletOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'accepted' } : o));
-    const order = tabletOrders.find(o => o.id === id);
+    updateOrder(id, o => ({ ...o, status: 'preparing' }));
+    const order = orders.find(o => o.id === id);
     if (order) {
-      setCart(order.items.map((it, i) => ({ id: `to-${i}`, name: it.name, price: it.price, qty: it.qty })));
-      setSelectedTable(order.tableNum);
+      setCart(order.items.map((it, i) => ({ id: it.id || `to-${i}`, name: it.name, price: it.price, qty: it.qty })));
+      const num = order.tableLabel.replace('Table ', '');
+      setSelectedTable(num);
       setShowTabletOrders(false);
     }
   };
 
   const rejectTabletOrder = (id: string) => {
-    setTabletOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'rejected' } : o));
+    updateOrder(id, o => ({ ...o, status: 'cancelled' }));
   };
 
   const startNewOrder = () => {
@@ -406,17 +453,33 @@ export default function PosTerminal() {
                     <div className="text-xs mt-1" style={{ color: theme.textMuted }}>{cart.length} items · Tax included</div>
                     <div className="text-xs mt-1" style={{ color: '#eab308' }}>Receipt locked until payment confirmed</div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 mb-4">
+                  <div className="grid grid-cols-3 gap-2 mb-4">
                     {([ { key: 'cash', label: 'Cash', icon: Banknote }, { key: 'card', label: 'Card', icon: CreditCard },
-                       { key: 'tap', label: 'Tap to Pay', icon: Smartphone }, { key: 'gift_card', label: 'Gift Card', icon: Gift }
+                       { key: 'tap', label: 'Tap to Pay', icon: Smartphone }, { key: 'gift_card', label: 'Gift Card', icon: Gift },
+                       { key: 'flutterwave', label: 'Flutterwave', icon: CreditCard }
                      ] as { key: PayMethod; label: string; icon: typeof Banknote }[]).map(m => (
                       <button key={m.key} onClick={() => setPayMethod(m.key)}
                         className="flex flex-col items-center gap-1.5 py-3 rounded-xl text-xs font-bold transition-all"
-                        style={{ background: payMethod === m.key ? theme.primary : theme.bg, color: payMethod === m.key ? '#fff' : theme.textMuted, border: `1px solid ${payMethod === m.key ? theme.primary : theme.border}` }}>
+                        style={{
+                          background: payMethod === m.key ? (m.key === 'flutterwave' ? '#f5a623' : theme.primary) : theme.bg,
+                          color: payMethod === m.key ? '#fff' : theme.textMuted,
+                          border: `1px solid ${payMethod === m.key ? (m.key === 'flutterwave' ? '#f5a623' : theme.primary) : theme.border}`
+                        }}>
                         <m.icon size={18} />{m.label}
                       </button>
                     ))}
                   </div>
+                  {payMethod === 'flutterwave' && (
+                    <div className="mb-4 p-3.5 rounded-xl border space-y-2" style={{ background: '#f5a62310', borderColor: '#f5a62330' }}>
+                      <div className="text-xs font-bold" style={{ color: '#f5a623' }}>Flutterwave Merchant API</div>
+                      <p className="text-[11px] leading-relaxed" style={{ color: theme.textMuted }}>
+                        Enter customer phone number below to push a USSD/M-Pesa or Card payment request link.
+                      </p>
+                      <input value={cardDetail} onChange={e => setCardDetail(e.target.value)} placeholder="+234 XXX XXX XXXX"
+                        className="w-full px-3 py-2 rounded-lg text-xs outline-none"
+                        style={{ background: theme.bg, color: theme.text, border: `1px solid #f5a62350` }} />
+                    </div>
+                  )}
                   {(payMethod === 'card' || payMethod === 'tap' || payMethod === 'gift_card') && (
                     <div className="mb-4">
                       <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>
@@ -451,8 +514,9 @@ export default function PosTerminal() {
                     </div>
                   )}
                   <button onClick={processPayment} disabled={payMethod === 'cash' && !cashGiven}
-                    className="w-full py-3 rounded-xl font-bold text-sm text-white disabled:opacity-50" style={{ background: theme.primary }}>
-                    Confirm {payMethod === 'cash' ? 'Cash' : payMethod === 'card' ? 'Card' : payMethod === 'tap' ? 'Tap' : 'Gift Card'} Payment
+                    className="w-full py-3 rounded-xl font-bold text-sm text-white disabled:opacity-50"
+                    style={{ background: payMethod === 'flutterwave' ? '#f5a623' : theme.primary }}>
+                    Confirm {payMethod === 'cash' ? 'Cash' : payMethod === 'card' ? 'Card' : payMethod === 'tap' ? 'Tap' : payMethod === 'flutterwave' ? 'Flutterwave' : 'Gift Card'} Payment
                   </button>
                 </>
               )}

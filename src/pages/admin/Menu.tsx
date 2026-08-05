@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Search, Edit2, Trash2, X, Check, Package, AlertTriangle, Image as ImageIcon, Upload, Loader2 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
+import { useSharedMenu } from '@/lib/menuStore';
 
 interface MenuItem {
   id: string; name: string; category: string; price: number; calories: number;
@@ -11,19 +12,12 @@ interface MenuItem {
   available: boolean; description: string;
   stock: number; ingredients: { name: string; grams: number }[];
   taxRate: number; image: string; portionSize: string; weight: number;
+  allergens: string[];
 }
 
 const CATS = ['All', 'Starters', 'Mains', 'Desserts', 'Drinks'];
 const PORTION_SIZES = ['Small', 'Regular', 'Large', 'Family'];
 
-const ITEMS: MenuItem[] = [
-  { id: '1', name: 'Wagyu Beef Burger', category: 'Mains', price: 24, calories: 820, protein: 48, carbs: 42, fats: 52, fiber: 4, halal: true, vegan: false, glutenFree: false, keto: false, nutFree: true, spicy: false, available: true, stock: 15, taxRate: 5, portionSize: 'Regular', weight: 380, image: 'https://images.pexels.com/photos/1639557/pexels-photo-1639557.jpeg?w=400', description: 'Premium A5 Wagyu patty, aged cheddar, truffle aioli, brioche bun.', ingredients: [{ name: 'Wagyu beef', grams: 180 }, { name: 'Brioche bun', grams: 60 }, { name: 'Cheddar', grams: 20 }] },
-  { id: '2', name: 'Truffle Fries', category: 'Starters', price: 9, calories: 380, protein: 6, carbs: 48, fats: 18, fiber: 5, halal: true, vegan: true, glutenFree: true, keto: false, nutFree: true, spicy: false, available: true, stock: 30, taxRate: 5, portionSize: 'Large', weight: 200, image: 'https://images.pexels.com/photos/1583884/pexels-photo-1583884.jpeg?w=400', description: 'Hand-cut fries tossed in truffle oil and parmesan.', ingredients: [{ name: 'Potatoes', grams: 200 }, { name: 'Truffle oil', grams: 5 }] },
-  { id: '3', name: 'Vegan Buddha Bowl', category: 'Mains', price: 18, calories: 540, protein: 22, carbs: 68, fats: 16, fiber: 12, halal: true, vegan: true, glutenFree: true, keto: false, nutFree: false, spicy: false, available: true, stock: 8, taxRate: 5, portionSize: 'Regular', weight: 420, image: 'https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg?w=400', description: 'Quinoa, roasted veggies, avocado, tahini, mixed greens.', ingredients: [{ name: 'Quinoa', grams: 150 }, { name: 'Avocado', grams: 50 }] },
-  { id: '4', name: 'Spicy Calamari', category: 'Starters', price: 14, calories: 320, protein: 24, carbs: 28, fats: 12, fiber: 2, halal: true, vegan: false, glutenFree: false, keto: false, nutFree: true, spicy: true, available: true, stock: 0, taxRate: 5, portionSize: 'Regular', weight: 250, image: 'https://images.pexels.com/photos/566345/pexels-photo-566345.jpeg?w=400', description: 'Lightly battered calamari rings, sriracha mayo.', ingredients: [{ name: 'Calamari', grams: 200 }] },
-  { id: '5', name: 'Chocolate Lava Cake', category: 'Desserts', price: 11, calories: 460, protein: 7, carbs: 62, fats: 22, fiber: 3, halal: true, vegan: false, glutenFree: false, keto: false, nutFree: false, spicy: false, available: false, stock: 12, taxRate: 5, portionSize: 'Small', weight: 180, image: 'https://images.pexels.com/photos/291528/pexels-photo-291528.jpeg?w=400', description: 'Warm molten chocolate cake, vanilla ice cream.', ingredients: [{ name: 'Dark chocolate', grams: 80 }, { name: 'Butter', grams: 40 }] },
-  { id: '6', name: 'Fresh Lemonade', category: 'Drinks', price: 6, calories: 120, protein: 0, carbs: 28, fats: 0, fiber: 0, halal: true, vegan: true, glutenFree: true, keto: false, nutFree: true, spicy: false, available: true, stock: 50, taxRate: 5, portionSize: 'Large', weight: 350, image: 'https://images.pexels.com/photos/1998635/pexels-photo-1998635.jpeg?w=400', description: 'House-squeezed lemonade with mint and ice.', ingredients: [{ name: 'Lemon juice', grams: 30 }] },
-];
 
 function DietBadge({ label, color }: { label: string; color: string }) {
   return <span className="inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: color + '20', color }}>{label}</span>;
