@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   UtensilsCrossed, Search, ShoppingCart, X, Plus, Minus,
@@ -51,6 +51,23 @@ export default function TabletMenu() {
   const [currency, setCurrency] = useState(() => {
     return localStorage.getItem('nutro:settings:currency') ?? 'USD';
   });
+
+  const [isOnline, setIsOnline] = useState(() => typeof window !== 'undefined' ? window.navigator.onLine : true);
+  const [brandLogo] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('nutro:settings:logoUrl') ?? '' : '');
+  const [brandName] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('nutro:settings:name') ?? 'Le Maison Dubai' : 'Le Maison Dubai');
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
   const [activeCat, setActiveCat] = useState('All');
   const [search, setSearch] = useState('');
   const [activeDietFilters, setActiveDietFilters] = useState<string[]>([]);
@@ -144,11 +161,22 @@ export default function TabletMenu() {
       <header className="sticky top-0 z-30 px-4 sm:px-6 py-3" style={{ background: theme.surface + 'F0', backdropFilter: 'blur(12px)', borderBottom: `1px solid ${theme.border}` }}>
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: theme.primary }}>
-              <UtensilsCrossed size={18} color="#fff" />
-            </div>
+            {brandLogo ? (
+              <img src={brandLogo} alt="Logo" className="w-9 h-9 rounded-xl object-cover" />
+            ) : (
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: theme.primary }}>
+                <UtensilsCrossed size={18} color="#fff" />
+              </div>
+            )}
             <div>
-              <div className="text-sm font-extrabold" style={{ color: theme.text }}>{t('tablet.title')}</div>
+              <div className="text-sm font-extrabold flex items-center gap-2" style={{ color: theme.text }}>
+                {brandName}
+                {!isOnline && (
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-500 animate-pulse border border-amber-500/20">
+                    Offline Mode
+                  </span>
+                )}
+              </div>
               <div className="text-xs" style={{ color: theme.textMuted }}>{t('tablet.table')} {tableNum}</div>
             </div>
           </div>
