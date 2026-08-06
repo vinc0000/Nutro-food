@@ -79,13 +79,15 @@ export function usePlanInfo(): PlanInfo & { loading: boolean; refresh: () => Pro
 
   const planStatus = orgContext?.plan_status ?? 'trial';
   const plan = orgContext?.plan ?? 'trial';
+  const isSuperAdmin = orgContext?.role === 'super_admin';
 
-  const isTrialActive = planStatus === 'trial' && daysLeft > 0;
-  const isTrialExpired = planStatus === 'trial' && daysLeft === 0;
-  const isPlanActive = planStatus === 'active';
-  const isSuspended = planStatus === 'suspended' || isTrialExpired;
+  const isTrialActive = isSuperAdmin ? true : (planStatus === 'trial' && daysLeft > 0);
+  const isTrialExpired = isSuperAdmin ? false : (planStatus === 'trial' && daysLeft === 0);
+  const isPlanActive = isSuperAdmin ? true : (planStatus === 'active');
+  const isSuspended = isSuperAdmin ? false : (planStatus === 'suspended' || isTrialExpired);
 
   const canAccess = (feature: string): boolean => {
+    if (isSuperAdmin) return true;
     if (isTrialActive) return true;
     if (isSuspended) return false;
     const features = PLAN_FEATURES[plan] ?? PLAN_FEATURES.starter;
