@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Monitor, Search, Plus, Minus, X, CreditCard, Banknote, Smartphone, Gift,
@@ -130,6 +130,24 @@ export default function PosTerminal() {
 
   const currencyCode = localStorage.getItem('nutro:settings:currency') ?? orgContext?.currency ?? 'USD';
   const currencySymbol = CURRENCIES.find(c => c.code === currencyCode)?.symbol ?? '$';
+
+  const [isOnline, setIsOnline] = useState(() => typeof window !== 'undefined' ? window.navigator.onLine : true);
+  const [brandName] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('nutro:settings:name') ?? orgContext?.org_name ?? 'Le Maison Dubai' : 'Le Maison Dubai');
+  const [brandAddress] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('nutro:settings:address') ?? '123 Main St, Dubai' : '123 Main St, Dubai');
+  const [brandPhone] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('nutro:settings:phone') ?? '+971 XX XXX XXXX' : '+971 XX XXX XXXX');
+  const [brandInstagram] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('nutro:settings:instagram') ?? 'https://instagram.com/yourrestaurant' : 'https://instagram.com/yourrestaurant');
+  const [brandTiktok] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('nutro:settings:tiktok') ?? 'https://tiktok.com/@yourrestaurant' : 'https://tiktok.com/@yourrestaurant');
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const [unlocked, setUnlocked] = useState(false);
   const [cat, setCat] = useState('All');
@@ -267,7 +285,14 @@ export default function PosTerminal() {
               <Monitor size={16} style={{ color: theme.primary }} />
             </div>
             <div>
-              <div className="text-sm font-bold" style={{ color: theme.text }}>{t('pos.title')}</div>
+              <div className="text-sm font-bold flex items-center gap-2" style={{ color: theme.text }}>
+                {t('pos.title')}
+                {!isOnline && (
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
+                    Offline Mode
+                  </span>
+                )}
+              </div>
               <div className="text-[11px]" style={{ color: theme.textMuted }}>Cloud checkout • live floor control</div>
             </div>
           </div>
@@ -546,11 +571,31 @@ export default function PosTerminal() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.8)' }} onClick={() => setShowReceipt(false)}>
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
-              className="w-80 rounded-2xl p-6" style={{ background: '#fff', color: '#000' }} onClick={e => e.stopPropagation()}>
+              className="w-80 rounded-2xl p-6 print-receipt-container" style={{ background: '#fff', color: '#000' }} onClick={e => e.stopPropagation()}>
+              <style dangerouslySetInnerHTML={{__html: `
+                @media print {
+                  body * {
+                    visibility: hidden !important;
+                  }
+                  .print-receipt-container, .print-receipt-container * {
+                    visibility: visible !important;
+                  }
+                  .print-receipt-container {
+                    position: absolute !important;
+                    left: 0 !important;
+                    top: 0 !important;
+                    width: 80mm !important;
+                    margin: 0 !important;
+                    padding: 10px !important;
+                    border: none !important;
+                    box-shadow: none !important;
+                  }
+                }
+              `}} />
               <div className="text-center mb-4">
-                <div className="text-lg font-extrabold">Le Maison Dubai</div>
-                <div className="text-xs text-gray-500">Powered by Nutro - LiAfrik</div>
-                <div className="text-xs text-gray-500">123 Main St, Dubai - +971 XX XXX XXXX</div>
+                <div className="text-lg font-extrabold">{brandName}</div>
+                <div className="text-xs text-gray-500">Powered by iPOSsoft - Foodics Cloud</div>
+                <div className="text-[10px] text-gray-500">{brandAddress} - {brandPhone}</div>
               </div>
               <div className="border-t border-b border-dashed border-gray-300 py-3 mb-3 text-xs">
                 <div className="flex justify-between mb-1"><span>Table: {tables.find(t => t.id === selectedTable)?.name ?? (selectedTable ? `T${selectedTable}` : '-')}</span><span>Cashier: {profile?.full_name ?? 'Staff'}</span></div>
@@ -572,12 +617,12 @@ export default function PosTerminal() {
                 {payMethod === 'cash' && cashGiven && <div className="flex justify-between"><span>Cash</span><span>{currencySymbol}{parseFloat(cashGiven).toFixed(2)}</span></div>}
                 {payMethod === 'cash' && <div className="flex justify-between"><span>Change</span><span>{currencySymbol}{change.toFixed(2)}</span></div>}
               </div>
-              <div className="text-center mt-4 text-xs text-gray-500">
+              <div className="text-center mt-4 text-[10px] text-gray-500">
                 <p>Thank you for dining with us!</p>
-                <p className="mt-1">Instagram: @lemaison | TikTok: @lemaison</p>
-                <p>Review us on Google Maps!</p>
+                <p className="mt-1">Instagram: {brandInstagram.replace('https://', '')}</p>
+                <p>TikTok: {brandTiktok.replace('https://', '')}</p>
               </div>
-              <div className="flex gap-2 mt-4">
+              <div className="flex gap-2 mt-4 print:hidden">
                 <button onClick={() => window.print()} className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-1.5" style={{ background: theme.primary }}>
                   <Printer size={14} /> Print 80mm
                 </button>
