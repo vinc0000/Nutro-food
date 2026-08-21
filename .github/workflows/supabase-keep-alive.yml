@@ -10,11 +10,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Test Supabase
+      - name: Keep Supabase awake
         run: |
-          echo "Test de connexion à Supabase..."
+          SUPABASE_URL="https://wqxjsbikoriuzinordko.supabase.co"
+          SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndxeGpzYmlrb3JpdXppbm9yZGtvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2NjE5NjIsImV4cCI6MjEwMTIzNzk2Mn0.-_vYWf0y9Mnbqjx56MCvTsSp4YjbeMKvruGRyxAEaos"
 
-          curl -i \
-            -H "apikey: TON_ANON_KEY" \
-            -H "Authorization: Bearer TON_ANON_KEY" \
-            "https://wqxjsbikoriuzinordko.supabase.co/rest/v1/"
+          echo "Ping de Supabase..."
+
+          HTTP_STATUS=$(curl \
+            --silent \
+            --output /dev/null \
+            --write-out "%{http_code}" \
+            --request GET \
+            --url "${SUPABASE_URL}/rest/v1/" \
+            --header "apikey: ${SUPABASE_ANON_KEY}" \
+            --header "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+
+          echo "HTTP Status: ${HTTP_STATUS}"
+
+          if [ "${HTTP_STATUS}" -ge 200 ] && [ "${HTTP_STATUS}" -lt 500 ]; then
+            echo "✅ Supabase répond correctement."
+          else
+            echo "❌ Supabase ne répond pas correctement."
+            exit 1
+          fi
