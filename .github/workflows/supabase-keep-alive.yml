@@ -10,9 +10,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Keep Supabase awake
+      - name: Test Supabase
         run: |
-          curl -fsS \
-            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndxeGpzYmlrb3JpdXppbm9yZGtvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2NjE5NjIsImV4cCI6MjEwMTIzNzk2Mn0.-_vYWf0y9Mnbqjx56MCvTsSp4YjbeMKvruGRyxAEaos" \
-            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndxeGpzYmlrb3JpdXppbm9yZGtvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2NjE5NjIsImV4cCI6MjEwMTIzNzk2Mn0.-_vYWf0y9Mnbqjx56MCvTsSp4YjbeMKvruGRyxAEaos" \
+          echo "Test de connexion à Supabase..."
+
+          curl -i \
+            -H "apikey: TON_ANON_KEY" \
+            -H "Authorization: Bearer TON_ANON_KEY" \
             "https://wqxjsbikoriuzinordko.supabase.co/rest/v1/"
