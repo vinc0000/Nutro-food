@@ -194,7 +194,9 @@ export default function PosTerminal() {
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const tax = subtotal * 0.05;
   const total = subtotal + tax;
-  const change = cashGiven ? Math.max(0, parseFloat(cashGiven) - total) : 0;
+  const cashGivenAmount = cashGiven ? parseFloat(cashGiven) : NaN;
+  const isCashAmountValid = !Number.isNaN(cashGivenAmount) && cashGivenAmount >= total;
+  const change = isCashAmountValid ? cashGivenAmount - total : 0;
   const pendingTabletOrders = tabletOrders.filter(o => o.status === 'pending');
 
   const addItem = (item: typeof posMenu[number]) => {
@@ -534,7 +536,7 @@ export default function PosTerminal() {
                     <div className="mb-4 space-y-3">
                       <div>
                         <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Cash Received</label>
-                        <input type="number" value={cashGiven} onChange={e => setCashGiven(e.target.value)} placeholder="0.00"
+                        <input type="number" min="0" step="0.01" value={cashGiven} onChange={e => setCashGiven(e.target.value)} placeholder="0.00"
                           className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
                           style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
                       </div>
@@ -545,7 +547,12 @@ export default function PosTerminal() {
                             style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>{currencySymbol}{v.toFixed(2)}</button>
                         ))}
                       </div>
-                      {cashGiven && (
+                      {cashGiven && !isCashAmountValid && (
+                        <div className="p-3 rounded-xl text-center text-sm font-semibold" style={{ background: '#ef444415', border: '1px solid #ef444430', color: '#ef4444' }}>
+                          {Number.isNaN(cashGivenAmount) ? 'Enter a valid amount' : `Amount is short by ${currencySymbol}${(total - cashGivenAmount).toFixed(2)}`}
+                        </div>
+                      )}
+                      {cashGiven && isCashAmountValid && (
                         <div className="p-3 rounded-xl text-center" style={{ background: '#22c55e15', border: '1px solid #22c55e30' }}>
                           <div className="text-xs font-semibold" style={{ color: theme.textMuted }}>CHANGE TO GIVE</div>
                           <div className="text-3xl font-extrabold" style={{ color: '#22c55e' }}>{currencySymbol}{change.toFixed(2)}</div>
@@ -553,7 +560,7 @@ export default function PosTerminal() {
                       )}
                     </div>
                   )}
-                  <button onClick={processPayment} disabled={payMethod === 'cash' && !cashGiven}
+                  <button onClick={processPayment} disabled={payMethod === 'cash' && !isCashAmountValid}
                     className="w-full py-3 rounded-xl font-bold text-sm text-white disabled:opacity-50"
                     style={{ background: payMethod === 'flutterwave' ? '#f5a623' : theme.primary }}>
                     Confirm {payMethod === 'cash' ? 'Cash' : payMethod === 'card' ? 'Card' : payMethod === 'tap' ? 'Tap' : payMethod === 'flutterwave' ? 'Flutterwave' : 'Gift Card'} Payment
@@ -614,7 +621,7 @@ export default function PosTerminal() {
                 <div className="flex justify-between"><span>Subtotal</span><span>{currencySymbol}{subtotal.toFixed(2)}</span></div>
                 <div className="flex justify-between"><span>Tax (5%)</span><span>{currencySymbol}{tax.toFixed(2)}</span></div>
                 <div className="flex justify-between font-bold text-sm"><span>TOTAL</span><span>{currencySymbol}{total.toFixed(2)}</span></div>
-                {payMethod === 'cash' && cashGiven && <div className="flex justify-between"><span>Cash</span><span>{currencySymbol}{parseFloat(cashGiven).toFixed(2)}</span></div>}
+                {payMethod === 'cash' && cashGiven && <div className="flex justify-between"><span>Cash</span><span>{currencySymbol}{cashGivenAmount.toFixed(2)}</span></div>}
                 {payMethod === 'cash' && <div className="flex justify-between"><span>Change</span><span>{currencySymbol}{change.toFixed(2)}</span></div>}
               </div>
               <div className="text-center mt-4 text-[10px] text-gray-500">

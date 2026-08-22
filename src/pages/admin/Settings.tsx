@@ -411,10 +411,14 @@ function PosSecurityTab({ theme, showSaved }: { theme: ReturnType<typeof useThem
     }
   };
 
-  useEffect(() => { checkExistingPin(); }, []);
+  useEffect(() => { checkExistingPin(); }, [branchId]);
 
   const handleSavePin = async () => {
     setError(null);
+    if (!branchId) {
+      setError('Still loading your branch — please try again in a moment.');
+      return;
+    }
     if (pin.length < 4 || pin.length > 8) {
       setError('PIN must be 4-8 digits');
       return;
