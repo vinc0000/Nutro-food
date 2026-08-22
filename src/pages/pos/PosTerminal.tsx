@@ -594,7 +594,7 @@ export default function PosTerminal() {
               `}} />
               <div className="text-center mb-4">
                 <div className="text-lg font-extrabold">{brandName}</div>
-                <div className="text-xs text-gray-500">Powered by iPOSsoft - Foodics Cloud</div>
+                <div className="text-xs text-gray-500">Powered by Nutro</div>
                 <div className="text-[10px] text-gray-500">{brandAddress} - {brandPhone}</div>
               </div>
               <div className="border-t border-b border-dashed border-gray-300 py-3 mb-3 text-xs">

@@ -80,7 +80,7 @@ export default function AdminDashboard() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold mb-3" style={{ background: theme.primary + '14', color: theme.primary }}>
-              <ChefHat size={13} /> iPOSsoft Foodics Cloud Dashboard
+              <ChefHat size={13} /> Nutro Cloud Dashboard
             </div>
             <h1 className="text-xl font-bold" style={{ color: theme.text }}>
               {new Date().getHours() < 12 ? t('dashboard.greetingMorning') : new Date().getHours() < 17 ? t('dashboard.greetingAfternoon') : t('dashboard.greetingEvening')}, {profile?.full_name?.split(' ')[0] ?? 'Chef'}

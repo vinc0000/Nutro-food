@@ -11,7 +11,6 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import ThemeSwitcher from '@/components/ui/ThemeSwitcher';
 import TrialBanner from '@/components/ui/TrialBanner';
-import { SUPER_ADMIN_EMAILS } from '@/components/guards/RouteGuards';
 import { CURRENCIES, LANGUAGES } from '@/lib/countries';
 
 const NAV = [
@@ -37,7 +36,7 @@ export default function AdminLayout() {
   const [lang, setLang] = useState('en');
   const [currency, setCurrency] = useState('USD');
 
-  const isWhitelisted = SUPER_ADMIN_EMAILS.includes(user?.email?.toLowerCase() ?? '');
+  const isSuperAdmin = profile?.system_role === 'super_admin';
   const selectedCurrency = CURRENCIES.find(c => c.code === currency);
   const selectedLang = LANGUAGES.find(l => l.code === lang);
 
@@ -84,7 +83,7 @@ export default function AdminLayout() {
             </NavLink>
           )
         )}
-        {isWhitelisted && (
+        {isSuperAdmin && (
           <>
             <div className="pt-4 pb-2 px-3" style={{ borderTop: `1px solid ${theme.border}`, marginTop: 8 }}>
               {!collapsed && (

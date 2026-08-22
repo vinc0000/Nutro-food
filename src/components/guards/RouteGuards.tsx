@@ -3,12 +3,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ReactNode } from 'react';
 import { usePlanInfo } from '@/hooks/useOrgContext';
 
-export const SUPER_ADMIN_EMAILS = [
-  'vincentnogue@yahoo.com',
-  'vincentnogue2@gmail.com',
-  'liyahjoha@gmail.com',
-  'liyahjoha@yahoo.com',
-];
+// Super admin access is granted exclusively through profile.system_role === 'super_admin',
+// which is the same check enforced server-side by the is_super_admin() RLS helper in
+// Supabase. Do NOT reintroduce a hardcoded email whitelist here: baking personal email
+// addresses into the client bundle is a privacy leak (they end up public in the shipped
+// JS and in git history) and it duplicates authorization logic that must live in the
+// database, since that is the only place it can actually be enforced securely.
 
 function LoadingScreen() {
   return (
@@ -26,13 +26,10 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   if (authLoading || planLoading) return <LoadingScreen />;
   if (!user) return <Navigate to="/auth/login" state={{ from: location }} replace />;
 
-  const email = user?.email?.toLowerCase() ?? '';
-  const isSuperAdminUser = SUPER_ADMIN_EMAILS.includes(email) || profile?.system_role === 'super_admin';
+  const isSuperAdminUser = profile?.system_role === 'super_admin';
 
   const isBillingPage = location.pathname === '/app/admin/settings';
   const isExpired = isSuperAdminUser ? false : (isTrialExpired || (isSuspended && planStatus !== 'active'));
-
-  console.log("DEBUG GUARD:", { isTrialExpired, isSuspended, planStatus, isExpired, planLoading, path: location.pathname });
 
   if (isExpired && !isBillingPage) {
     return <Navigate to="/app/admin/settings" state={{ expiredAlert: true }} replace />;
@@ -48,12 +45,9 @@ export function SuperAdminGuard({ children }: { children: ReactNode }) {
 
   if (!user) return <Navigate to="/auth/login" replace />;
 
-  const email = user.email?.toLowerCase() ?? '';
-  const isWhitelisted = SUPER_ADMIN_EMAILS.includes(email);
   const isSuperAdminRole = profile?.system_role === 'super_admin';
 
-  // Allow whitelisted emails OR users with super_admin system role
-  if (!isWhitelisted && !isSuperAdminRole) return <Navigate to="/app/admin" replace />;
+  if (!isSuperAdminRole) return <Navigate to="/app/admin" replace />;
 
   return <>{children}</>;
 }
@@ -68,8 +62,7 @@ export function PublicOnlyGuard({ children }: { children: ReactNode }) {
   if (loading) return <LoadingScreen />;
 
   if (user) {
-    const email = user.email?.toLowerCase() ?? '';
-    if (SUPER_ADMIN_EMAILS.includes(email) && profile?.system_role === 'super_admin')
+    if (profile?.system_role === 'super_admin')
       return <Navigate to="/app/super-admin" replace />;
     return <Navigate to="/app/admin" replace />;
   }

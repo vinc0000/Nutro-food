@@ -201,9 +201,44 @@ function createMockSupabaseClient() {
 
   const from = (table: string) => {
     const builder: Record<string, unknown> = {};
-    const state = { filters: [] as Array<[string, unknown]>, orderBy: null as { field: string; ascending: boolean } | null, limitValue: null as number | null };
+    const state = {
+      filters: [] as Array<[string, unknown]>,
+      orderBy: null as { field: string; ascending: boolean } | null,
+      limitValue: null as number | null,
+      updateValues: null as Record<string, unknown> | null,
+      deleteFlag: false,
+    };
 
     const computeData = () => runQuery(table, state.filters, state.orderBy, state.limitValue);
+
+    const applyMutation = () => {
+      const store = readStore();
+      const items = (store as Record<string, unknown>)[table] as Array<Record<string, unknown>> | undefined;
+      if (!Array.isArray(items)) return { data: [] as Array<Record<string, unknown>>, error: null };
+
+      const matches = (item: Record<string, unknown>) => state.filters.every(([field, value]) => item[field] === value);
+
+      if (state.deleteFlag) {
+        const removed = items.filter(matches);
+        (store as Record<string, unknown>)[table] = items.filter((item) => !matches(item));
+        writeStore(store);
+        return { data: removed, error: null };
+      }
+
+      if (state.updateValues) {
+        const updated: Array<Record<string, unknown>> = [];
+        (store as Record<string, unknown>)[table] = items.map((item) => {
+          if (!matches(item)) return item;
+          const next = { ...item, ...state.updateValues };
+          updated.push(next);
+          return next;
+        });
+        writeStore(store);
+        return { data: updated, error: null };
+      }
+
+      return { data: computeData(), error: null };
+    };
 
     builder.select = () => builder;
     builder.eq = (field: string, value: unknown) => {
@@ -218,7 +253,19 @@ function createMockSupabaseClient() {
       state.limitValue = value;
       return builder;
     };
+    builder.update = (values: Record<string, unknown>) => {
+      state.updateValues = values;
+      return builder;
+    };
+    builder.delete = () => {
+      state.deleteFlag = true;
+      return builder;
+    };
     builder.maybeSingle = async () => {
+      if (state.updateValues || state.deleteFlag) {
+        const { data, error } = applyMutation();
+        return { data: data[0] ?? null, error };
+      }
       const data = computeData()[0] ?? null;
       return { data, error: null };
     };
@@ -232,13 +279,16 @@ function createMockSupabaseClient() {
       eq: (field: string, value: unknown) => SupabaseBuilder;
       order: (field: string, options?: { ascending?: boolean }) => SupabaseBuilder;
       limit: (value: number) => SupabaseBuilder;
+      update: (values: Record<string, unknown>) => SupabaseBuilder;
+      delete: () => SupabaseBuilder;
       maybeSingle: <T = Record<string, unknown>>() => Promise<{ data: T | null; error: any }>;
-      then: (callback: (result: { data: any[] }) => void) => Promise<void>;
+      then: (callback: (result: { data: any[]; error: null }) => void) => Promise<void>;
     }
 
-    // Support simple promise-like .then() chaining for platform_metrics query
+    // Support simple promise-like .then() chaining (covers plain selects as well as
+    // .update()/.delete() calls that are awaited directly without .maybeSingle()).
     (builder as any).then = (callback: any) => {
-      return Promise.resolve({ data: computeData() }).then(callback);
+      return Promise.resolve(applyMutation()).then(callback);
     };
 
     return builder as unknown as SupabaseBuilder;

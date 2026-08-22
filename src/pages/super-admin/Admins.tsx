@@ -1,153 +1,178 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldAlert, Lock, Mail, Trash2, UserCog, X, Check, Plus, AlertTriangle } from 'lucide-react';
+import { ShieldAlert, Mail, Trash2, X, Check, Plus, AlertTriangle, Loader2 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
-import { SUPER_ADMIN_EMAILS } from '@/components/guards/RouteGuards';
-
-const ADMIN_NAMES: Record<string, string> = {
-  'vincentnogue@yahoo.com': 'Vincent Nogue',
-  'vincentnogue2@gmail.com': 'Vincent Nogue',
-  'liyahjoha@gmail.com': 'Liyah Joha',
-  'liyahjoha@yahoo.com': 'Liyah Joha',
-};
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 interface AdminUser {
+  id: string;
   email: string;
   name: string;
-  role: string;
-  protected: boolean;
-  active: boolean;
-  lastLogin: string;
+  createdAt: string;
 }
-
-const INITIAL_ADMINS: AdminUser[] = SUPER_ADMIN_EMAILS.map((email, i) => ({
-  email,
-  name: ADMIN_NAMES[email] ?? 'Unknown',
-  role: i < 2 ? 'Founder' : 'Co-Founder',
-  protected: i < 2,
-  active: true,
-  lastLogin: ['2m ago', '1h ago', '3h ago', '1d ago'][i] ?? 'unknown',
-}));
 
 export default function SuperAdminAdmins() {
   const { theme } = useTheme();
-  const [admins, setAdmins] = useState<AdminUser[]>(INITIAL_ADMINS);
+  const { profile: currentProfile } = useAuth();
+  const [admins, setAdmins] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteName, setInviteName] = useState('');
-  const [inviteRole, setInviteRole] = useState('Co-Founder');
-  const [editAdmin, setEditAdmin] = useState<AdminUser | null>(null);
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<AdminUser | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
 
-  const sendInvite = () => {
-    if (!inviteEmail || !inviteEmail.includes('@')) { showToast('Please enter a valid email'); return; }
-    const newAdmin: AdminUser = {
-      email: inviteEmail, name: inviteName || inviteEmail.split('@')[0],
-      role: inviteRole, protected: false, active: true, lastLogin: 'Never',
-    };
-    setAdmins(prev => [...prev, newAdmin]);
-    setShowInvite(false); setInviteEmail(''); setInviteName(''); setInviteRole('Co-Founder');
-    showToast(`Invitation sent to ${inviteEmail}`);
+  const loadAdmins = async () => {
+    setLoading(true);
+    setLoadError(null);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('system_role', 'super_admin')
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      setLoadError(error.message);
+      setLoading(false);
+      return;
+    }
+
+    const rows = (data ?? []) as Array<{ id: string; email: string | null; full_name: string | null; created_at: string }>;
+    setAdmins(rows.map(row => ({
+      id: row.id,
+      email: row.email ?? '(no email)',
+      name: row.full_name ?? row.email ?? 'Unnamed',
+      createdAt: row.created_at,
+    })));
+    setLoading(false);
   };
 
-  const saveEdit = () => {
-    if (!editAdmin) return;
-    setAdmins(prev => prev.map(a => a.email === editAdmin.email ? editAdmin : a));
-    showToast(`Updated ${editAdmin.name}`);
-    setEditAdmin(null);
+  useEffect(() => { loadAdmins(); }, []);
+
+  // Promotes an EXISTING account to super_admin. We deliberately do not fabricate an
+  // "invitation email" here: sending real invite emails requires a server-side function
+  // with the Supabase service role key, which this project does not have yet. The person
+  // being promoted must already have created a regular Nutro account first.
+  const promoteToSuperAdmin = async () => {
+    if (!inviteEmail || !inviteEmail.includes('@')) { setInviteError('Please enter a valid email'); return; }
+    setInviteBusy(true);
+    setInviteError(null);
+
+    const { data: existing, error: lookupError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', inviteEmail.trim().toLowerCase())
+      .maybeSingle();
+
+    if (lookupError) { setInviteError(lookupError.message); setInviteBusy(false); return; }
+    if (!existing) {
+      setInviteError('No Nutro account exists with this email yet. Ask them to sign up first, then promote them here.');
+      setInviteBusy(false);
+      return;
+    }
+
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ system_role: 'super_admin' })
+      .eq('id', (existing as { id: string }).id);
+
+    setInviteBusy(false);
+    if (updateError) { setInviteError(updateError.message); return; }
+
+    setShowInvite(false);
+    setInviteEmail('');
+    showToast(`${inviteEmail} is now a Super Admin`);
+    loadAdmins();
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteConfirm) return;
-    setAdmins(prev => prev.filter(a => a.email !== deleteConfirm.email));
+    const { error } = await supabase
+      .from('profiles')
+      .update({ system_role: 'user' })
+      .eq('id', deleteConfirm.id);
+
+    if (error) { showToast(`Failed: ${error.message}`); setDeleteConfirm(null); return; }
     showToast(`Access revoked for ${deleteConfirm.email}`);
     setDeleteConfirm(null);
+    loadAdmins();
   };
 
-  const toggleActive = (email: string) => {
-    setAdmins(prev => prev.map(a => a.email === email ? { ...a, active: !a.active } : a));
-  };
+  const isLastAdmin = admins.length <= 1;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold" style={{ color: theme.text }}>Super Admin Team</h1>
-          <p className="text-sm mt-1" style={{ color: theme.textMuted }}>Manage founder accounts, roles, and access control</p>
+          <p className="text-sm mt-1" style={{ color: theme.textMuted }}>Manage who has Super Admin access to the platform</p>
         </div>
         <button onClick={() => setShowInvite(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{ background: '#0369A1' }}>
-          <Plus size={16} /> Invite Admin
+          <Plus size={16} /> Promote an Admin
         </button>
       </div>
 
       <div className="flex items-center gap-3 p-4 rounded-xl" style={{ background: '#ef444410', border: '1px solid #ef444430' }}>
         <ShieldAlert size={18} style={{ color: '#ef4444' }} />
         <div>
-          <p className="text-sm font-bold" style={{ color: '#ef4444' }}>Deletion Protection Active</p>
-          <p className="text-xs" style={{ color: theme.textMuted }}>The last 2 Super Admin accounts are permanently protected from deletion or demotion. Support emails do NOT possess Super Admin rights.</p>
+          <p className="text-sm font-bold" style={{ color: '#ef4444' }}>Access is DB-enforced</p>
+          <p className="text-xs" style={{ color: theme.textMuted }}>Super Admin access is granted only via the <code className="px-1 py-0.5 rounded font-mono text-xs" style={{ background: theme.bg }}>system_role</code> column on <code className="px-1 py-0.5 rounded font-mono text-xs" style={{ background: theme.bg }}>profiles</code>, enforced by Supabase RLS. The list below is the real, live source of truth &mdash; not a hardcoded list.</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Admins', val: admins.length, color: '#0369A1' },
-          { label: 'Protected', val: admins.filter(a => a.protected).length, color: '#ef4444' },
-          { label: 'Active', val: admins.filter(a => a.active).length, color: '#22c55e' },
-          { label: 'Invited', val: admins.filter(a => a.lastLogin === 'Never').length, color: '#3b82f6' },
-        ].map(s => (
-          <div key={s.label} className="p-4 rounded-xl text-center" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
-            <div className="text-2xl font-extrabold" style={{ color: s.color }}>{s.val}</div>
-            <div className="text-xs mt-1" style={{ color: theme.textMuted }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
+      {loading && (
+        <div className="flex items-center gap-2 p-6 justify-center" style={{ color: theme.textMuted }}>
+          <Loader2 size={16} className="animate-spin" /> Loading admins…
+        </div>
+      )}
 
-      <div className="space-y-3">
-        {admins.map(admin => (
-          <div key={admin.email} className="flex items-center gap-4 p-4 rounded-2xl"
-            style={{ background: theme.surface, border: `1px solid ${admin.protected ? '#0369A140' : theme.border}` }}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-sm"
-              style={{ background: admin.protected ? '#0369A118' : theme.bg, color: admin.protected ? '#0369A1' : theme.textMuted }}>
-              {admin.name.split(' ').map(n => n[0]).join('')}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-bold" style={{ color: theme.text }}>{admin.name}</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#0369A118', color: '#0369A1' }}>{admin.role}</span>
-                {admin.protected && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#ef444420', color: '#ef4444' }}>PROTECTED</span>}
-                {!admin.active && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#6b728020', color: '#6b7280' }}>INACTIVE</span>}
+      {!loading && loadError && (
+        <div className="p-4 rounded-xl text-sm" style={{ background: '#ef444410', border: '1px solid #ef444430', color: '#ef4444' }}>
+          Could not load admins: {loadError}
+        </div>
+      )}
+
+      {!loading && !loadError && (
+        <div className="space-y-3">
+          {admins.map(admin => {
+            const isSelf = admin.id === currentProfile?.id;
+            const protectedFromDeletion = isSelf || isLastAdmin;
+            return (
+              <div key={admin.id} className="flex items-center gap-4 p-4 rounded-2xl"
+                style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-sm"
+                  style={{ background: theme.bg, color: theme.textMuted }}>
+                  {admin.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold" style={{ color: theme.text }}>{admin.name}</span>
+                    {isSelf && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#0369A118', color: '#0369A1' }}>YOU</span>}
+                    {protectedFromDeletion && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#ef444420', color: '#ef4444' }}>PROTECTED</span>}
+                  </div>
+                  <div className="text-sm" style={{ color: theme.textMuted }}>{admin.email}</div>
+                  <div className="text-[10px] mt-0.5" style={{ color: theme.textMuted }}>Admin since {new Date(admin.createdAt).toLocaleDateString()}</div>
+                </div>
+                <div className="flex items-center gap-1">
+                  {!protectedFromDeletion && (
+                    <button onClick={() => setDeleteConfirm(admin)} title="Revoke Access" className="p-2 rounded-lg hover:opacity-70" style={{ color: '#ef4444' }}><Trash2 size={14} /></button>
+                  )}
+                </div>
               </div>
-              <div className="text-sm" style={{ color: theme.textMuted }}>{admin.email}</div>
-              <div className="text-[10px] mt-0.5" style={{ color: theme.textMuted }}>Last login: {admin.lastLogin}</div>
-            </div>
-            <div className="flex items-center gap-1">
-              <button onClick={() => setEditAdmin(admin)} title="Edit Role" className="p-2 rounded-lg hover:opacity-70" style={{ color: theme.textMuted }}><UserCog size={14} /></button>
-              {!admin.protected && (
-                <button onClick={() => toggleActive(admin.email)} title={admin.active ? 'Deactivate' : 'Activate'}
-                  className="p-2 rounded-lg hover:opacity-70" style={{ color: admin.active ? '#eab308' : '#22c55e' }}>
-                  {admin.active ? <Lock size={14} /> : <Check size={14} />}
-                </button>
-              )}
-              {!admin.protected && (
-                <button onClick={() => setDeleteConfirm(admin)} title="Revoke Access" className="p-2 rounded-lg hover:opacity-70" style={{ color: '#ef4444' }}><Trash2 size={14} /></button>
-              )}
-              {admin.protected && <Lock size={14} style={{ color: theme.textMuted }} />}
-            </div>
-          </div>
-        ))}
-      </div>
+            );
+          })}
+          {admins.length === 0 && (
+            <p className="text-sm text-center py-6" style={{ color: theme.textMuted }}>No Super Admins found.</p>
+          )}
+        </div>
+      )}
 
-      <div className="rounded-2xl p-5" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
-        <h3 className="font-bold mb-2" style={{ color: theme.text }}>Whitelist Policy</h3>
-        <p className="text-sm leading-relaxed" style={{ color: theme.textMuted }}>
-          Only whitelisted emails can access the Super Admin module. Any other email attempting to access <code className="px-1 py-0.5 rounded font-mono text-xs" style={{ background: theme.bg }}>/app/super-admin</code> is automatically redirected to <code className="px-1 py-0.5 rounded font-mono text-xs" style={{ background: theme.bg }}>/app/admin</code>. This whitelist is enforced at both the route guard and database RLS level.
-        </p>
-      </div>
-
-      {/* Invite modal */}
+      {/* Promote modal */}
       <AnimatePresence>
         {showInvite && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -155,73 +180,26 @@ export default function SuperAdminAdmins() {
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
               className="w-full max-w-sm rounded-2xl p-6" style={{ background: theme.surface, border: `1px solid ${theme.border}` }} onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-extrabold flex items-center gap-2" style={{ color: theme.text }}><Mail size={18} /> Invite Super Admin</h2>
+                <h2 className="text-lg font-extrabold flex items-center gap-2" style={{ color: theme.text }}><Mail size={18} /> Promote to Super Admin</h2>
                 <button onClick={() => setShowInvite(false)} style={{ color: theme.textMuted }}><X size={18} /></button>
               </div>
+              <p className="text-xs mb-4" style={{ color: theme.textMuted }}>
+                The account must already exist. Enter the email of an existing Nutro user to grant them Super Admin access.
+              </p>
               <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Full Name</label>
-                  <input value={inviteName} onChange={e => setInviteName(e.target.value)} placeholder="John Doe"
-                    className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
-                </div>
                 <div>
                   <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Email Address</label>
-                  <input value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="john@liafrik.com"
+                  <input value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="teammate@example.com"
                     className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
                 </div>
-                <div>
-                  <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Role</label>
-                  <select value={inviteRole} onChange={e => setInviteRole(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>
-                    <option>Co-Founder</option>
-                    <option>Operations Lead</option>
-                    <option>Support Lead</option>
-                    <option>Developer</option>
-                  </select>
-                </div>
+                {inviteError && <p className="text-xs" style={{ color: '#ef4444' }}>{inviteError}</p>}
               </div>
               <div className="flex gap-3 mt-5">
-                <button onClick={sendInvite} className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: '#0369A1' }}>Send Invitation</button>
+                <button onClick={promoteToSuperAdmin} disabled={inviteBusy}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-50 flex items-center justify-center gap-2" style={{ background: '#0369A1' }}>
+                  {inviteBusy && <Loader2 size={14} className="animate-spin" />} Promote
+                </button>
                 <button onClick={() => setShowInvite(false)} className="px-4 py-2.5 rounded-xl font-bold text-sm" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Cancel</button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Edit modal */}
-      <AnimatePresence>
-        {editAdmin && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={() => setEditAdmin(null)}>
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
-              className="w-full max-w-sm rounded-2xl p-6" style={{ background: theme.surface, border: `1px solid ${theme.border}` }} onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-extrabold" style={{ color: theme.text }}>Edit {editAdmin.name}</h2>
-                <button onClick={() => setEditAdmin(null)} style={{ color: theme.textMuted }}><X size={18} /></button>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Name</label>
-                  <input value={editAdmin.name} onChange={e => setEditAdmin(p => p ? { ...p, name: e.target.value } : p)}
-                    className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Role</label>
-                  <select value={editAdmin.role} onChange={e => setEditAdmin(p => p ? { ...p, role: e.target.value } : p)}
-                    className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} disabled={editAdmin.protected}>
-                    {['Founder', 'Co-Founder', 'Operations Lead', 'Support Lead', 'Developer'].map(r => <option key={r}>{r}</option>)}
-                  </select>
-                  {editAdmin.protected && <p className="text-[10px] mt-1" style={{ color: '#ef4444' }}>Role locked for protected accounts</p>}
-                </div>
-                <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
-                  <input type="checkbox" checked={editAdmin.active} onChange={e => setEditAdmin(p => p ? { ...p, active: e.target.checked } : p)} style={{ accentColor: '#0369A1' }} />
-                  <span style={{ color: theme.text }}>Active</span>
-                </label>
-              </div>
-              <div className="flex gap-3 mt-5">
-                <button onClick={saveEdit} className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: '#0369A1' }}>Save Changes</button>
-                <button onClick={() => setEditAdmin(null)} className="px-4 py-2.5 rounded-xl font-bold text-sm" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Cancel</button>
               </div>
             </motion.div>
           </motion.div>
