@@ -9,8 +9,10 @@ import Logo from '@/components/Logo';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSearchParams } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
 import { useSharedMenu } from '@/lib/menuStore';
 import { useSharedOrders, SharedOrder } from '@/lib/ordersStore';
+import { useOrgContext } from '@/hooks/useOrgContext';
 
 const CURRENCIES = ['USD', 'EUR', 'AED', 'XAF', 'NGN', 'GBP'];
 const CURRENCY_RATES: Record<string, number> = { USD: 1, EUR: 0.92, AED: 3.67, XAF: 600, NGN: 1500, GBP: 0.79 };
@@ -44,10 +46,35 @@ interface CartItem { item: MenuItem; qty: number; }
 export default function TabletMenu() {
   const { theme } = useTheme();
   const { t } = useLocale();
-  const { menuItems } = useSharedMenu();
-  const { addOrder } = useSharedOrders();
   const [searchParams] = useSearchParams();
   const tableNum = searchParams.get('table') ?? '1';
+
+  // A real customer-facing tablet is unauthenticated, so it must identify its own
+  // branch from the URL — either directly (?branch=<id>) or via a QR-provisioned
+  // token (?token=<tablet_token>, resolved against the public branch_public_info
+  // view). When neither is present (e.g. previewing from the admin sidebar while
+  // logged in), fall back to the signed-in admin's own branch.
+  const branchParam = searchParams.get('branch');
+  const tokenParam = searchParams.get('token');
+  const { orgContext } = useOrgContext();
+  const [resolvedBranchId, setResolvedBranchId] = useState<string | null>(branchParam);
+
+  useEffect(() => {
+    if (branchParam) { setResolvedBranchId(branchParam); return; }
+    if (tokenParam) {
+      supabase
+        .from('branch_public_info')
+        .select('id,name,currency,country,city')
+        .eq('tablet_token', tokenParam)
+        .maybeSingle<{ id: string }>()
+        .then(({ data }) => setResolvedBranchId(data?.id ?? null));
+      return;
+    }
+    setResolvedBranchId(orgContext?.branch_id ?? null);
+  }, [branchParam, tokenParam, orgContext?.branch_id]);
+
+  const { menuItems } = useSharedMenu(resolvedBranchId);
+  const { addOrder } = useSharedOrders();
 
   const [currency, setCurrency] = useState(() => {
     return localStorage.getItem('nutro:settings:currency') ?? 'USD';

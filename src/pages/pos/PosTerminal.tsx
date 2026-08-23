@@ -122,10 +122,10 @@ export default function PosTerminal() {
   const { theme } = useTheme();
   const { profile } = useAuth();
   const { t } = useLocale();
-  const { menuItems } = useSharedMenu();
   const navigate = useNavigate();
   const { plan } = usePlanInfo();
   const { orgContext } = useOrgContext();
+  const { menuItems } = useSharedMenu(orgContext?.branch_id ?? null);
   const PLAN_TABLE_LIMIT = plan === 'starter' ? 10 : (plan === 'premium' ? 30 : 999);
 
   const currencyCode = localStorage.getItem('nutro:settings:currency') ?? orgContext?.currency ?? 'USD';

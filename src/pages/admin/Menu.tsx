@@ -1,19 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Search, Edit2, Trash2, X, Check, Package, AlertTriangle, Image as ImageIcon, Upload, Loader2 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
-import { useSharedMenu } from '@/lib/menuStore';
+import { useSharedMenu, type SharedMenuItem } from '@/lib/menuStore';
+import { useOrgContext } from '@/hooks/useOrgContext';
 
-interface MenuItem {
-  id: string; name: string; category: string; price: number; calories: number;
-  protein: number; carbs: number; fats: number; fiber: number;
-  halal: boolean; vegan: boolean; glutenFree: boolean; keto: boolean; nutFree: boolean; spicy: boolean;
-  available: boolean; description: string;
-  stock: number; ingredients: { name: string; grams: number }[];
-  taxRate: number; image: string; portionSize: string; weight: number;
-  allergens: string[];
-}
+type MenuItem = SharedMenuItem;
 
 const CATS = ['All', 'Starters', 'Mains', 'Desserts', 'Drinks', 'Snacks'];
 const PORTION_SIZES = ['Small', 'Regular', 'Large', 'Family'];
@@ -25,8 +18,9 @@ function DietBadge({ label, color }: { label: string; color: string }) {
 
 export default function AdminMenu() {
   const { theme } = useTheme();
-  const { menuItems, setMenuItems } = useSharedMenu();
-  const [items, setItems] = useState<MenuItem[]>(menuItems);
+  const { orgContext } = useOrgContext();
+  const branchId = orgContext?.branch_id ?? null;
+  const { menuItems: items, loading, error, addItem, updateItem, deleteItem: removeItem, toggleAvailable: toggleItemAvailable, adjustStock: adjustItemStock } = useSharedMenu(branchId);
   const [search, setSearch] = useState('');
   const [activeCat, setActiveCat] = useState('All');
   const [editing, setEditing] = useState<MenuItem | null>(null);
@@ -36,30 +30,14 @@ export default function AdminMenu() {
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [newIngredient, setNewIngredient] = useState({ name: '', grams: 0 });
 
-  useEffect(() => {
-    setItems(menuItems);
-  }, [menuItems]);
-
   const filtered = items.filter(item =>
     (activeCat === 'All' || item.category === activeCat) &&
     item.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const toggleAvailable = (id: string) => {
-    const next = items.map(i => i.id === id ? { ...i, available: !i.available } : i);
-    setItems(next);
-    setMenuItems(next);
-  };
-  const deleteItem = (id: string) => {
-    const next = items.filter(i => i.id !== id);
-    setItems(next);
-    setMenuItems(next);
-  };
-  const adjustStock = (id: string, delta: number) => {
-    const next = items.map(i => i.id === id ? { ...i, stock: Math.max(0, i.stock + delta) } : i);
-    setItems(next);
-    setMenuItems(next);
-  };
+  const toggleAvailable = (id: string) => { void toggleItemAvailable(id); };
+  const deleteItem = (id: string) => { void removeItem(id); };
+  const adjustStock = (id: string, delta: number) => { void adjustItemStock(id, delta); };
 
   const openAddForm = () => {
     setFormData({ available: true, stock: 0, taxRate: 5, portionSize: 'Regular', halal: true, ingredients: [], image: '', category: 'Mains' });
@@ -75,13 +53,11 @@ export default function AdminMenu() {
     setUploadMessage(null);
   };
 
-  const saveForm = () => {
-    let nextItems: MenuItem[];
+  const saveForm = async () => {
     if (editing) {
-      nextItems = items.map(i => i.id === editing.id ? { ...i, ...formData } as MenuItem : i);
+      await updateItem(editing.id, formData);
     } else {
-      const newItem: MenuItem = {
-        id: Date.now().toString(),
+      const newItem: Omit<MenuItem, 'id'> = {
         name: formData.name ?? '',
         category: formData.category ?? 'Mains',
         price: formData.price ?? 0,
@@ -106,10 +82,8 @@ export default function AdminMenu() {
         portionSize: formData.portionSize ?? 'Regular',
         weight: formData.weight ?? 0,
       };
-      nextItems = [...items, newItem];
+      await addItem(newItem);
     }
-    setItems(nextItems);
-    setMenuItems(nextItems);
     setShowForm(false);
     setFormData({});
   };
@@ -170,10 +144,21 @@ export default function AdminMenu() {
           <h1 className="text-xl font-bold" style={{ color: theme.text }}>Menu & Recipe Manager</h1>
           <p className="text-sm mt-1" style={{ color: theme.textMuted }}>Manage items, images, portions, macros, stock, allergens, and pricing</p>
         </div>
-        <button onClick={openAddForm} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>
+        <button onClick={openAddForm} disabled={!branchId} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-50" style={{ background: theme.primary }}>
           <Plus size={16} /> Add Item
         </button>
       </div>
+
+      {loading && (
+        <div className="flex items-center gap-2 p-6 justify-center" style={{ color: theme.textMuted }}>
+          <Loader2 size={16} className="animate-spin" /> Loading menu…
+        </div>
+      )}
+      {!loading && error && (
+        <div className="p-4 rounded-xl text-sm" style={{ background: '#ef444410', border: '1px solid #ef444430', color: '#ef4444' }}>
+          Could not load menu: {error}
+        </div>
+      )}
 
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative">
@@ -430,7 +415,7 @@ export default function AdminMenu() {
                 </div>
               </div>
               <div className="flex gap-3 mt-6">
-                <button onClick={saveForm} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>{editing ? 'Save Changes' : 'Add Item'}</button>
+                <button onClick={() => void saveForm()} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>{editing ? 'Save Changes' : 'Add Item'}</button>
                 <button onClick={() => setShowForm(false)}
                   className="px-4 py-2.5 rounded-xl text-sm font-semibold" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Cancel</button>
               </div>
