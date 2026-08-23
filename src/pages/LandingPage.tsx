@@ -3,13 +3,14 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChefHat, Monitor, Tablet, BarChart3, Shield, Globe, Zap,
-  Check, X, ArrowRight, Menu as MenuIcon, ChevronDown, Sparkles, UtensilsCrossed, Mail, X as XIcon,
+  Check, X, ArrowRight, Menu as MenuIcon, ChevronDown, Sparkles, Mail, X as XIcon,
   Star, Award, Headphones, Cloud, Scale, Brain,
   Phone, MessageCircle, ArrowUp
 } from 'lucide-react';
 import { useTheme, THEMES, ThemeName } from '@/contexts/ThemeContext';
 import { useLocale, type SupportedCurrency } from '@/contexts/LocaleContext';
 import { CURRENCIES } from '@/lib/countries';
+import Logo from '@/components/Logo';
 
 const SLIDES = [
   {
@@ -228,8 +229,8 @@ export default function LandingPage() {
         }}>
         <div className="section-shell px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#0369A1' }}>
-              <UtensilsCrossed size={18} color="#fff" />
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#16A34A' }}>
+              <Logo size={18} color="#fff" />
             </div>
             <div className="flex flex-col leading-none">
               <span className="text-lg font-bold tracking-tight text-white">NUTRO</span>
@@ -605,7 +606,7 @@ export default function LandingPage() {
             <div>
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: theme.primary }}>
-                  <UtensilsCrossed size={18} color="#fff" />
+                  <Logo size={18} color="#fff" />
                 </div>
                 <span className="text-lg font-bold" style={{ color: theme.text }}>NUTRO</span>
               </div>

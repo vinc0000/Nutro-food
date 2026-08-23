@@ -25,8 +25,8 @@ export const THEMES: Record<ThemeName, ThemeConfig> = {
     text: '#0F172A', textMuted: '#64748B', isDark: false,
   },
   emerald: {
-    name: 'emerald', label: 'Emerald Tech',
-    primary: '#10B981', primaryHover: '#059669', secondary: '#34D399', accent: '#6EE7B7',
+    name: 'emerald', label: 'Bio Organic',
+    primary: '#16A34A', primaryHover: '#15803D', secondary: '#4ADE80', accent: '#86EFAC',
     bg: '#F8FAFC', surface: '#FFFFFF', border: '#E2E8F0',
     text: '#0F172A', textMuted: '#64748B', isDark: false,
   },
@@ -50,7 +50,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [themeName, setThemeName] = useState<ThemeName>(() => {
     const stored = localStorage.getItem('nutro-theme') as ThemeName;
     const valid: ThemeName[] = ['ocean', 'emerald', 'slate'];
-    return valid.includes(stored) ? stored : 'ocean';
+    return valid.includes(stored) ? stored : 'emerald';
   });
 
   const theme = useMemo(() => THEMES[themeName], [themeName]);

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UtensilsCrossed, Mail, Lock, Eye, EyeOff, AlertCircle, Check, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, Check, ArrowLeft } from 'lucide-react';
+import Logo from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -73,7 +74,7 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: theme.primary }}>
-              <UtensilsCrossed size={24} color="#fff" />
+              <Logo size={24} color="#fff" />
             </div>
             <span className="text-2xl font-extrabold tracking-tight" style={{ color: theme.text }}>NUTRO</span>
           </Link>

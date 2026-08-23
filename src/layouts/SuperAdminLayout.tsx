@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Building2, Users, DollarSign, ShieldCheck,
-  LogOut, ChevronLeft, ChevronRight, UtensilsCrossed, Bell, Menu as MenuIcon, X,
+  LogOut, ChevronLeft, ChevronRight, Bell, Menu as MenuIcon, X,
   Languages, ChevronDown, Check
 } from 'lucide-react';
+import Logo from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import ThemeSwitcher from '@/components/ui/ThemeSwitcher';
@@ -54,7 +55,7 @@ export default function SuperAdminLayout() {
         {!collapsed && (
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: theme.primary }}>
-              <UtensilsCrossed size={14} color="#fff" />
+              <Logo size={14} color="#fff" />
             </div>
             <div>
               <span className="text-sm font-extrabold text-white">NUTRO</span>

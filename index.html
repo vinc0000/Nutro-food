@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Nutro — Restaurant Technology Platform by LiAfrik</title>
     <meta name="description" content="Nutro by LiAfrik: Interactive tablet menus, smart nutrition engine, cloud POS, and kitchen display system for restaurants." />
@@ -10,10 +10,11 @@
     <meta name="theme-color" content="#10B981" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <!-- TODO: add a real 1200x630 branded OG image to /public and set og:image / twitter:image
-         to it. They previously pointed at manifest.json (not an image), which silently broke
-         link previews on WhatsApp/Twitter/Facebook/LinkedIn. -->
+    <!-- Square logo used as a fallback share image; swap for a real 1200x630 branded
+         image under /public if you want a proper landscape link-preview crop. -->
+    <meta property="og:image" content="/logo.png">
     <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="/logo.png">
 </head>
   <body>
     <div id="root"></div>

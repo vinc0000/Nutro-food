@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  UtensilsCrossed, Mail, Lock, User, Eye, EyeOff, AlertCircle, Check,
+  Mail, Lock, User, Eye, EyeOff, AlertCircle, Check,
   Building2, MapPin, Globe, ChevronRight, ChevronLeft, Phone
 } from 'lucide-react';
+import Logo from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -91,7 +92,7 @@ export default function SignupPage() {
         <div className="text-center mb-6">
           <Link to="/" className="inline-flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: theme.primary }}>
-              <UtensilsCrossed size={22} color="#fff" />
+              <Logo size={22} color="#fff" />
             </div>
             <span className="text-2xl font-extrabold tracking-tight" style={{ color: theme.text }}>NUTRO</span>
           </Link>

@@ -4,8 +4,9 @@ import {
   LayoutDashboard, UtensilsCrossed, Users,
   Settings, LogOut, ChevronLeft, ChevronRight, Monitor,
   ChefHat, Bell, Tablet, FileBarChart, ShieldCheck, Menu as MenuIcon,
-  X, ChevronDown, UtensilsCrossed as Logo, Languages
+  X, ChevronDown, Languages
 } from 'lucide-react';
+import Logo from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLocale } from '@/contexts/LocaleContext';

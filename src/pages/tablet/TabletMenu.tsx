@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  UtensilsCrossed, Search, ShoppingCart, X, Plus, Minus,
+  Search, ShoppingCart, X, Plus, Minus,
   Info, Check, AlertTriangle, Leaf, Instagram, Facebook, MessageCircle, MapPin,
   CreditCard, Banknote, Lock
 } from 'lucide-react';
+import Logo from '@/components/Logo';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSearchParams } from 'react-router-dom';
@@ -165,7 +166,7 @@ export default function TabletMenu() {
               <img src={brandLogo} alt="Logo" className="w-9 h-9 rounded-xl object-cover" />
             ) : (
               <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: theme.primary }}>
-                <UtensilsCrossed size={18} color="#fff" />
+                <Logo size={18} color="#fff" />
               </div>
             )}
             <div>
