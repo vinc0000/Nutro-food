@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, Check, ArrowLeft } from 'lucide-react';
 import Logo from '@/components/Logo';
+import AuthBackground from '@/components/AuthBackground';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -64,11 +65,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden" style={{ background: theme.bg }}>
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full opacity-10 blur-3xl" style={{ background: theme.primary }} />
-        <div className="absolute bottom-1/4 right-1/4 w-64 h-64 rounded-full opacity-5 blur-3xl" style={{ background: theme.secondary }} />
-      </div>
+    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
+      <AuthBackground />
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md relative z-10">
         <div className="text-center mb-8">
@@ -76,9 +74,9 @@ export default function LoginPage() {
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: theme.primary }}>
               <Logo size={24} color="#fff" />
             </div>
-            <span className="text-2xl font-extrabold tracking-tight" style={{ color: theme.text }}>NUTRO</span>
+            <span className="text-2xl font-extrabold tracking-tight" style={{ color: '#fff' }}>NUTRO</span>
           </Link>
-          <p className="mt-2 text-sm" style={{ color: theme.textMuted }}>{t('auth.signin')} to your restaurant platform</p>
+          <p className="mt-2 text-sm" style={{ color: 'rgba(255,255,255,0.75)' }}>{t('auth.signin')} to your restaurant platform</p>
         </div>
 
         <div className="rounded-2xl p-8" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>

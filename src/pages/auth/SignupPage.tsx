@@ -6,6 +6,7 @@ import {
   Building2, MapPin, Globe, ChevronRight, ChevronLeft, Phone
 } from 'lucide-react';
 import Logo from '@/components/Logo';
+import AuthBackground from '@/components/AuthBackground';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -82,11 +83,8 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-8 relative overflow-hidden" style={{ background: theme.bg }}>
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-1/4 right-1/4 w-96 h-96 rounded-full opacity-5 blur-3xl" style={{ background: theme.primary }} />
-        <div className="absolute bottom-1/4 left-1/4 w-64 h-64 rounded-full opacity-5 blur-3xl" style={{ background: theme.secondary }} />
-      </div>
+    <div className="min-h-screen flex items-center justify-center px-4 py-8 relative overflow-hidden">
+      <AuthBackground />
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-lg relative z-10">
         <div className="text-center mb-6">
@@ -94,26 +92,26 @@ export default function SignupPage() {
             <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: theme.primary }}>
               <Logo size={22} color="#fff" />
             </div>
-            <span className="text-2xl font-extrabold tracking-tight" style={{ color: theme.text }}>NUTRO</span>
+            <span className="text-2xl font-extrabold tracking-tight" style={{ color: '#fff' }}>NUTRO</span>
           </Link>
         </div>
 
         {/* Progress steps */}
-        <div className="flex items-center justify-center gap-2 mb-6">
+        <div className="flex items-center justify-center gap-2 mb-6 mx-auto w-fit px-4 py-2 rounded-full" style={{ background: 'rgba(15,23,20,0.55)', backdropFilter: 'blur(6px)' }}>
           {STEPS.map((s, i) => (
             <div key={s} className="flex items-center gap-2">
               <div className="flex items-center gap-1.5">
                 <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all"
                   style={{
-                    background: i <= step ? theme.primary : theme.surface,
-                    color: i <= step ? '#fff' : theme.textMuted,
-                    border: `1px solid ${i <= step ? theme.primary : theme.border}`,
+                    background: i <= step ? theme.primary : 'rgba(255,255,255,0.15)',
+                    color: '#fff',
+                    border: `1px solid ${i <= step ? theme.primary : 'rgba(255,255,255,0.3)'}`,
                   }}>
                   {i < step ? <Check size={13} /> : i + 1}
                 </div>
-                <span className="text-xs font-semibold hidden sm:block" style={{ color: i <= step ? theme.text : theme.textMuted }}>{s}</span>
+                <span className="text-xs font-semibold hidden sm:block" style={{ color: i <= step ? '#fff' : 'rgba(255,255,255,0.6)' }}>{s}</span>
               </div>
-              {i < STEPS.length - 1 && <div className="w-6 h-0.5" style={{ background: i < step ? theme.primary : theme.border }} />}
+              {i < STEPS.length - 1 && <div className="w-6 h-0.5" style={{ background: i < step ? theme.primary : 'rgba(255,255,255,0.25)' }} />}
             </div>
           ))}
         </div>

@@ -112,7 +112,7 @@ export default function SuperAdminAdmins() {
           <h1 className="text-xl font-bold" style={{ color: theme.text }}>Super Admin Team</h1>
           <p className="text-sm mt-1" style={{ color: theme.textMuted }}>Manage who has Super Admin access to the platform</p>
         </div>
-        <button onClick={() => setShowInvite(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{ background: '#0369A1' }}>
+        <button onClick={() => setShowInvite(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>
           <Plus size={16} /> Promote an Admin
         </button>
       </div>
@@ -196,7 +196,7 @@ export default function SuperAdminAdmins() {
               </div>
               <div className="flex gap-3 mt-5">
                 <button onClick={promoteToSuperAdmin} disabled={inviteBusy}
-                  className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-50 flex items-center justify-center gap-2" style={{ background: '#0369A1' }}>
+                  className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-50 flex items-center justify-center gap-2" style={{ background: theme.primary }}>
                   {inviteBusy && <Loader2 size={14} className="animate-spin" />} Promote
                 </button>
                 <button onClick={() => setShowInvite(false)} className="px-4 py-2.5 rounded-xl font-bold text-sm" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Cancel</button>
@@ -231,7 +231,7 @@ export default function SuperAdminAdmins() {
       </AnimatePresence>
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-xl font-semibold text-sm text-white shadow-2xl flex items-center gap-2" style={{ background: '#0369A1' }}>
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-xl font-semibold text-sm text-white shadow-2xl flex items-center gap-2" style={{ background: theme.primary }}>
           <Check size={16} /> {toast}
         </div>
       )}

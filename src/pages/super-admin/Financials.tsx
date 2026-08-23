@@ -45,7 +45,7 @@ function FilterDropdown({ label, value, options, onChange, theme }: {
             {options.map(opt => (
               <button key={opt} onClick={() => { onChange(opt); setOpen(false); }}
                 className="w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80"
-                style={{ background: value === opt ? '#0369A115' : 'transparent', color: value === opt ? '#0369A1' : theme.text }}>
+                style={{ background: value === opt ? theme.primary + '15' : 'transparent', color: value === opt ? theme.primary : theme.text }}>
                 {opt}
               </button>
             ))}
@@ -102,7 +102,7 @@ export default function SuperAdminFinancials() {
             <Download size={16} /> Export CSV
           </button>
           <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold"
-            style={{ background: '#0369A1', color: '#fff' }}>
+            style={{ background: theme.primary, color: '#fff' }}>
             <Receipt size={16} /> Print
           </button>
         </div>
@@ -198,7 +198,7 @@ export default function SuperAdminFinancials() {
       </div>
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-xl font-semibold text-sm text-white shadow-2xl flex items-center gap-2" style={{ background: '#0369A1' }}>
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-xl font-semibold text-sm text-white shadow-2xl flex items-center gap-2" style={{ background: theme.primary }}>
           <Download size={16} /> {toast}
         </div>
       )}
