@@ -10,9 +10,10 @@
     <meta name="theme-color" content="#10B981" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta property="og:image" content="/manifest.json">
+    <!-- TODO: add a real 1200x630 branded OG image to /public and set og:image / twitter:image
+         to it. They previously pointed at manifest.json (not an image), which silently broke
+         link previews on WhatsApp/Twitter/Facebook/LinkedIn. -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:image" content="/manifest.json">
 </head>
   <body>
     <div id="root"></div>
