@@ -5,6 +5,7 @@ import { UtensilsCrossed, Mail, Lock, Eye, EyeOff, AlertCircle, Check, ArrowLeft
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLocale } from '@/contexts/LocaleContext';
+import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
   const { signIn } = useAuth();
@@ -40,20 +41,6 @@ export default function LoginPage() {
     setLoading(false);
     if (error) { setError(error); return; }
 
-    // Save User Connection Log
-    try {
-      const connections = JSON.parse(localStorage.getItem('nutro:user-connections') || '[]');
-      connections.unshift({
-        id: 'conn-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
-        email: email,
-        loggedAt: new Date().toISOString(),
-        userAgent: navigator.userAgent,
-      });
-      localStorage.setItem('nutro:user-connections', JSON.stringify(connections.slice(0, 50)));
-    } catch (err) {
-      console.error('Failed to log connection:', err);
-    }
-
     // Save/Clear Remembered Email
     if (remember) {
       localStorage.setItem('nutro:remembered-email', email);
@@ -64,8 +51,14 @@ export default function LoginPage() {
     navigate(from, { replace: true });
   };
 
-  const handleForgot = (e: React.FormEvent) => {
+  const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Fire-and-forget: Supabase's resetPasswordForEmail doesn't reveal whether the
+    // address is registered, and we mirror that by always showing the same success
+    // state regardless of the outcome.
+    await supabase.auth.resetPasswordForEmail(forgotEmail, {
+      redirectTo: `${window.location.origin}/auth/login`,
+    });
     setForgotSent(true);
   };
 

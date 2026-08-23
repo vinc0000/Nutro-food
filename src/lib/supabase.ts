@@ -179,6 +179,12 @@ function createMockSupabaseClient() {
       writeStore(store);
       notifyAuthChange();
     },
+    resetPasswordForEmail: async (email: string) => {
+      // In demo mode there's no real email delivery. We deliberately don't reveal
+      // whether the address exists, matching the real Supabase API's behavior.
+      void email;
+      return { data: {}, error: null };
+    },
   };
 
   const runQuery = (table: string, filters: Array<[string, unknown]>, orderBy: { field: string; ascending: boolean } | null, limitValue: number | null) => {
