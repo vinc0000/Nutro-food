@@ -15,6 +15,10 @@ export interface OrgContext {
   city: string | null;
   role: string;
   permissions: Record<string, string[]> | null;
+  // True when this org's owner is a platform Super Admin (e.g. Nutro's own internal
+  // team). Staff in such an org never pay for a subscription, same as the Super Admin
+  // account itself — see usePlanInfo below.
+  org_owner_is_super_admin?: boolean;
 }
 
 export interface PlanInfo {
@@ -78,11 +82,11 @@ export function usePlanInfo(): PlanInfo & { loading: boolean; refresh: () => Pro
 
   const planStatus = orgContext?.plan_status ?? 'trial';
   const plan = orgContext?.plan ?? 'trial';
-  // Platform super admins (and their staff) run Nutro itself — they are not a tenant,
-  // so they typically have no row in user_org_roles at all and orgContext.role is not
-  // a reliable signal for them. The authoritative, platform-wide flag is
-  // profile.system_role, the same one RouteGuards uses to bypass trial/billing gates.
-  const isSuperAdmin = profile?.system_role === 'super_admin';
+  // Platform super admins run Nutro itself and never pay. Their staff — anyone
+  // belonging to an org that a super admin owns — are exempt too (org_owner_is_super_admin,
+  // from get_user_org_context). This is a role check, not tied to any country/branch/
+  // currency, so it applies the same way everywhere.
+  const isSuperAdmin = profile?.system_role === 'super_admin' || orgContext?.org_owner_is_super_admin === true;
 
   const isTrialActive = isSuperAdmin ? true : (planStatus === 'trial' && daysLeft > 0);
   const isTrialExpired = isSuperAdmin ? false : (planStatus === 'trial' && daysLeft === 0);
