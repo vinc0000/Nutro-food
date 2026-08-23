@@ -65,12 +65,11 @@ export function useOrgContext() {
     refresh();
   }, [refresh]);
 
-  const isActuallyLoading = loading || (Boolean(user) && !orgContext && !error);
-
-  return { orgContext, loading: isActuallyLoading, error, refresh };
+  return { orgContext, loading, error, refresh };
 }
 
 export function usePlanInfo(): PlanInfo & { loading: boolean; refresh: () => Promise<void> } {
+  const { profile } = useAuth();
   const { orgContext, loading, refresh } = useOrgContext();
 
   const trialEndsAt = orgContext?.trial_ends_at ? new Date(orgContext.trial_ends_at) : null;
@@ -79,7 +78,11 @@ export function usePlanInfo(): PlanInfo & { loading: boolean; refresh: () => Pro
 
   const planStatus = orgContext?.plan_status ?? 'trial';
   const plan = orgContext?.plan ?? 'trial';
-  const isSuperAdmin = orgContext?.role === 'super_admin';
+  // Platform super admins (and their staff) run Nutro itself — they are not a tenant,
+  // so they typically have no row in user_org_roles at all and orgContext.role is not
+  // a reliable signal for them. The authoritative, platform-wide flag is
+  // profile.system_role, the same one RouteGuards uses to bypass trial/billing gates.
+  const isSuperAdmin = profile?.system_role === 'super_admin';
 
   const isTrialActive = isSuperAdmin ? true : (planStatus === 'trial' && daysLeft > 0);
   const isTrialExpired = isSuperAdmin ? false : (planStatus === 'trial' && daysLeft === 0);
