@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 export type OrderType = 'dine_in' | 'takeaway' | 'delivery';
 export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'served' | 'paid' | 'cancelled';
@@ -28,108 +29,143 @@ export interface SharedOrder {
   updatedAt: string;
 }
 
-const STORAGE_KEY = 'nutro:shared-orders';
-const ORDERS_EVENT = 'nutro:orders-updated';
-
-const seedOrders: SharedOrder[] = [
-  {
-    id: 'order-1001',
-    orderNumber: '#1042',
-    tableLabel: 'Table 4',
-    type: 'dine_in',
-    status: 'preparing',
-    payment: 'paid',
-    items: [
-      { id: '1', name: 'Wagyu Beef Burger', price: 24, qty: 2 },
-      { id: '2', name: 'Truffle Fries', price: 9, qty: 1 },
-    ],
-    subtotal: 57,
-    tax: 2.85,
-    total: 59.85,
-    source: 'tablet',
-    note: 'No onion on burger',
-    createdAt: new Date(Date.now() - 8 * 60000).toISOString(),
-    updatedAt: new Date(Date.now() - 5 * 60000).toISOString(),
-  },
-  {
-    id: 'order-1002',
-    orderNumber: '#1043',
-    tableLabel: 'Takeaway',
-    type: 'takeaway',
-    status: 'pending',
-    payment: 'paid',
-    items: [
-      { id: '6', name: 'Fresh Lemonade', price: 6, qty: 2 },
-      { id: '3', name: 'Vegan Buddha Bowl', price: 18, qty: 1 },
-    ],
-    subtotal: 30,
-    tax: 1.5,
-    total: 31.5,
-    source: 'pos',
-    createdAt: new Date(Date.now() - 12 * 60000).toISOString(),
-    updatedAt: new Date(Date.now() - 12 * 60000).toISOString(),
-  },
-];
-
-function readStoredOrders(): SharedOrder[] {
-  if (typeof window === 'undefined') return seedOrders;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return seedOrders;
-    const parsed = JSON.parse(raw) as SharedOrder[];
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : seedOrders;
-  } catch {
-    return seedOrders;
-  }
+interface OrderRow {
+  id: string;
+  order_number: string;
+  table_label: string | null;
+  order_type: OrderType;
+  status: OrderStatus;
+  payment_status: string;
+  subtotal: number;
+  tax_amount: number;
+  total_amount: number;
+  source: 'pos' | 'tablet';
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
-function persistOrders(orders: SharedOrder[]) {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
-  window.dispatchEvent(new CustomEvent(ORDERS_EVENT, { detail: orders }));
+interface OrderItemRow {
+  id: string;
+  order_id: string;
+  menu_item_id: string | null;
+  name: string;
+  unit_price: number;
+  quantity: number;
 }
 
-export function useSharedOrders() {
-  const [orders, setOrdersState] = useState<SharedOrder[]>(() => readStoredOrders());
+function genId() {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `id-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
-  useEffect(() => {
-    const syncOrders = () => setOrdersState(readStoredOrders());
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key === STORAGE_KEY) syncOrders();
-    };
+function rowToShared(row: OrderRow, items: OrderItemRow[]): SharedOrder {
+  return {
+    id: row.id,
+    orderNumber: row.order_number,
+    tableLabel: row.table_label ?? '—',
+    type: row.order_type,
+    status: row.status,
+    payment: row.payment_status === 'paid' ? 'paid' : 'unpaid',
+    items: items.map((it) => ({ id: it.menu_item_id ?? it.id, name: it.name, price: Number(it.unit_price), qty: it.quantity })),
+    subtotal: Number(row.subtotal),
+    tax: Number(row.tax_amount),
+    total: Number(row.total_amount),
+    source: row.source,
+    note: row.notes ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
 
-    window.addEventListener(ORDERS_EVENT, syncOrders as EventListener);
-    window.addEventListener('storage', handleStorage);
+/**
+ * Orders for a branch, backed by real Supabase tables (orders / order_items) instead
+ * of localStorage. Pass `null` while the branch hasn't been resolved yet.
+ *
+ * The customer tablet has no Supabase Auth session, so addOrder() generates its own
+ * ids client-side and never needs to read a row back — this lets it work under a
+ * write-only anon RLS policy (see migration 20260823040000).
+ */
+export function useSharedOrders(branchId: string | null) {
+  const [orders, setOrders] = useState<SharedOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    return () => {
-      window.removeEventListener(ORDERS_EVENT, syncOrders as EventListener);
-      window.removeEventListener('storage', handleStorage);
-    };
-  }, []);
+  const load = useCallback(async () => {
+    if (!branchId) { setOrders([]); setLoading(false); return; }
+    setLoading(true);
+    const { data: orderRows, error: ordersError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('branch_id', branchId)
+      .order('created_at', { ascending: false });
 
-  const setOrders = useCallback((valueOrUpdater: SharedOrder[] | ((prev: SharedOrder[]) => SharedOrder[])) => {
-    setOrdersState(prev => {
-      const next = typeof valueOrUpdater === 'function' ? valueOrUpdater(prev) : valueOrUpdater;
-      persistOrders(next);
-      return next;
-    });
-  }, []);
+    if (ordersError) { setError(ordersError.message); setLoading(false); return; }
 
-  const addOrder = useCallback((order: SharedOrder) => {
-    setOrdersState(prev => {
-      const next = [order, ...prev];
-      persistOrders(next);
-      return next;
-    });
-  }, []);
+    const rows = (orderRows ?? []) as OrderRow[];
+    const withItems = await Promise.all(rows.map(async (row) => {
+      const { data: itemRows } = await supabase.from('order_items').select('*').eq('order_id', row.id);
+      return rowToShared(row, (itemRows ?? []) as OrderItemRow[]);
+    }));
 
-  const updateOrder = useCallback((id: string, updater: (order: SharedOrder) => SharedOrder) => {
-    setOrdersState(prev => {
-      const next = prev.map(order => (order.id === id ? updater(order) : order));
-      persistOrders(next);
-      return next;
-    });
-  }, []);
+    setOrders(withItems);
+    setError(null);
+    setLoading(false);
+  }, [branchId]);
 
-  return { orders, setOrders, addOrder, updateOrder };
+  useEffect(() => { load(); }, [load]);
+
+  const addOrder = useCallback(async (order: SharedOrder) => {
+    if (!branchId) return;
+    const orderId = genId();
+
+    const { error: insertError } = await supabase.from('orders').insert({
+      id: orderId,
+      branch_id: branchId,
+      order_number: order.orderNumber,
+      table_label: order.tableLabel,
+      order_type: order.type,
+      status: order.status,
+      payment_status: order.payment,
+      subtotal: order.subtotal,
+      tax_amount: order.tax,
+      discount_amount: 0,
+      total_amount: order.total,
+      source: order.source,
+      notes: order.note ?? null,
+    } as never);
+    if (insertError) { setError(insertError.message); return; }
+
+    for (const item of order.items) {
+      await supabase.from('order_items').insert({
+        id: genId(),
+        order_id: orderId,
+        menu_item_id: item.id,
+        name: item.name,
+        unit_price: item.price,
+        quantity: item.qty,
+        subtotal: item.price * item.qty,
+      } as never);
+    }
+
+    setOrders((prev) => [{ ...order, id: orderId }, ...prev]);
+  }, [branchId]);
+
+  const updateOrder = useCallback(async (id: string, updater: (order: SharedOrder) => SharedOrder) => {
+    const current = orders.find((o) => o.id === id);
+    if (!current) return;
+    const next = updater(current);
+
+    const { error: updateError } = await supabase.from('orders').update({
+      status: next.status,
+      payment_status: next.payment,
+      updated_at: new Date().toISOString(),
+    } as never).eq('id', id);
+    if (updateError) { setError(updateError.message); return; }
+
+    setOrders((prev) => prev.map((o) => (o.id === id ? next : o)));
+  }, [orders]);
+
+  return { orders, loading, error, addOrder, updateOrder, refresh: load };
 }

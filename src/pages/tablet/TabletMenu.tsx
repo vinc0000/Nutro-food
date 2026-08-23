@@ -74,7 +74,7 @@ export default function TabletMenu() {
   }, [branchParam, tokenParam, orgContext?.branch_id]);
 
   const { menuItems } = useSharedMenu(resolvedBranchId);
-  const { addOrder } = useSharedOrders();
+  const { addOrder } = useSharedOrders(resolvedBranchId);
 
   const [currency, setCurrency] = useState(() => {
     return localStorage.getItem('nutro:settings:currency') ?? 'USD';
@@ -142,7 +142,7 @@ export default function TabletMenu() {
   const cartTotal = cart.reduce((s, c) => s + c.item.price * c.qty, 0);
   const cartCount = cart.reduce((s, c) => s + c.qty, 0);
 
-  const placeOrderDirectly = () => {
+  const placeOrderDirectly = async () => {
     const orderId = 'order-' + Date.now();
     const orderNum = '#' + Math.floor(1000 + Math.random() * 9000);
     const combinedNotes = [
@@ -171,7 +171,7 @@ export default function TabletMenu() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    addOrder(newOrder);
+    await addOrder(newOrder);
 
     setOrderPlaced(true);
     setTimeout(() => setOrderPlaced(false), 5000);
@@ -428,7 +428,7 @@ export default function TabletMenu() {
                   <div className="flex justify-between font-extrabold text-base pt-1">
                     <span style={{ color: theme.text }}>Total</span><span style={{ color: theme.primary }}>{toPrice(cartTotal)}</span>
                   </div>
-                  <button onClick={() => { setShowCart(false); placeOrderDirectly(); }} className="w-full py-3 rounded-xl font-bold text-white" style={{ background: theme.primary }}>
+                  <button onClick={() => { setShowCart(false); void placeOrderDirectly(); }} className="w-full py-3 rounded-xl font-bold text-white" style={{ background: theme.primary }}>
                     Passer la commande (Règlement à la caisse)
                   </button>
                 </div>

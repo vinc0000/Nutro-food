@@ -175,7 +175,7 @@ export default function PosTerminal() {
   const [showManagerPin, setShowManagerPin] = useState(false);
   const [pendingAction, setPendingAction] = useState<null | 'void'>(null);
   const [showTabletOrders, setShowTabletOrders] = useState(false);
-  const { orders, updateOrder, addOrder } = useSharedOrders();
+  const { orders, updateOrder, addOrder } = useSharedOrders(orgContext?.branch_id ?? null);
 
   // Dynamically map shared orders to TabletOrder structure
   const tabletOrders: TabletOrder[] = orders
@@ -212,11 +212,11 @@ export default function PosTerminal() {
     setCart(prev => prev.map(c => c.id === id ? { ...c, qty: Math.max(0, c.qty + delta) } : c).filter(c => c.qty > 0));
   };
 
-  const processPayment = () => {
+  const processPayment = async () => {
     // If it is an accepted tablet order, update its payment and keep/ensure status in useSharedOrders
     const existingTabletOrder = orders.find(o => o.source === 'tablet' && o.tableLabel === 'Table ' + selectedTable && o.status === 'pending');
     if (existingTabletOrder) {
-      updateOrder(existingTabletOrder.id, o => ({
+      await updateOrder(existingTabletOrder.id, o => ({
         ...o,
         payment: 'paid',
         status: 'preparing',
@@ -246,7 +246,7 @@ export default function PosTerminal() {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-      addOrder(newOrder);
+      await addOrder(newOrder);
     }
 
     setPaidSuccess(true);
@@ -257,7 +257,7 @@ export default function PosTerminal() {
   };
 
   const acceptTabletOrder = (id: string) => {
-    updateOrder(id, o => ({ ...o, status: 'preparing' }));
+    void updateOrder(id, o => ({ ...o, status: 'preparing' }));
     const order = orders.find(o => o.id === id);
     if (order) {
       setCart(order.items.map((it, i) => ({ id: it.id || `to-${i}`, name: it.name, price: it.price, qty: it.qty })));
@@ -268,7 +268,7 @@ export default function PosTerminal() {
   };
 
   const rejectTabletOrder = (id: string) => {
-    updateOrder(id, o => ({ ...o, status: 'cancelled' }));
+    void updateOrder(id, o => ({ ...o, status: 'cancelled' }));
   };
 
   const startNewOrder = () => {
@@ -560,7 +560,7 @@ export default function PosTerminal() {
                       )}
                     </div>
                   )}
-                  <button onClick={processPayment} disabled={payMethod === 'cash' && !isCashAmountValid}
+                  <button onClick={() => void processPayment()} disabled={payMethod === 'cash' && !isCashAmountValid}
                     className="w-full py-3 rounded-xl font-bold text-sm text-white disabled:opacity-50"
                     style={{ background: payMethod === 'flutterwave' ? '#f5a623' : theme.primary }}>
                     Confirm {payMethod === 'cash' ? 'Cash' : payMethod === 'card' ? 'Card' : payMethod === 'tap' ? 'Tap' : payMethod === 'flutterwave' ? 'Flutterwave' : 'Gift Card'} Payment

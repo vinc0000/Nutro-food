@@ -66,8 +66,14 @@ function createDemoStore() {
       },
     ],
     orders: [
-      { id: 'ord-1', branch_id: branchId, table_id: 'table-1', order_number: '1042', order_type: 'dine_in', status: 'preparing', subtotal: 56.5, tax_amount: 2.83, discount_amount: 0, total_amount: 59.33, payment_method: 'card', payment_status: 'paid', notes: null, created_at: new Date().toISOString() },
-      { id: 'ord-2', branch_id: branchId, table_id: 'table-4', order_number: '1043', order_type: 'takeaway', status: 'ready', subtotal: 37.0, tax_amount: 1.85, discount_amount: 0, total_amount: 38.85, payment_method: 'cash', payment_status: 'paid', notes: 'Pack well', created_at: new Date(Date.now() - 20 * 60 * 1000).toISOString() },
+      { id: 'ord-1', branch_id: branchId, table_id: 'table-1', table_label: 'Table 1', order_number: '#1042', order_type: 'dine_in', status: 'preparing', subtotal: 56.5, tax_amount: 2.83, discount_amount: 0, total_amount: 59.33, payment_method: 'card', payment_status: 'paid', source: 'tablet', notes: null, created_at: new Date(Date.now() - 8 * 60000).toISOString(), updated_at: new Date(Date.now() - 5 * 60000).toISOString() },
+      { id: 'ord-2', branch_id: branchId, table_id: 'table-4', table_label: 'Takeaway', order_number: '#1043', order_type: 'takeaway', status: 'ready', subtotal: 37.0, tax_amount: 1.85, discount_amount: 0, total_amount: 38.85, payment_method: 'cash', payment_status: 'paid', source: 'pos', notes: 'Pack well', created_at: new Date(Date.now() - 20 * 60 * 1000).toISOString(), updated_at: new Date(Date.now() - 20 * 60 * 1000).toISOString() },
+    ],
+    order_items: [
+      { id: 'oi-1', order_id: 'ord-1', menu_item_id: 'item-1', name: 'Wagyu Beef Burger', unit_price: 24, quantity: 2, subtotal: 48, modifiers: [], notes: null, created_at: new Date().toISOString() },
+      { id: 'oi-2', order_id: 'ord-1', menu_item_id: 'item-2', name: 'Truffle Fries', unit_price: 9, quantity: 1, subtotal: 9, modifiers: [], notes: null, created_at: new Date().toISOString() },
+      { id: 'oi-3', order_id: 'ord-2', menu_item_id: 'item-5', name: 'Fresh Lemonade', unit_price: 6, quantity: 2, subtotal: 12, modifiers: [], notes: null, created_at: new Date().toISOString() },
+      { id: 'oi-4', order_id: 'ord-2', menu_item_id: 'item-3', name: 'Vegan Buddha Bowl', unit_price: 18, quantity: 1, subtotal: 18, modifiers: [], notes: null, created_at: new Date().toISOString() },
     ],
     branch_public_info: [
       { id: branchId, name: 'Main Branch', currency: 'AED', country: 'United Arab Emirates', city: 'Dubai', tablet_token: 'demo-tablet-token' },

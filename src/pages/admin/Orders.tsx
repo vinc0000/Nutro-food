@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Check, Eye, X, Printer } from 'lucide-react';
+import { Search, Check, Eye, X, Printer, Loader2 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSharedOrders } from '@/lib/ordersStore';
+import { useOrgContext } from '@/hooks/useOrgContext';
 
 const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
   preparing: { bg: '#3b82f620', text: '#3b82f6', label: 'Preparing' },
@@ -13,7 +14,8 @@ const statusConfig: Record<string, { bg: string; text: string; label: string }> 
 
 export default function AdminOrders() {
   const { theme } = useTheme();
-  const { orders, updateOrder } = useSharedOrders();
+  const { orgContext } = useOrgContext();
+  const { orders, loading, error, updateOrder } = useSharedOrders(orgContext?.branch_id ?? null);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [viewOrder, setViewOrder] = useState<(typeof orders)[number] | null>(null);
@@ -29,7 +31,7 @@ export default function AdminOrders() {
   }), [orders]);
 
   const markAsPaid = (id: string) => {
-    updateOrder(id, order => ({ ...order, status: 'paid', payment: 'paid', updatedAt: new Date().toISOString() }));
+    void updateOrder(id, order => ({ ...order, status: 'paid', payment: 'paid', updatedAt: new Date().toISOString() }));
   };
 
   return (
@@ -69,6 +71,15 @@ export default function AdminOrders() {
       </div>
 
       <div className="rounded-2xl overflow-hidden" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
+        {loading && (
+          <div className="flex items-center gap-2 p-6 justify-center" style={{ color: theme.textMuted }}>
+            <Loader2 size={16} className="animate-spin" /> Loading orders…
+          </div>
+        )}
+        {!loading && error && (
+          <div className="p-4 text-sm" style={{ color: '#ef4444' }}>Could not load orders: {error}</div>
+        )}
+        {!loading && !error && (
         <table className="w-full data-table">
           <thead>
             <tr><th>Order</th><th>Location</th><th>Type</th><th>Items</th><th>Total</th><th>Status</th><th>Payment</th><th>Time</th><th>Actions</th></tr>
@@ -96,6 +107,7 @@ export default function AdminOrders() {
             ))}
           </tbody>
         </table>
+        )}
       </div>
 
       <AnimatePresence>

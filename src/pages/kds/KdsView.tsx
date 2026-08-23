@@ -4,6 +4,7 @@ import { ChefHat, Clock, AlertTriangle, Check, ArrowLeft, Volume2, VolumeX } fro
 import { useNavigate } from 'react-router-dom';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSharedOrders } from '@/lib/ordersStore';
+import { useOrgContext } from '@/hooks/useOrgContext';
 
 interface KdsTicket {
   id: string;
@@ -96,7 +97,8 @@ const COLUMNS: { key: KdsTicket['status']; label: string; color: string }[] = [
 export default function KdsView() {
   const navigate = useNavigate();
   const { t } = useLocale();
-  const { orders, updateOrder } = useSharedOrders();
+  const { orgContext } = useOrgContext();
+  const { orders, updateOrder } = useSharedOrders(orgContext?.branch_id ?? null);
   const [, setTick] = useState(0);
   const [soundOn, setSoundOn] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -150,7 +152,7 @@ export default function KdsView() {
     const order = orders.find(o => o.id === id);
     if (!order) return;
     const nextStatus = order.status === 'pending' ? 'preparing' : 'ready';
-    updateOrder(id, o => ({
+    void updateOrder(id, o => ({
       ...o,
       status: nextStatus as any,
       updatedAt: new Date().toISOString()
@@ -158,7 +160,7 @@ export default function KdsView() {
   };
 
   const bumpTicket = (id: string) => {
-    updateOrder(id, o => ({
+    void updateOrder(id, o => ({
       ...o,
       status: 'served',
       updatedAt: new Date().toISOString()
