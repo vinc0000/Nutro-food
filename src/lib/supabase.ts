@@ -75,6 +75,9 @@ function createDemoStore() {
       { id: 'table-3', branch_id: branchId, status: 'reserved' },
       { id: 'table-4', branch_id: branchId, status: 'occupied' },
     ],
+    user_org_roles: [
+      { id: 'membership-demo-admin', user_id: 'demo-admin', org_id: orgId, branch_id: null, role_name: 'owner', permissions: {}, is_active: true, created_at: now },
+    ] as Array<Record<string, unknown>>,
     session: null as Record<string, unknown> | null,
   };
 }
@@ -212,6 +215,7 @@ function createMockSupabaseClient() {
       orderBy: null as { field: string; ascending: boolean } | null,
       limitValue: null as number | null,
       updateValues: null as Record<string, unknown> | null,
+      insertValues: null as Record<string, unknown> | null,
       deleteFlag: false,
     };
 
@@ -223,6 +227,18 @@ function createMockSupabaseClient() {
       if (!Array.isArray(items)) return { data: [] as Array<Record<string, unknown>>, error: null };
 
       const matches = (item: Record<string, unknown>) => state.filters.every(([field, value]) => item[field] === value);
+
+      if (state.insertValues) {
+        const inserted = {
+          id: `${table}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          created_at: new Date().toISOString(),
+          ...state.insertValues,
+        };
+        items.push(inserted);
+        (store as Record<string, unknown>)[table] = items;
+        writeStore(store);
+        return { data: [inserted], error: null };
+      }
 
       if (state.deleteFlag) {
         const removed = items.filter(matches);
@@ -263,6 +279,10 @@ function createMockSupabaseClient() {
       state.updateValues = values;
       return builder;
     };
+    builder.insert = (values: Record<string, unknown>) => {
+      state.insertValues = values;
+      return builder;
+    };
     builder.delete = () => {
       state.deleteFlag = true;
       return builder;
@@ -286,6 +306,7 @@ function createMockSupabaseClient() {
       order: (field: string, options?: { ascending?: boolean }) => SupabaseBuilder;
       limit: (value: number) => SupabaseBuilder;
       update: (values: Record<string, unknown>) => SupabaseBuilder;
+      insert: (values: Record<string, unknown>) => SupabaseBuilder;
       delete: () => SupabaseBuilder;
       maybeSingle: <T = Record<string, unknown>>() => Promise<{ data: T | null; error: any }>;
       then: (callback: (result: { data: any[]; error: null }) => void) => Promise<void>;
@@ -321,9 +342,21 @@ function createMockSupabaseClient() {
           city: branch?.city ?? 'Dubai',
           role: profile?.system_role ?? 'user',
           permissions: { menu: ['read', 'write'], orders: ['read', 'write'], reports: ['read'] },
+          org_owner_is_super_admin: true,
         },
         error: null,
       };
+    }
+
+    if (name === 'set_staff_pin') {
+      const targetUserId = String(params?.p_target_user_id ?? '');
+      const pin = String(params?.p_pin ?? '');
+      if (pin.length < 4) return { data: false, error: null };
+      const targetProfile = store.profiles.find((entry) => entry.id === targetUserId);
+      if (!targetProfile) return { data: false, error: null };
+      (targetProfile as { pin_hash: string | null }).pin_hash = `demo-hash-${pin}`;
+      writeStore(store);
+      return { data: true, error: null };
     }
 
     if (name === 'create_tenant') {
