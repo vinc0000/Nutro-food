@@ -52,6 +52,89 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    const body = await req.json().catch(() => ({}));
+
+    // --- Flutterwave webhook: this is called by Flutterwave's own servers, never by
+    // a signed-in Nutro user, so it must NOT be gated behind our normal Supabase auth
+    // check below. Instead it is authenticated using the secret hash Flutterwave sends
+    // in the `verif-hash` header, which must match the hash configured in the
+    // Flutterwave dashboard (FLW_WEBHOOK_HASH). Without this, anyone who knows a
+    // pending tx_ref (which is handed back to the tenant themselves by `initialize`)
+    // could call this action directly and self-activate a paid plan for free.
+    if (body?.action === "webhook") {
+      const webhookHash = Deno.env.get("FLW_WEBHOOK_HASH");
+      const receivedHash = req.headers.get("verif-hash");
+      if (!webhookHash || !receivedHash || receivedHash !== webhookHash) {
+        return new Response(JSON.stringify({ error: "Invalid webhook signature" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const payload = body as Record<string, unknown>;
+      const data = payload?.data as Record<string, unknown> | undefined;
+      const txRef = data?.tx_ref as string | undefined;
+      const flwTransactionId = data?.id as string | number | undefined;
+      const metaOrgId = (data?.meta as Record<string, unknown> | undefined)?.org_id as string | undefined;
+
+      if (!txRef || !flwTransactionId || !metaOrgId) {
+        return new Response(JSON.stringify({ error: "Invalid webhook payload" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Never trust the payload's own status field for something that unlocks paid
+      // access — re-verify the transaction directly against Flutterwave's API using
+      // our secret key, which only Flutterwave and Nutro's backend know.
+      const flwSecretKey = Deno.env.get("FLW_SECRET_KEY");
+      if (!flwSecretKey) {
+        return new Response(JSON.stringify({ error: "Payments are not configured" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const verifyResponse = await fetch(
+        `https://api.flutterwave.com/v3/transactions/${flwTransactionId}/verify`,
+        { headers: { Authorization: `Bearer ${flwSecretKey}` } }
+      );
+      const verifyData = await verifyResponse.json();
+      const isSuccessful =
+        verifyData.status === "success" &&
+        verifyData.data?.status === "successful" &&
+        verifyData.data?.tx_ref === txRef;
+
+      if (isSuccessful) {
+        const subscriptionLookup = await supabase
+          .from("subscriptions")
+          .select("plan")
+          .eq("org_id", metaOrgId)
+          .eq("flw_tx_ref", txRef)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+        if (subscriptionLookup.error) throw subscriptionLookup.error;
+
+        await updateSubscriptionStatus(supabase, metaOrgId, txRef, {
+          status: "successful",
+          flw_tx_id: String(flwTransactionId),
+          paid_at: new Date().toISOString(),
+        });
+        await supabase.from("organizations").update({
+          plan: subscriptionLookup.data?.plan ?? "starter",
+          plan_status: "active",
+        }).eq("id", metaOrgId);
+      } else if (txRef) {
+        await updateSubscriptionStatus(supabase, metaOrgId, txRef, { status: "failed" });
+      }
+
+      return new Response(JSON.stringify({ status: "received" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Missing auth header" }), {
@@ -69,7 +152,6 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const body = await req.json().catch(() => ({}));
     const { action, plan, billing_period, tx_ref, transaction_id, tenant_org_id } = body as {
       action?: string;
       plan?: string;
@@ -233,16 +315,39 @@ Deno.serve(async (req: Request) => {
       const isSuccessful = verifyData.status === "success" && verifyData.data?.status === "successful";
 
       if (isSuccessful) {
-        const activePlan = (plan ?? verifyData.data?.meta?.plan ?? "starter").toLowerCase();
-        const planStatusValue = "active";
         const txRefToUpdate = verificationTxRef ?? verifyData.data?.tx_ref?.toString() ?? null;
-        const updateResult = txRefToUpdate
-          ? await updateSubscriptionStatus(supabase, orgId, txRefToUpdate, {
-              status: "successful",
-              flw_tx_id: verificationTransactionId?.toString() ?? verifyData.data?.id?.toString() ?? null,
-              paid_at: new Date().toISOString(),
-            })
-          : { error: null };
+        if (!txRefToUpdate) {
+          return new Response(JSON.stringify({ error: "Missing transaction reference" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // The plan to activate must come from OUR OWN record of what was actually
+        // initialized/paid for (written server-side in `initialize`), never from the
+        // client-supplied `plan` field — otherwise a tenant could pay for Starter and
+        // ask us to activate Enterprise just by editing the request body.
+        const { data: subscriptionRow, error: subLookupError } = await supabase
+          .from("subscriptions")
+          .select("plan")
+          .eq("org_id", orgId)
+          .eq("flw_tx_ref", txRefToUpdate)
+          .maybeSingle();
+        if (subLookupError) throw subLookupError;
+        if (!subscriptionRow) {
+          return new Response(JSON.stringify({ error: "No matching subscription found for this org" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const activePlan = subscriptionRow.plan as string;
+        const planStatusValue = "active";
+        const updateResult = await updateSubscriptionStatus(supabase, orgId, txRefToUpdate, {
+          status: "successful",
+          flw_tx_id: verificationTransactionId?.toString() ?? verifyData.data?.id?.toString() ?? null,
+          paid_at: new Date().toISOString(),
+        });
 
         if (updateResult.error) throw updateResult.error;
 
@@ -296,37 +401,6 @@ Deno.serve(async (req: Request) => {
         plan: latestSubscription.plan,
         tx_ref: latestSubscription.flw_tx_ref,
       }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (action === "webhook") {
-      const payload = body as Record<string, unknown>;
-      const txRef = (payload?.data as Record<string, unknown> | undefined)?.tx_ref as string | undefined;
-      const incomingStatus = (payload?.data as Record<string, unknown> | undefined)?.status as string | undefined;
-      if (!txRef || !incomingStatus) {
-        return new Response(JSON.stringify({ error: "Invalid webhook payload" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      if (incomingStatus === "successful") {
-        const subscriptionLookup = await supabase
-          .from("subscriptions")
-          .select("plan")
-          .eq("org_id", orgId)
-          .eq("flw_tx_ref", txRef)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
-        if (subscriptionLookup.error) throw subscriptionLookup.error;
-        await updateSubscriptionStatus(supabase, orgId, txRef, { status: "successful", paid_at: new Date().toISOString() });
-        await supabase.from("organizations").update({ plan: subscriptionLookup.data?.plan ?? "starter", plan_status: "active" }).eq("id", orgId);
-      }
-
-      return new Response(JSON.stringify({ status: "received" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
