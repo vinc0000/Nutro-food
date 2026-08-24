@@ -157,6 +157,7 @@ export default function TabletMenu() {
       type: 'dine_in',
       status: 'pending',
       payment: 'unpaid',
+      refundAmount: 0,
       items: cart.map(c => ({
         id: c.item.id,
         name: c.item.name,

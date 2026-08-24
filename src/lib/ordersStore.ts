@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export type OrderType = 'dine_in' | 'takeaway' | 'delivery';
-export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'served' | 'paid' | 'cancelled';
+export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'served' | 'paid' | 'refunded' | 'cancelled';
 export type PaymentStatus = 'unpaid' | 'paid';
 
 export interface SharedOrderItem {
@@ -21,6 +21,9 @@ export interface SharedOrder {
   payment: PaymentStatus;
   paymentMethod?: 'cash' | 'card' | 'tap' | 'gift_card' | 'flutterwave' | null;
   cashierId?: string | null;
+  refundAmount: number;
+  refundedAt?: string | null;
+  refundReason?: string | null;
   items: SharedOrderItem[];
   subtotal: number;
   tax: number;
@@ -40,6 +43,9 @@ interface OrderRow {
   payment_status: string;
   payment_method: string | null;
   cashier_id: string | null;
+  refund_amount: number;
+  refunded_at: string | null;
+  refund_reason: string | null;
   subtotal: number;
   tax_amount: number;
   total_amount: number;
@@ -74,6 +80,9 @@ function rowToShared(row: OrderRow, items: OrderItemRow[]): SharedOrder {
     payment: row.payment_status === 'paid' ? 'paid' : 'unpaid',
     paymentMethod: (['cash', 'card', 'tap', 'gift_card', 'flutterwave'] as const).includes(row.payment_method as any) ? (row.payment_method as SharedOrder['paymentMethod']) : null,
     cashierId: row.cashier_id,
+    refundAmount: Number(row.refund_amount ?? 0),
+    refundedAt: row.refunded_at,
+    refundReason: row.refund_reason,
     items: items.map((it) => ({ id: it.menu_item_id ?? it.id, name: it.name, price: Number(it.unit_price), qty: it.quantity })),
     subtotal: Number(row.subtotal),
     tax: Number(row.tax_amount),
@@ -176,5 +185,19 @@ export function useSharedOrders(branchId: string | null) {
     setOrders((prev) => prev.map((o) => (o.id === id ? next : o)));
   }, [orders]);
 
-  return { orders, loading, error, addOrder, updateOrder, refresh: load };
+  const refundOrder = useCallback(async (id: string, amount: number, reason: string) => {
+    const { data, error: rpcError } = await supabase.rpc('refund_order', {
+      p_order_id: id,
+      p_amount: amount,
+      p_reason: reason,
+    });
+    if (rpcError || !data) {
+      setError(rpcError?.message ?? 'Refund failed — check your permissions and the amount.');
+      return false;
+    }
+    await load();
+    return true;
+  }, [load]);
+
+  return { orders, loading, error, addOrder, updateOrder, refundOrder, refresh: load };
 }

@@ -237,6 +237,7 @@ export default function PosTerminal() {
         payment: 'paid',
         paymentMethod: payMethod,
         cashierId: profile?.id ?? null,
+        refundAmount: 0,
         items: cart.map(c => ({
           id: c.id,
           name: c.name,

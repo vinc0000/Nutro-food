@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Check, Eye, X, Printer, Loader2 } from 'lucide-react';
+import { Search, Check, Eye, X, Printer, Loader2, RotateCcw, AlertTriangle } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useSharedOrders } from '@/lib/ordersStore';
+import { useSharedOrders, SharedOrder } from '@/lib/ordersStore';
 import { useOrgContext } from '@/hooks/useOrgContext';
 
 const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
@@ -10,15 +10,21 @@ const statusConfig: Record<string, { bg: string; text: string; label: string }> 
   ready: { bg: '#22c55e20', text: '#22c55e', label: 'Ready' },
   served: { bg: '#06b6d420', text: '#06b6d4', label: 'Served' },
   paid: { bg: '#6b728020', text: '#6b7280', label: 'Paid' },
+  refunded: { bg: '#ef444420', text: '#ef4444', label: 'Refunded' },
 };
 
 export default function AdminOrders() {
   const { theme } = useTheme();
   const { orgContext } = useOrgContext();
-  const { orders, loading, error, updateOrder } = useSharedOrders(orgContext?.branch_id ?? null);
+  const { orders, loading, error, updateOrder, refundOrder } = useSharedOrders(orgContext?.branch_id ?? null);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [viewOrder, setViewOrder] = useState<(typeof orders)[number] | null>(null);
+  const [viewOrder, setViewOrder] = useState<SharedOrder | null>(null);
+  const [refundTarget, setRefundTarget] = useState<SharedOrder | null>(null);
+  const [refundAmount, setRefundAmount] = useState('');
+  const [refundReason, setRefundReason] = useState('');
+  const [refundBusy, setRefundBusy] = useState(false);
+  const [refundError, setRefundError] = useState<string | null>(null);
 
   const filtered = useMemo(() => orders.filter(o =>
     (filterStatus === 'all' || o.status === filterStatus) &&
@@ -26,12 +32,35 @@ export default function AdminOrders() {
   ), [filterStatus, orders, search]);
 
   const totals = useMemo(() => ({
-    revenue: orders.filter(o => o.payment === 'paid').reduce((s, o) => s + o.total, 0),
+    revenue: orders.filter(o => o.payment === 'paid').reduce((s, o) => s + (o.total - o.refundAmount), 0),
+    refunded: orders.reduce((s, o) => s + o.refundAmount, 0),
     count: orders.length,
   }), [orders]);
 
   const markAsPaid = (id: string) => {
     void updateOrder(id, order => ({ ...order, status: 'paid', payment: 'paid', updatedAt: new Date().toISOString() }));
+  };
+
+  const openRefund = (order: SharedOrder) => {
+    setRefundTarget(order);
+    setRefundAmount((order.total - order.refundAmount).toFixed(2));
+    setRefundReason('');
+    setRefundError(null);
+  };
+
+  const confirmRefund = async () => {
+    if (!refundTarget) return;
+    const amount = parseFloat(refundAmount);
+    const remaining = refundTarget.total - refundTarget.refundAmount;
+    if (Number.isNaN(amount) || amount <= 0) { setRefundError('Enter a valid amount'); return; }
+    if (amount > remaining) { setRefundError(`Cannot exceed the remaining refundable amount ($${remaining.toFixed(2)})`); return; }
+    if (!refundReason.trim()) { setRefundError('A reason is required for the record'); return; }
+
+    setRefundBusy(true);
+    const ok = await refundOrder(refundTarget.id, amount, refundReason.trim());
+    setRefundBusy(false);
+    if (!ok) { setRefundError('Refund failed — you may not have permission, or the amount is invalid.'); return; }
+    setRefundTarget(null);
   };
 
   return (
@@ -41,9 +70,10 @@ export default function AdminOrders() {
         <p className="text-sm mt-1" style={{ color: theme.textMuted }}>Real-time order management across all tables and channels</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[{ label: 'Total Orders Today', val: totals.count, color: theme.primary },
-          { label: 'Revenue Collected', val: `$${totals.revenue.toFixed(2)}`, color: '#22c55e' },
+          { label: 'Net Revenue', val: `$${totals.revenue.toFixed(2)}`, color: '#22c55e' },
+          { label: 'Refunded', val: `$${totals.refunded.toFixed(2)}`, color: '#ef4444' },
           { label: 'Pending Payment', val: orders.filter(o => o.payment === 'unpaid' && o.status !== 'cancelled').length, color: '#eab308' }].map(s => (
           <div key={s.label} className="p-4 rounded-xl text-center" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
             <div className="text-2xl font-extrabold" style={{ color: s.color }}>{s.val}</div>
@@ -60,7 +90,7 @@ export default function AdminOrders() {
             style={{ background: theme.surface, color: theme.text, border: `1px solid ${theme.border}` }} />
         </div>
         <div className="flex gap-1 flex-wrap">
-          {['all', 'pending', 'preparing', 'ready', 'paid'].map(s => (
+          {['all', 'pending', 'preparing', 'ready', 'paid', 'refunded'].map(s => (
             <button key={s} onClick={() => setFilterStatus(s)}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all"
               style={{ background: filterStatus === s ? theme.primary : theme.surface, color: filterStatus === s ? '#fff' : theme.textMuted, border: `1px solid ${filterStatus === s ? theme.primary : theme.border}` }}>
@@ -91,15 +121,21 @@ export default function AdminOrders() {
                 <td><span className="text-sm">{o.tableLabel}</span></td>
                 <td><span className="text-xs px-2 py-0.5 rounded-full font-semibold capitalize" style={{ background: theme.bg, color: theme.textMuted }}>{o.type.replace('_', ' ')}</span></td>
                 <td><span className="text-sm">{o.items.reduce((sum, item) => sum + item.qty, 0)}</span></td>
-                <td><span className="text-sm font-semibold">${o.total.toFixed(2)}</span></td>
-                <td><span className="badge text-[10px]" style={{ background: statusConfig[o.status]?.bg, color: statusConfig[o.status]?.text }}>{statusConfig[o.status]?.label}</span></td>
+                <td>
+                  <span className="text-sm font-semibold">${o.total.toFixed(2)}</span>
+                  {o.refundAmount > 0 && <div className="text-[10px] font-semibold" style={{ color: '#ef4444' }}>-${o.refundAmount.toFixed(2)} refunded</div>}
+                </td>
+                <td><span className="badge text-[10px]" style={{ background: statusConfig[o.status]?.bg, color: statusConfig[o.status]?.text }}>{statusConfig[o.status]?.label ?? o.status}</span></td>
                 <td><span className="badge text-[10px]" style={{ background: o.payment === 'paid' ? '#22c55e20' : '#eab30820', color: o.payment === 'paid' ? '#22c55e' : '#eab308' }}>{o.payment}</span></td>
                 <td><span className="text-xs" style={{ color: theme.textMuted }}>{new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></td>
                 <td>
                   <div className="flex items-center gap-1">
                     <button onClick={() => setViewOrder(o)} title="View details" className="p-1.5 rounded-lg hover:opacity-70" style={{ color: theme.textMuted }}><Eye size={13} /></button>
-                    {o.status !== 'paid' && (
+                    {o.status !== 'paid' && o.status !== 'refunded' && (
                       <button onClick={() => markAsPaid(o.id)} title="Mark as paid" className="p-1.5 rounded-lg hover:opacity-70" style={{ color: '#22c55e' }}><Check size={13} /></button>
+                    )}
+                    {o.payment === 'paid' && o.refundAmount < o.total && (
+                      <button onClick={() => openRefund(o)} title="Refund" className="p-1.5 rounded-lg hover:opacity-70" style={{ color: '#ef4444' }}><RotateCcw size={13} /></button>
                     )}
                   </div>
                 </td>
@@ -134,9 +170,15 @@ export default function AdminOrders() {
                 <div className="flex justify-between p-3 rounded-xl" style={{ background: theme.bg }}>
                   <span style={{ color: theme.textMuted }}>Total</span><span className="font-extrabold" style={{ color: theme.primary }}>${viewOrder.total.toFixed(2)}</span>
                 </div>
+                {viewOrder.refundAmount > 0 && (
+                  <div className="flex justify-between p-3 rounded-xl" style={{ background: '#ef444410' }}>
+                    <span style={{ color: theme.textMuted }}>Refunded</span>
+                    <span className="font-extrabold" style={{ color: '#ef4444' }}>-${viewOrder.refundAmount.toFixed(2)}{viewOrder.refundReason ? ` (${viewOrder.refundReason})` : ''}</span>
+                  </div>
+                )}
                 <div className="flex justify-between p-3 rounded-xl" style={{ background: theme.bg }}>
                   <span style={{ color: theme.textMuted }}>Status</span>
-                  <span className="badge text-[10px]" style={{ background: statusConfig[viewOrder.status]?.bg, color: statusConfig[viewOrder.status]?.text }}>{statusConfig[viewOrder.status]?.label}</span>
+                  <span className="badge text-[10px]" style={{ background: statusConfig[viewOrder.status]?.bg, color: statusConfig[viewOrder.status]?.text }}>{statusConfig[viewOrder.status]?.label ?? viewOrder.status}</span>
                 </div>
                 <div className="flex justify-between p-3 rounded-xl" style={{ background: theme.bg }}>
                   <span style={{ color: theme.textMuted }}>Payment</span>
@@ -146,11 +188,17 @@ export default function AdminOrders() {
                   <span style={{ color: theme.textMuted }}>Time</span><span className="font-bold" style={{ color: theme.text }}>{new Date(viewOrder.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
               </div>
-              <div className="flex gap-3 mt-5">
-                {viewOrder.status !== 'paid' && (
+              <div className="flex gap-3 mt-5 flex-wrap">
+                {viewOrder.status !== 'paid' && viewOrder.status !== 'refunded' && (
                   <button onClick={() => { markAsPaid(viewOrder.id); setViewOrder(null); }}
                     className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-1.5" style={{ background: '#22c55e' }}>
                     <Check size={14} /> Mark as Paid
+                  </button>
+                )}
+                {viewOrder.payment === 'paid' && viewOrder.refundAmount < viewOrder.total && (
+                  <button onClick={() => { openRefund(viewOrder); setViewOrder(null); }}
+                    className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-1.5" style={{ background: '#ef4444' }}>
+                    <RotateCcw size={14} /> Refund
                   </button>
                 )}
                 <button onClick={() => window.print()}
@@ -159,6 +207,49 @@ export default function AdminOrders() {
                 </button>
                 <button onClick={() => setViewOrder(null)}
                   className="px-4 py-2.5 rounded-xl font-bold text-sm" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Close</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Refund modal */}
+      <AnimatePresence>
+        {refundTarget && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}
+            onClick={() => setRefundTarget(null)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="w-full max-w-sm rounded-2xl p-6" style={{ background: theme.surface, border: `1px solid ${theme.border}` }} onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-extrabold flex items-center gap-2" style={{ color: theme.text }}><RotateCcw size={18} style={{ color: '#ef4444' }} /> Refund Order {refundTarget.orderNumber}</h2>
+                <button onClick={() => setRefundTarget(null)} style={{ color: theme.textMuted }}><X size={18} /></button>
+              </div>
+              <div className="flex items-start gap-2 p-3 rounded-xl mb-4" style={{ background: '#ef444410', border: '1px solid #ef444430' }}>
+                <AlertTriangle size={14} style={{ color: '#ef4444', flexShrink: 0, marginTop: 1 }} />
+                <p className="text-xs" style={{ color: theme.textMuted }}>
+                  This is permanent and recorded against your account. Remaining refundable: <strong style={{ color: theme.text }}>${(refundTarget.total - refundTarget.refundAmount).toFixed(2)}</strong>
+                </p>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Amount to refund</label>
+                  <input type="number" min="0" step="0.01" value={refundAmount} onChange={e => setRefundAmount(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Reason (required)</label>
+                  <input value={refundReason} onChange={e => setRefundReason(e.target.value)} placeholder="e.g. Item was cold, customer complaint..."
+                    className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+                </div>
+                {refundError && <p className="text-xs" style={{ color: '#ef4444' }}>{refundError}</p>}
+              </div>
+              <div className="flex gap-3 mt-5">
+                <button onClick={() => void confirmRefund()} disabled={refundBusy}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-50 flex items-center justify-center gap-2" style={{ background: '#ef4444' }}>
+                  {refundBusy && <Loader2 size={14} className="animate-spin" />} Confirm Refund
+                </button>
+                <button onClick={() => setRefundTarget(null)} className="px-4 py-2.5 rounded-xl font-bold text-sm" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Cancel</button>
               </div>
             </motion.div>
           </motion.div>

@@ -129,9 +129,10 @@ export default function AdminReports() {
         totalSales: 0, cashCollected: 0, cardTransactions: 0, refunds: 0, itemsSold: 0, ordersCount: 0,
       };
       if (isPaid) {
-        entry.totalSales += order.total;
-        if (order.paymentMethod === 'cash') entry.cashCollected += order.total;
-        if (order.paymentMethod === 'card') entry.cardTransactions += order.total;
+        entry.totalSales += order.total - order.refundAmount;
+        entry.refunds += order.refundAmount;
+        if (order.paymentMethod === 'cash') entry.cashCollected += order.total - order.refundAmount;
+        if (order.paymentMethod === 'card') entry.cardTransactions += order.total - order.refundAmount;
       }
       entry.itemsSold += itemCount;
       entry.ordersCount += 1;
@@ -168,9 +169,10 @@ export default function AdminReports() {
   const totals = useMemo(() => {
     const paidOrders = ordersInRange.filter(o => o.payment === 'paid');
     return {
-      sales: paidOrders.reduce((s, o) => s + o.total, 0),
-      cash: paidOrders.filter(o => o.paymentMethod === 'cash').reduce((s, o) => s + o.total, 0),
-      card: paidOrders.filter(o => o.paymentMethod === 'card').reduce((s, o) => s + o.total, 0),
+      sales: paidOrders.reduce((s, o) => s + o.total - o.refundAmount, 0),
+      cash: paidOrders.filter(o => o.paymentMethod === 'cash').reduce((s, o) => s + o.total - o.refundAmount, 0),
+      card: paidOrders.filter(o => o.paymentMethod === 'card').reduce((s, o) => s + o.total - o.refundAmount, 0),
+      refunds: ordersInRange.reduce((s, o) => s + o.refundAmount, 0),
       items: ordersInRange.reduce((s, o) => s + o.items.reduce((si, it) => si + it.qty, 0), 0),
       orders: ordersInRange.length,
     };
@@ -221,12 +223,10 @@ export default function AdminReports() {
         <StatTile label="Total Sales" value={`$${totals.sales.toLocaleString()}`} icon={DollarSign} color="#22c55e" theme={theme} />
         <StatTile label="Cash Collected" value={`$${totals.cash.toLocaleString()}`} icon={Banknote} color="#f59e0b" theme={theme} />
         <StatTile label="Card Transactions" value={`$${totals.card.toLocaleString()}`} icon={CreditCard} color="#3b82f6" theme={theme} />
+        <StatTile label="Refunded" value={`$${totals.refunds.toLocaleString()}`} icon={RotateCcw} color="#ef4444" theme={theme} />
         <StatTile label="Items Sold" value={String(totals.items)} icon={Package} color="#8b5cf6" theme={theme} />
         <StatTile label="Orders" value={String(totals.orders)} icon={TrendingUp} color={theme.primary} theme={theme} />
       </div>
-      <p className="text-xs -mt-2" style={{ color: theme.textMuted }}>
-        Refund tracking isn't wired up yet — there's no void/refund action in the POS to record against. This will show real numbers once that flow exists.
-      </p>
 
       {/* Staff performance table */}
       <PlanGate feature="advanced_reports" title="Advanced Staff Analytics" description="Staff performance breakdown is available on Premium and Enterprise plans. Upgrade to unlock detailed per-staff sales reporting.">
@@ -246,6 +246,7 @@ export default function AdminReports() {
                 <th>Total Sales</th>
                 <th>Cash</th>
                 <th>Card</th>
+                <th>Refunds</th>
                 <th>Items</th>
                 <th>Orders</th>
                 <th>Actions</th>
@@ -259,6 +260,7 @@ export default function AdminReports() {
                   <td><span className="text-sm font-bold" style={{ color: theme.primary }}>${r.totalSales.toLocaleString()}</span></td>
                   <td><span className="text-sm">${r.cashCollected.toLocaleString()}</span></td>
                   <td><span className="text-sm">${r.cardTransactions.toLocaleString()}</span></td>
+                  <td><span className="text-sm" style={{ color: r.refunds > 0 ? '#ef4444' : undefined }}>${r.refunds.toLocaleString()}</span></td>
                   <td><span className="text-sm">{r.itemsSold}</span></td>
                   <td><span className="text-sm">{r.ordersCount}</span></td>
                   <td>
@@ -271,7 +273,7 @@ export default function AdminReports() {
                 </motion.tr>
               ))}
               {filteredReports.length === 0 && (
-                <tr><td colSpan={8} className="text-center py-6 text-sm" style={{ color: theme.textMuted }}>No orders in this date range yet.</td></tr>
+                <tr><td colSpan={9} className="text-center py-6 text-sm" style={{ color: theme.textMuted }}>No orders in this date range yet.</td></tr>
               )}
             </tbody>
           </table>
@@ -302,6 +304,7 @@ export default function AdminReports() {
                 <div className="flex justify-between"><span>Total Sales</span><span className="font-bold">${printStaff.totalSales.toLocaleString()}</span></div>
                 <div className="flex justify-between"><span>Cash Collected</span><span className="font-bold">${printStaff.cashCollected.toLocaleString()}</span></div>
                 <div className="flex justify-between"><span>Card Transactions</span><span className="font-bold">${printStaff.cardTransactions.toLocaleString()}</span></div>
+                <div className="flex justify-between"><span>Refunds</span><span className="font-bold">${printStaff.refunds.toLocaleString()}</span></div>
                 <div className="flex justify-between"><span>Items Sold</span><span className="font-bold">{printStaff.itemsSold}</span></div>
                 <div className="flex justify-between"><span>Orders Processed</span><span className="font-bold">{printStaff.ordersCount}</span></div>
               </div>

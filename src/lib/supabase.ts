@@ -415,6 +415,25 @@ function createMockSupabaseClient() {
       };
     }
 
+    if (name === 'refund_order') {
+      const orderId = String(params?.p_order_id ?? '');
+      const amount = Number(params?.p_amount ?? 0);
+      if (!orderId || amount <= 0) return { data: false, error: null };
+      const order = store.orders.find((entry) => entry.id === orderId) as Record<string, unknown> | undefined;
+      if (!order) return { data: false, error: null };
+      const currentRefund = Number(order.refund_amount ?? 0);
+      const total = Number(order.total_amount ?? 0);
+      const nextRefund = currentRefund + amount;
+      if (nextRefund > total) return { data: false, error: null };
+      order.refund_amount = nextRefund;
+      order.refunded_at = new Date().toISOString();
+      order.refund_reason = String(params?.p_reason ?? '');
+      order.updated_at = new Date().toISOString();
+      if (nextRefund >= total) order.payment_status = 'refunded';
+      writeStore(store);
+      return { data: true, error: null };
+    }
+
     if (name === 'set_staff_pin') {
       const targetUserId = String(params?.p_target_user_id ?? '');
       const pin = String(params?.p_pin ?? '');
