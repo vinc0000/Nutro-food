@@ -141,7 +141,11 @@ Deno.serve(async (req: Request) => {
       }
       const period = billing_period === "annual" ? "annual" : "monthly";
       const amount = prices[period];
-      const currency = orgData.currency || "XAF";
+      // Nutro's own subscription fee is always billed in USD, regardless of what
+      // currency the tenant's branch uses for their own customers' orders (that's a
+      // separate concern — branches.currency). PLAN_PRICES above are USD figures;
+      // silently sending them as e.g. XAF or AED would charge a wildly wrong amount.
+      const currency = "USD";
       const txRef = `PU-${orgId.slice(0, 8)}-${Date.now()}`;
       const appOrigin = req.headers.get("origin") || Deno.env.get("APP_BASE_URL") || "https://nutro.app";
 

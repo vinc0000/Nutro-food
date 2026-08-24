@@ -700,7 +700,8 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
               style={{ background: theme.bg, border: `2px solid ${isCurrent ? '#22c55e' : p.color + '40'}` }}>
               <div className="font-bold text-sm mb-1" style={{ color: p.color }}>{p.label}</div>
               <div className="text-lg font-extrabold" style={{ color: theme.text }}>
-                {orgContext?.currency === 'USD' || !orgContext?.currency ? '$' : ''}{price}
+                {/* Subscription billing is always USD (see the payunit-pay/flutterwave-pay edge functions) — this is Nutro's own fee, independent of the tenant's branches.currency used for their customers' orders. */}
+                ${price}
                 <span className="text-xs font-normal" style={{ color: theme.textMuted }}>/{selectedPeriod === 'annual' ? 'yr' : 'mo'}</span>
               </div>
               <div className="text-xs mt-1" style={{ color: theme.textMuted }}>{p.features}</div>

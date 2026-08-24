@@ -199,7 +199,10 @@ Deno.serve(async (req: Request) => {
 
       const period = billing_period === "annual" ? "annual" : "monthly";
       const amount = prices[period];
-      const currency = orgData.currency || "USD";
+      // Same reasoning as payunit-pay: Nutro's own subscription fee is always billed
+      // in USD, independent of the tenant's own branches.currency (used for their
+      // customers' orders, a separate concern).
+      const currency = "USD";
       const txRef = `nutro-${normalizedPlan}-${Date.now()}`;
 
       const { error: subError } = await supabase.from("subscriptions").insert({
