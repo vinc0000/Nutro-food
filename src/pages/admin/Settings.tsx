@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Building2, Globe, Bell, CreditCard, Palette, Stamp, Share2, MapPin, Check, Lock, KeyRound, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { usePlanInfo } from '@/hooks/useOrgContext';
@@ -396,7 +396,7 @@ function PosSecurityTab({ theme, showSaved }: { theme: ReturnType<typeof useThem
   const [error, setError] = useState<string | null>(null);
   const [hasPin, setHasPin] = useState<boolean | null>(null);
 
-  const checkExistingPin = async () => {
+  const checkExistingPin = useCallback(async () => {
     if (!branchId) return;
     try {
       const { data, error } = await supabase
@@ -409,9 +409,9 @@ function PosSecurityTab({ theme, showSaved }: { theme: ReturnType<typeof useThem
     } catch {
       setHasPin(false);
     }
-  };
+  }, [branchId]);
 
-  useEffect(() => { checkExistingPin(); }, [branchId]);
+  useEffect(() => { checkExistingPin(); }, [checkExistingPin]);
 
   const handleSavePin = async () => {
     setError(null);
