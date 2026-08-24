@@ -219,6 +219,8 @@ export default function PosTerminal() {
       await updateOrder(existingTabletOrder.id, o => ({
         ...o,
         payment: 'paid',
+        paymentMethod: payMethod,
+        cashierId: profile?.id ?? null,
         status: 'preparing',
         updatedAt: new Date().toISOString()
       }));
@@ -233,6 +235,8 @@ export default function PosTerminal() {
         type: orderType,
         status: 'preparing', // Send to KDS immediately
         payment: 'paid',
+        paymentMethod: payMethod,
+        cashierId: profile?.id ?? null,
         items: cart.map(c => ({
           id: c.id,
           name: c.name,

@@ -1,29 +1,25 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-  FileBarChart, Calendar, Clock, Building2, User, Printer,
+  FileBarChart, Calendar, Clock, User, Printer,
   TrendingUp, DollarSign, CreditCard, Banknote, RotateCcw, Package,
-  X, ChevronDown
+  X, ChevronDown, Loader2
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrgContext } from '@/hooks/useOrgContext';
+import { useSharedOrders } from '@/lib/ordersStore';
+import { supabase } from '@/lib/supabase';
 import PlanGate from '@/components/ui/PlanGate';
 
 interface StaffReport {
-  name: string; role: string; shift: string;
+  cashierId: string | null;
+  name: string;
+  firstOrder: string;
+  lastOrder: string;
   totalSales: number; cashCollected: number; cardTransactions: number;
   refunds: number; itemsSold: number; ordersCount: number;
 }
-
-const STAFF_REPORTS: StaffReport[] = [
-  { name: 'Ahmed Al-Rashid', role: 'Branch Manager', shift: '08:00 - 16:00', totalSales: 2840, cashCollected: 1200, cardTransactions: 1640, refunds: 0, itemsSold: 87, ordersCount: 34 },
-  { name: 'Layla Hassan', role: 'Cashier', shift: '10:00 - 18:00', totalSales: 1920, cashCollected: 800, cardTransactions: 1120, refunds: 45, itemsSold: 62, ordersCount: 28 },
-  { name: 'Marcus Owusu', role: 'Kitchen Staff', shift: '06:00 - 14:00', totalSales: 0, cashCollected: 0, cardTransactions: 0, refunds: 0, itemsSold: 95, ordersCount: 0 },
-  { name: 'Sophie Diallo', role: 'Cashier', shift: '14:00 - 22:00', totalSales: 3120, cashCollected: 1450, cardTransactions: 1670, refunds: 120, itemsSold: 78, ordersCount: 41 },
-];
-
-const BRANCHES = ['All Branches', 'Downtown Dubai', 'Marina Branch', 'Jumeirah Branch'];
-const SHIFTS = ['All Shifts', 'Morning (06-14)', 'Evening (14-22)', 'Night (22-06)'];
 
 function DateRangePicker({ startDate, endDate, onStartChange, onEndChange, theme }: {
   startDate: string; endDate: string; onStartChange: (d: string) => void; onEndChange: (d: string) => void;
@@ -45,7 +41,7 @@ function DateRangePicker({ startDate, endDate, onStartChange, onEndChange, theme
 
 function FilterDropdown({ label, value, options, onChange, icon: Icon, theme }: {
   label: string; value: string; options: string[]; onChange: (v: string) => void;
-  icon: typeof Building2; theme: ReturnType<typeof useTheme>['theme'];
+  icon: typeof User; theme: ReturnType<typeof useTheme>['theme'];
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -61,7 +57,7 @@ function FilterDropdown({ label, value, options, onChange, icon: Icon, theme }: 
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute top-full mt-1 left-0 z-50 w-48 rounded-xl p-1.5 shadow-xl"
+          <div className="absolute top-full mt-1 left-0 z-50 w-56 max-h-64 overflow-auto rounded-xl p-1.5 shadow-xl"
             style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
             {options.map(opt => (
               <button key={opt} onClick={() => { onChange(opt); setOpen(false); }}
@@ -97,35 +93,95 @@ function StatTile({ label, value, icon: Icon, color, theme }: {
 export default function AdminReports() {
   const { theme } = useTheme();
   const { profile } = useAuth();
+  const { orgContext } = useOrgContext();
+  const { orders, loading, error } = useSharedOrders(orgContext?.branch_id ?? null);
   const [startDate, setStartDate] = useState(new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10));
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10));
-  const [branch, setBranch] = useState('All Branches');
-  const [shift, setShift] = useState('All Shifts');
   const [staffFilter, setStaffFilter] = useState('All Staff');
   const [printStaff, setPrintStaff] = useState<StaffReport | null>(null);
   const [showZReport, setShowZReport] = useState(false);
   const [zPrintsToday, setZPrintsToday] = useState(0);
   const MAX_Z_PRINTS = 2;
+  const [cashierNames, setCashierNames] = useState<Record<string, string>>({});
 
-  const filteredReports = useMemo(() => {
-    return STAFF_REPORTS.filter(r => staffFilter === 'All Staff' || r.name === staffFilter);
-  }, [staffFilter]);
+  const ordersInRange = useMemo(() => {
+    const startMs = new Date(startDate + 'T00:00:00').getTime();
+    const endMs = new Date(endDate + 'T23:59:59').getTime();
+    return orders.filter(o => {
+      const t = new Date(o.createdAt).getTime();
+      return t >= startMs && t <= endMs;
+    });
+  }, [orders, startDate, endDate]);
 
-  const totals = useMemo(() => ({
-    sales: filteredReports.reduce((s, r) => s + r.totalSales, 0),
-    cash: filteredReports.reduce((s, r) => s + r.cashCollected, 0),
-    card: filteredReports.reduce((s, r) => s + r.cardTransactions, 0),
-    refunds: filteredReports.reduce((s, r) => s + r.refunds, 0),
-    items: filteredReports.reduce((s, r) => s + r.itemsSold, 0),
-    orders: filteredReports.reduce((s, r) => s + r.ordersCount, 0),
-  }), [filteredReports]);
+  const staffReports = useMemo(() => {
+    const byCashier = new Map<string, StaffReport>();
+    for (const order of ordersInRange) {
+      const key = order.cashierId ?? '__unattributed__';
+      const isPaid = order.payment === 'paid';
+      const itemCount = order.items.reduce((s, it) => s + it.qty, 0);
+      const existing = byCashier.get(key);
+      const label = key === '__unattributed__' ? 'Tablet Self-Order' : (cashierNames[key] ?? key);
+      const entry: StaffReport = existing ?? {
+        cashierId: order.cashierId ?? null,
+        name: label,
+        firstOrder: order.createdAt,
+        lastOrder: order.createdAt,
+        totalSales: 0, cashCollected: 0, cardTransactions: 0, refunds: 0, itemsSold: 0, ordersCount: 0,
+      };
+      if (isPaid) {
+        entry.totalSales += order.total;
+        if (order.paymentMethod === 'cash') entry.cashCollected += order.total;
+        if (order.paymentMethod === 'card') entry.cardTransactions += order.total;
+      }
+      entry.itemsSold += itemCount;
+      entry.ordersCount += 1;
+      if (order.createdAt < entry.firstOrder) entry.firstOrder = order.createdAt;
+      if (order.createdAt > entry.lastOrder) entry.lastOrder = order.createdAt;
+      byCashier.set(key, entry);
+    }
+    return Array.from(byCashier.values()).sort((a, b) => b.totalSales - a.totalSales);
+  }, [ordersInRange, cashierNames]);
+
+  // Resolve cashier_id -> display name for whichever staff show up in this range.
+  useEffect(() => {
+    const ids = Array.from(new Set(ordersInRange.map(o => o.cashierId).filter((id): id is string => !!id)));
+    const missing = ids.filter(id => !(id in cashierNames));
+    if (missing.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(missing.map(async (id) => {
+        const { data } = await supabase.from('profiles').select('*').eq('id', id).maybeSingle<{ full_name: string | null; email: string | null }>();
+        return [id, data?.full_name ?? data?.email ?? id] as const;
+      }));
+      if (cancelled) return;
+      setCashierNames(prev => ({ ...prev, ...Object.fromEntries(entries) }));
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ordersInRange]);
+
+  const filteredReports = useMemo(
+    () => staffFilter === 'All Staff' ? staffReports : staffReports.filter(r => r.name === staffFilter),
+    [staffReports, staffFilter]
+  );
+
+  const totals = useMemo(() => {
+    const paidOrders = ordersInRange.filter(o => o.payment === 'paid');
+    return {
+      sales: paidOrders.reduce((s, o) => s + o.total, 0),
+      cash: paidOrders.filter(o => o.paymentMethod === 'cash').reduce((s, o) => s + o.total, 0),
+      card: paidOrders.filter(o => o.paymentMethod === 'card').reduce((s, o) => s + o.total, 0),
+      items: ordersInRange.reduce((s, o) => s + o.items.reduce((si, it) => si + it.qty, 0), 0),
+      orders: ordersInRange.length,
+    };
+  }, [ordersInRange]);
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold" style={{ color: theme.text }}>Reports & Analytics</h1>
-          <p className="text-sm mt-1" style={{ color: theme.textMuted }}>Dynamics 365-style enterprise reporting with staff performance tracking</p>
+          <p className="text-sm mt-1" style={{ color: theme.textMuted }}>Real sales and staff performance for {orgContext?.branch_name ?? 'your branch'}</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setShowZReport(true)}
@@ -139,25 +195,38 @@ export default function AdminReports() {
       {/* Filter bar */}
       <div className="p-4 rounded-2xl flex flex-wrap items-center gap-3" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
         <DateRangePicker startDate={startDate} endDate={endDate} onStartChange={setStartDate} onEndChange={setEndDate} theme={theme} />
-        <FilterDropdown label="Branch" value={branch} options={BRANCHES} onChange={setBranch} icon={Building2} theme={theme} />
-        <FilterDropdown label="Shift" value={shift} options={SHIFTS} onChange={setShift} icon={Clock} theme={theme} />
-        <FilterDropdown label="Staff" value={staffFilter} options={['All Staff', ...STAFF_REPORTS.map(r => r.name)]} onChange={setStaffFilter} icon={User} theme={theme} />
-        <button onClick={() => { setBranch('All Branches'); setShift('All Shifts'); setStaffFilter('All Staff'); }}
+        <FilterDropdown label="Staff" value={staffFilter} options={['All Staff', ...staffReports.map(r => r.name)]} onChange={setStaffFilter} icon={User} theme={theme} />
+        <button onClick={() => setStaffFilter('All Staff')}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80"
           style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>
           <X size={12} /> Clear
         </button>
       </div>
 
+      {loading && (
+        <div className="flex items-center gap-2 p-6 justify-center" style={{ color: theme.textMuted }}>
+          <Loader2 size={16} className="animate-spin" /> Loading orders…
+        </div>
+      )}
+      {!loading && error && (
+        <div className="p-4 rounded-xl text-sm" style={{ background: '#ef444410', border: '1px solid #ef444430', color: '#ef4444' }}>
+          Could not load reports: {error}
+        </div>
+      )}
+
+      {!loading && !error && (
+      <>
       {/* Summary tiles */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
         <StatTile label="Total Sales" value={`$${totals.sales.toLocaleString()}`} icon={DollarSign} color="#22c55e" theme={theme} />
         <StatTile label="Cash Collected" value={`$${totals.cash.toLocaleString()}`} icon={Banknote} color="#f59e0b" theme={theme} />
         <StatTile label="Card Transactions" value={`$${totals.card.toLocaleString()}`} icon={CreditCard} color="#3b82f6" theme={theme} />
-        <StatTile label="Refunds" value={`$${totals.refunds.toLocaleString()}`} icon={RotateCcw} color="#ef4444" theme={theme} />
         <StatTile label="Items Sold" value={String(totals.items)} icon={Package} color="#8b5cf6" theme={theme} />
         <StatTile label="Orders" value={String(totals.orders)} icon={TrendingUp} color={theme.primary} theme={theme} />
       </div>
+      <p className="text-xs -mt-2" style={{ color: theme.textMuted }}>
+        Refund tracking isn't wired up yet — there's no void/refund action in the POS to record against. This will show real numbers once that flow exists.
+      </p>
 
       {/* Staff performance table */}
       <PlanGate feature="advanced_reports" title="Advanced Staff Analytics" description="Staff performance breakdown is available on Premium and Enterprise plans. Upgrade to unlock detailed per-staff sales reporting.">
@@ -166,19 +235,17 @@ export default function AdminReports() {
           <h2 className="font-extrabold flex items-center gap-2" style={{ color: theme.text }}>
             <User size={16} style={{ color: theme.primary }} /> Staff Performance Breakdown
           </h2>
-          <span className="text-xs" style={{ color: theme.textMuted }}>{filteredReports.length} staff members</span>
+          <span className="text-xs" style={{ color: theme.textMuted }}>{filteredReports.length} contributors</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full data-table">
             <thead>
               <tr>
                 <th>Staff Member</th>
-                <th>Role</th>
-                <th>Shift</th>
+                <th>First → Last Order</th>
                 <th>Total Sales</th>
                 <th>Cash</th>
                 <th>Card</th>
-                <th>Refunds</th>
                 <th>Items</th>
                 <th>Orders</th>
                 <th>Actions</th>
@@ -186,14 +253,12 @@ export default function AdminReports() {
             </thead>
             <tbody>
               {filteredReports.map((r, i) => (
-                <motion.tr key={r.name} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }}>
-                  <td><div className="flex items-center gap-2"><div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style={{ background: theme.primary }}>{r.name.split(' ').map(n => n[0]).join('')}</div><span className="text-sm font-semibold">{r.name}</span></div></td>
-                  <td><span className="text-xs">{r.role}</span></td>
-                  <td><span className="text-xs font-mono">{r.shift}</span></td>
+                <motion.tr key={r.cashierId ?? 'unattributed'} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.05 }}>
+                  <td><div className="flex items-center gap-2"><div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style={{ background: theme.primary }}>{r.name.split(' ').map(n => n[0]).join('').slice(0, 2)}</div><span className="text-sm font-semibold">{r.name}</span></div></td>
+                  <td><span className="text-xs font-mono">{new Date(r.firstOrder).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} → {new Date(r.lastOrder).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></td>
                   <td><span className="text-sm font-bold" style={{ color: theme.primary }}>${r.totalSales.toLocaleString()}</span></td>
                   <td><span className="text-sm">${r.cashCollected.toLocaleString()}</span></td>
                   <td><span className="text-sm">${r.cardTransactions.toLocaleString()}</span></td>
-                  <td><span className="text-sm" style={{ color: r.refunds > 0 ? '#ef4444' : theme.textMuted }}>${r.refunds.toLocaleString()}</span></td>
                   <td><span className="text-sm">{r.itemsSold}</span></td>
                   <td><span className="text-sm">{r.ordersCount}</span></td>
                   <td>
@@ -205,11 +270,16 @@ export default function AdminReports() {
                   </td>
                 </motion.tr>
               ))}
+              {filteredReports.length === 0 && (
+                <tr><td colSpan={8} className="text-center py-6 text-sm" style={{ color: theme.textMuted }}>No orders in this date range yet.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
       </PlanGate>
+      </>
+      )}
 
       {/* Staff report print modal */}
       {printStaff && (
@@ -221,20 +291,17 @@ export default function AdminReports() {
                 <button onClick={() => setPrintStaff(null)} style={{ color: '#999' }}><X size={18} /></button>
               </div>
               <div className="text-center mb-4 pb-3" style={{ borderBottom: '1px dashed #ddd' }}>
-                <div className="font-extrabold text-sm">Le Maison Dubai</div>
-                <div className="text-xs text-gray-500">Powered by Nutro - LiAfrik</div>
-                <div className="text-xs text-gray-500">{branch} | {startDate} to {endDate}</div>
+                <div className="font-extrabold text-sm">{orgContext?.org_name ?? 'Nutro'}</div>
+                <div className="text-xs text-gray-500">Powered by Nutro</div>
+                <div className="text-xs text-gray-500">{orgContext?.branch_name ?? ''} | {startDate} to {endDate}</div>
               </div>
               <div className="space-y-2 text-xs mb-4">
-                <div className="flex justify-between"><span className="text-gray-500">Staff Name:</span><span className="font-bold">{printStaff.name}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Role:</span><span className="font-bold">{printStaff.role}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Shift:</span><span className="font-bold">{printStaff.shift}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Staff:</span><span className="font-bold">{printStaff.name}</span></div>
               </div>
               <div className="border-t border-dashed border-gray-300 pt-3 space-y-2 text-xs">
                 <div className="flex justify-between"><span>Total Sales</span><span className="font-bold">${printStaff.totalSales.toLocaleString()}</span></div>
                 <div className="flex justify-between"><span>Cash Collected</span><span className="font-bold">${printStaff.cashCollected.toLocaleString()}</span></div>
                 <div className="flex justify-between"><span>Card Transactions</span><span className="font-bold">${printStaff.cardTransactions.toLocaleString()}</span></div>
-                <div className="flex justify-between"><span>Refunds Triggered</span><span className="font-bold" style={{ color: '#ef4444' }}>${printStaff.refunds.toLocaleString()}</span></div>
                 <div className="flex justify-between"><span>Items Sold</span><span className="font-bold">{printStaff.itemsSold}</span></div>
                 <div className="flex justify-between"><span>Orders Processed</span><span className="font-bold">{printStaff.ordersCount}</span></div>
               </div>
@@ -270,7 +337,7 @@ export default function AdminReports() {
                 <span style={{ color: theme.textMuted }}>Date Range</span><span className="font-bold" style={{ color: theme.text }}>{startDate} to {endDate}</span>
               </div>
               <div className="flex justify-between p-3 rounded-xl" style={{ background: theme.bg }}>
-                <span style={{ color: theme.textMuted }}>Branch</span><span className="font-bold" style={{ color: theme.text }}>{branch}</span>
+                <span style={{ color: theme.textMuted }}>Branch</span><span className="font-bold" style={{ color: theme.text }}>{orgContext?.branch_name ?? '—'}</span>
               </div>
               <div className="flex justify-between p-3 rounded-xl" style={{ background: theme.bg }}>
                 <span style={{ color: theme.textMuted }}>Total Orders</span><span className="font-bold" style={{ color: theme.text }}>{totals.orders}</span>
@@ -283,9 +350,6 @@ export default function AdminReports() {
               </div>
               <div className="flex justify-between p-3 rounded-xl" style={{ background: theme.bg }}>
                 <span style={{ color: theme.textMuted }}>Card Transactions</span><span className="font-bold" style={{ color: '#3b82f6' }}>${totals.card.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between p-3 rounded-xl" style={{ background: theme.bg }}>
-                <span style={{ color: theme.textMuted }}>Total Refunds</span><span className="font-bold" style={{ color: '#ef4444' }}>${totals.refunds.toLocaleString()}</span>
               </div>
               <div className="flex justify-between p-3 rounded-xl" style={{ background: theme.bg }}>
                 <span style={{ color: theme.textMuted }}>Items Sold</span><span className="font-bold" style={{ color: theme.text }}>{totals.items}</span>

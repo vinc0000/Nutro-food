@@ -19,6 +19,8 @@ export interface SharedOrder {
   type: OrderType;
   status: OrderStatus;
   payment: PaymentStatus;
+  paymentMethod?: 'cash' | 'card' | 'tap' | 'gift_card' | 'flutterwave' | null;
+  cashierId?: string | null;
   items: SharedOrderItem[];
   subtotal: number;
   tax: number;
@@ -36,6 +38,8 @@ interface OrderRow {
   order_type: OrderType;
   status: OrderStatus;
   payment_status: string;
+  payment_method: string | null;
+  cashier_id: string | null;
   subtotal: number;
   tax_amount: number;
   total_amount: number;
@@ -68,6 +72,8 @@ function rowToShared(row: OrderRow, items: OrderItemRow[]): SharedOrder {
     type: row.order_type,
     status: row.status,
     payment: row.payment_status === 'paid' ? 'paid' : 'unpaid',
+    paymentMethod: (['cash', 'card', 'tap', 'gift_card', 'flutterwave'] as const).includes(row.payment_method as any) ? (row.payment_method as SharedOrder['paymentMethod']) : null,
+    cashierId: row.cashier_id,
     items: items.map((it) => ({ id: it.menu_item_id ?? it.id, name: it.name, price: Number(it.unit_price), qty: it.quantity })),
     subtotal: Number(row.subtotal),
     tax: Number(row.tax_amount),
@@ -128,6 +134,8 @@ export function useSharedOrders(branchId: string | null) {
       order_type: order.type,
       status: order.status,
       payment_status: order.payment,
+      payment_method: order.paymentMethod ?? null,
+      cashier_id: order.cashierId ?? null,
       subtotal: order.subtotal,
       tax_amount: order.tax,
       discount_amount: 0,
@@ -160,6 +168,7 @@ export function useSharedOrders(branchId: string | null) {
     const { error: updateError } = await supabase.from('orders').update({
       status: next.status,
       payment_status: next.payment,
+      payment_method: next.paymentMethod ?? null,
       updated_at: new Date().toISOString(),
     } as never).eq('id', id);
     if (updateError) { setError(updateError.message); return; }
