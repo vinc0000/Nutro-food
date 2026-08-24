@@ -282,7 +282,7 @@ function createMockSupabaseClient() {
       orderBy: null as { field: string; ascending: boolean } | null,
       limitValue: null as number | null,
       updateValues: null as Record<string, unknown> | null,
-      insertValues: null as Record<string, unknown> | null,
+      insertValues: null as Record<string, unknown> | Record<string, unknown>[] | null,
       deleteFlag: false,
     };
 
@@ -296,15 +296,34 @@ function createMockSupabaseClient() {
       const matches = (item: Record<string, unknown>) => state.filters.every(([field, value]) => item[field] === value);
 
       if (state.insertValues) {
-        const inserted = {
+        // insert() takes either a single row or an array of rows (used by
+        // ordersStore.addOrder's batched order_items insert) — mirror
+        // supabase-js's real behavior instead of assuming one row.
+        const rows = Array.isArray(state.insertValues) ? state.insertValues : [state.insertValues];
+        const inserted = rows.map((row) => ({
           id: `${table}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           created_at: new Date().toISOString(),
-          ...state.insertValues,
-        };
-        items.push(inserted);
+          ...row,
+        }));
+        items.push(...inserted);
         (store as Record<string, unknown>)[table] = items;
+
+        // Mirror the real decrement_menu_item_stock trigger: placing an order
+        // (POS or tablet, either way this table is where line items land)
+        // actually depletes stock instead of only the admin's manual +/-.
+        if (table === 'order_items') {
+          const menuItems = store.menu_items as Array<Record<string, unknown>>;
+          for (const row of inserted) {
+            const menuItemId = (row as Record<string, unknown>).menu_item_id as string | null;
+            const quantity = Number((row as Record<string, unknown>).quantity ?? 0);
+            if (!menuItemId || !quantity) continue;
+            const menuItem = menuItems.find((m) => m.id === menuItemId);
+            if (menuItem) menuItem.stock = Math.max(0, Number(menuItem.stock ?? 0) - quantity);
+          }
+        }
+
         writeStore(store);
-        return { data: [inserted], error: null };
+        return { data: inserted, error: null };
       }
 
       if (state.deleteFlag) {
@@ -346,7 +365,7 @@ function createMockSupabaseClient() {
       state.updateValues = values;
       return builder;
     };
-    builder.insert = (values: Record<string, unknown>) => {
+    builder.insert = (values: Record<string, unknown> | Record<string, unknown>[]) => {
       state.insertValues = values;
       return builder;
     };
@@ -373,7 +392,7 @@ function createMockSupabaseClient() {
       order: (field: string, options?: { ascending?: boolean }) => SupabaseBuilder;
       limit: (value: number) => SupabaseBuilder;
       update: (values: Record<string, unknown>) => SupabaseBuilder;
-      insert: (values: Record<string, unknown>) => SupabaseBuilder;
+      insert: (values: Record<string, unknown> | Record<string, unknown>[]) => SupabaseBuilder;
       delete: () => SupabaseBuilder;
       maybeSingle: <T = Record<string, unknown>>() => Promise<{ data: T | null; error: any }>;
       then: (callback: (result: { data: any[]; error: null }) => void) => Promise<void>;
