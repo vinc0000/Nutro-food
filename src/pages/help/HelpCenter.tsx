@@ -34,7 +34,7 @@ const AI_RESPONSES: Record<string, string> = {
   kds: "The Kitchen Display System (/app/kds) shows tickets in real-time. Tickets turn yellow after 10 minutes and red after 15 minutes. Allergy alerts glow with a pulsing red border. Press BUMP when a ticket is complete to remove it from the screen.",
   allergen: "Nutro's allergen system lets you flag every menu item with dietary attributes: Halal, Vegan, Gluten-Free, Keto, Nut-Free, Dairy, Shellfish, and Spicy. On the customer tablet, guests can filter the entire menu by these flags. Severe allergy notes placed during ordering trigger high-priority KDS alerts.",
   tablet: "The customer tablet menu (/app/tablet?table=X) runs in a full-screen kiosk mode. It supports 4 languages (EN, FR, AR, ES) and multiple currencies (USD, EUR, AED, GBP). Customers can filter by dietary needs, view full macros per dish, and place orders directly from their table.",
-  pricing: "Nutro offers three plans:\n• **Starter** ($29/mo): 1 location, 5 tablets, digital menu + basic allergens\n• **Premium** ($69/mo): 3 locations, 15 tablets, POS + KDS\n• **Enterprise** ($189/mo): Unlimited everything + custom roles + AI nutrition engine\n\nAll plans include a 7-day free trial.",
+  pricing: "Nutro offers three plans:\n• **Starter** ($29/mo): 1 location, 5 tablets, digital menu + basic allergens\n• **Premium** ($69/mo): 3 locations, 15 tablets, POS + KDS\n• **Enterprise** ($189/mo): Unlimited everything + custom roles + AI nutrition engine\n\nAll plans include a 14-day free trial.",
 };
 
 function getAIResponse(message: string): string {
