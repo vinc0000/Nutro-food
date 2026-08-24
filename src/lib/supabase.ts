@@ -390,6 +390,17 @@ function createMockSupabaseClient() {
 
   const rpc = async (name: string, params?: Record<string, unknown>) => {
     const store = readStore();
+    if (name === 'resolve_branch_by_tablet_token') {
+      // Mirrors the real resolve_branch_by_tablet_token() migration: look a
+      // branch up by its exact token instead of exposing tablet_token through
+      // a broadly-selectable table/view.
+      const token = String(params?.p_token ?? '');
+      const branch = store.branch_public_info.find((b) => b.tablet_token === token);
+      return {
+        data: branch ? [{ id: branch.id, name: branch.name, currency: branch.currency, country: branch.country, city: branch.city }] : [],
+        error: null,
+      };
+    }
     if (name === 'get_user_org_context') {
       const currentUser = store.session?.user as { id?: string; email?: string } | undefined;
       const profile = store.profiles.find((entry) => entry.id === currentUser?.id) ?? null;
