@@ -504,7 +504,23 @@ function createMockSupabaseClient() {
     }),
   };
 
-  return { auth, from, rpc, storage };
+  // Demo mode has no real backend to push changes from, so realtime is a no-op stub
+  // that still satisfies the same shape the real client exposes (channel(...).on(...).subscribe()),
+  // so callers like useSharedOrders/useSharedMenu don't need to special-case demo mode.
+  const channel = (_name: string) => {
+    const builder = {
+      on: () => builder,
+      subscribe: () => builder,
+    };
+    return builder;
+  };
+  const removeChannel = (_channel: unknown) => {};
+
+  // Cast to the real client's type: this is a mock, not a structural subtype of
+  // SupabaseClient (it only implements the handful of methods this app actually
+  // calls), so without the cast every caller would see a real-client | mock-client
+  // union and TS would reject calls like the postgres_changes overload of .on().
+  return { auth, from, rpc, storage, channel, removeChannel } as unknown as ReturnType<typeof createClient>;
 }
 
 const supabaseClient = isSupabaseConfigured ? createClient(supabaseUrl!, supabaseAnonKey!) : createMockSupabaseClient();

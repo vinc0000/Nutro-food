@@ -131,6 +131,26 @@ export function useSharedOrders(branchId: string | null) {
 
   useEffect(() => { load(); }, [load]);
 
+  // Keep every screen (POS, KDS, tablet, admin) in sync without a manual refresh.
+  // The KDS view badges itself "LIVE" — this is what actually makes that true:
+  // any insert/update/delete on this branch's orders or order_items re-pulls the
+  // list. We refetch wholesale rather than patching in place because an order's
+  // items live in a separate table and row-level payloads don't include them.
+  useEffect(() => {
+    if (!branchId) return;
+    const channel = supabase
+      .channel(`orders-branch-${branchId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `branch_id=eq.${branchId}` }, () => {
+        load();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => {
+        load();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [branchId, load]);
+
   const addOrder = useCallback(async (order: SharedOrder) => {
     if (!branchId) return;
     const orderId = genId();
@@ -154,16 +174,28 @@ export function useSharedOrders(branchId: string | null) {
     } as never);
     if (insertError) { setError(insertError.message); return; }
 
-    for (const item of order.items) {
-      await supabase.from('order_items').insert({
-        id: genId(),
-        order_id: orderId,
-        menu_item_id: item.id,
-        name: item.name,
-        unit_price: item.price,
-        quantity: item.qty,
-        subtotal: item.price * item.qty,
-      } as never);
+    // Insert every line item in a single batched call instead of one request per
+    // item: it's faster, and it means we get one error we can react to instead of
+    // silently losing whichever items happened to fail mid-loop.
+    if (order.items.length > 0) {
+      const { error: itemsError } = await supabase.from('order_items').insert(
+        order.items.map((item) => ({
+          id: genId(),
+          order_id: orderId,
+          menu_item_id: item.id,
+          name: item.name,
+          unit_price: item.price,
+          quantity: item.qty,
+          subtotal: item.price * item.qty,
+        })) as never
+      );
+      if (itemsError) {
+        // The order row exists but has no items — remove it rather than leaving a
+        // ghost order behind for the kitchen/POS to choke on.
+        await supabase.from('orders').delete().eq('id', orderId);
+        setError(itemsError.message);
+        return;
+      }
     }
 
     setOrders((prev) => [{ ...order, id: orderId }, ...prev]);

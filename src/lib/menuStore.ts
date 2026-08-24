@@ -159,6 +159,24 @@ export function useSharedMenu(branchId: string | null) {
 
   useEffect(() => { load(); }, [load]);
 
+  // Mirror the orders store: subscribe so that a stock change or 86'd item made
+  // from one screen (e.g. admin marks something unavailable) shows up on every
+  // other open screen (POS, customer tablet) without a manual refresh.
+  useEffect(() => {
+    if (!branchId) return;
+    const channel = supabase
+      .channel(`menu-branch-${branchId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items', filter: `branch_id=eq.${branchId}` }, () => {
+        load();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_categories', filter: `branch_id=eq.${branchId}` }, () => {
+        load();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [branchId, load]);
+
   // Categories are managed as plain name strings in the UI (a fixed dropdown), but
   // stored as their own table with an id underneath. Get-or-create by name per branch.
   const resolveCategoryId = useCallback(async (categoryName: string): Promise<string | null> => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Edit2, Trash2, Shield, Key, AlertTriangle, Archive, X, Check, Loader2 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -50,7 +50,7 @@ export default function AdminStaff() {
   const [toast, setToast] = useState<string | null>(null);
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
 
-  const loadStaff = async () => {
+  const loadStaff = useCallback(async () => {
     if (!orgId) return;
     setLoading(true);
     setLoadError(null);
@@ -85,9 +85,9 @@ export default function AdminStaff() {
 
     setStaff(withProfiles);
     setLoading(false);
-  };
+  }, [orgId]);
 
-  useEffect(() => { loadStaff(); }, [orgId]);
+  useEffect(() => { loadStaff(); }, [loadStaff]);
 
   // Adds an EXISTING Nutro account to this org. We don't fabricate a "staff invitation
   // email" here for the same reason as the Super Admin panel: sending real invite
