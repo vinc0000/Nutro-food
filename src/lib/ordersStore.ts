@@ -155,10 +155,24 @@ export function useSharedOrders(branchId: string | null) {
     if (!branchId) return;
     const orderId = genId();
 
+    // Order numbers are handed out atomically by the DB (see migration
+    // 20260825010000) instead of trusting whatever the caller computed —
+    // client-side counting/randomness can't guarantee uniqueness across two
+    // concurrent POS sessions or a POS order landing at the same moment as a
+    // tablet order.
+    const { data: orderNumberData, error: numberError } = await supabase.rpc('get_next_order_number', {
+      p_branch_id: branchId,
+    });
+    if (numberError || !orderNumberData) {
+      setError(numberError?.message ?? 'Could not assign an order number — please try again.');
+      return;
+    }
+    const orderNumber = orderNumberData as string;
+
     const { error: insertError } = await supabase.from('orders').insert({
       id: orderId,
       branch_id: branchId,
-      order_number: order.orderNumber,
+      order_number: orderNumber,
       table_label: order.tableLabel,
       order_type: order.type,
       status: order.status,
@@ -198,7 +212,8 @@ export function useSharedOrders(branchId: string | null) {
       }
     }
 
-    setOrders((prev) => [{ ...order, id: orderId }, ...prev]);
+    setOrders((prev) => [{ ...order, id: orderId, orderNumber }, ...prev]);
+    return orderNumber;
   }, [branchId]);
 
   const updateOrder = useCallback(async (id: string, updater: (order: SharedOrder) => SharedOrder) => {

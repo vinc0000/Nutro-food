@@ -390,6 +390,18 @@ function createMockSupabaseClient() {
 
   const rpc = async (name: string, params?: Record<string, unknown>) => {
     const store = readStore();
+    if (name === 'get_next_order_number') {
+      // Mirrors the real get_next_order_number() migration: one atomically-
+      // incrementing counter per branch instead of client-side randomness, so
+      // demo mode can't produce duplicate ticket numbers either.
+      const branchIdParam = String(params?.p_branch_id ?? 'demo-branch');
+      const counters = (store as unknown as { orderCounters?: Record<string, number> }).orderCounters ?? {};
+      const next = (counters[branchIdParam] ?? 1000) + 1;
+      counters[branchIdParam] = next;
+      (store as unknown as { orderCounters?: Record<string, number> }).orderCounters = counters;
+      writeStore(store);
+      return { data: `#${next}`, error: null };
+    }
     if (name === 'get_user_org_context') {
       const currentUser = store.session?.user as { id?: string; email?: string } | undefined;
       const profile = store.profiles.find((entry) => entry.id === currentUser?.id) ?? null;
