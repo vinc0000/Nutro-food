@@ -544,9 +544,6 @@ function PosSecurityTab({ theme, showSaved }: { theme: ReturnType<typeof useThem
   );
 }
 
-import { AnimatePresence, motion } from 'framer-motion';
-import { CreditCard as CardIcon, X as CloseIcon } from 'lucide-react';
-
 function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['theme']; showSaved: (msg: string) => void }) {
   const { plan, planStatus, isTrialActive, daysLeft, refresh } = usePlanInfo();
   const { orgContext } = useOrgContext();
@@ -554,81 +551,105 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
   const [paying, setPaying] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [latestTxRef, setLatestTxRef] = useState<string | null>(null);
-
-  // Simulated Flutterwave Checkout state
-  const [showFwModal, setShowFwModal] = useState(false);
-  const [fwPlan, setFwPlan] = useState('');
-  const [fwStep, setFwStep] = useState<'details' | 'otp' | 'success'>('details');
-  const [fwCard, setFwCard] = useState('');
-  const [fwOtp, setFwOtp] = useState('');
+  const [latestTxRef, setLatestTxRef] = useState<string | null>(() => localStorage.getItem('nutro:pending-tx-ref'));
+  const [activePsp, setActivePsp] = useState<'flutterwave' | 'payunit' | null>(() => (localStorage.getItem('nutro:pending-psp') as 'flutterwave' | 'payunit' | null));
+  const [pspChecking, setPspChecking] = useState(true);
 
   const PLANS = [
     { name: 'starter', label: 'Starter', price: 29, color: '#94a3b8', features: '10 tables, 3 staff, basic reports' },
     { name: 'premium', label: 'Premium', price: 69, color: '#10B981', features: '30 tables, 10 staff, advanced reports' },
-    { name: 'enterprise', label: 'Enterprise', price: 189, color: '#0369A1', features: 'Unlimited everything, API access' },
+    { name: 'enterprise', label: 'Enterprise', price: 189, color: theme.primary, features: 'Unlimited everything, API access' },
   ];
 
-  const handleSubscribe = async (planName: string) => {
-    setError(null);
-    setFwPlan(planName);
-    setShowFwModal(true);
-    setFwStep('details');
-    setFwCard('');
-    setFwOtp('');
+  const callPsp = async (psp: 'flutterwave' | 'payunit', payload: Record<string, unknown>) => {
+    const { data: session } = await supabase.auth.getSession();
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${psp}-pay`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.session?.access_token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    return response.json();
   };
 
-  const completeSimulatedSubscription = async () => {
-    setVerifying(true);
-    try {
-      const STORAGE_KEY = 'nutro-demo-store';
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const store = JSON.parse(raw);
-        if (store.organizations && store.organizations[0]) {
-          store.organizations[0].plan = fwPlan.toLowerCase();
-          store.organizations[0].plan_status = 'active';
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-          window.dispatchEvent(new Event('nutro-auth-change'));
-        }
+  // PayUnit and Flutterwave are both supported — whichever one has real API
+  // credentials configured in Supabase secrets is the one that gets used. If both are
+  // configured, PayUnit takes priority (it's the newer, Africa-focused addition); if
+  // neither is configured yet, subscribing is disabled with an explanatory message
+  // rather than faking a successful payment.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setPspChecking(true);
+      try {
+        const [payunitStatus, flutterwaveStatus] = await Promise.all([
+          callPsp('payunit', { action: 'status' }).catch(() => ({ configured: false })),
+          callPsp('flutterwave', { action: 'status' }).catch(() => ({ configured: false })),
+        ]);
+        if (cancelled) return;
+        if (payunitStatus?.configured) setActivePsp('payunit');
+        else if (flutterwaveStatus?.configured) setActivePsp('flutterwave');
+        else setActivePsp(null);
+      } finally {
+        if (!cancelled) setPspChecking(false);
       }
-      await refresh();
-      showSaved(`Subscribed to ${fwPlan} plan successfully!`);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleSubscribe = async (planName: string) => {
+    if (!activePsp) {
+      setError('Payments are not configured yet. Add Flutterwave or PayUnit API credentials to Supabase secrets to enable subscriptions.');
+      return;
+    }
+    setError(null);
+    setPaying(true);
+    try {
+      const result = await callPsp(activePsp, {
+        action: 'initialize',
+        plan: planName,
+        billing_period: selectedPeriod,
+        tenant_org_id: orgContext?.org_id,
+      });
+      if (result.error) { setError(result.error); return; }
+      if (!result.payment_link || !result.tx_ref) { setError('Could not start checkout — please try again.'); return; }
+
+      localStorage.setItem('nutro:pending-tx-ref', result.tx_ref);
+      localStorage.setItem('nutro:pending-psp', activePsp);
+      setLatestTxRef(result.tx_ref);
+      // Full-page redirect to the PSP's real hosted checkout — this is not a modal or
+      // simulation, the customer leaves the app and pays on the provider's own page.
+      window.location.href = result.payment_link;
     } catch (err) {
-      console.error(err);
+      setError(err instanceof Error ? err.message : 'Could not start checkout');
     } finally {
-      setVerifying(false);
+      setPaying(false);
     }
   };
 
   const handleVerifyPayment = async () => {
-    if (!latestTxRef) {
+    if (!latestTxRef || !activePsp) {
       setError('No pending payment was initialized for this tenant yet.');
       return;
     }
-
     setError(null);
     setVerifying(true);
     try {
-      const { data: session } = await supabase.auth.getSession();
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flutterwave-pay`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.session?.access_token}`,
-        },
-        body: JSON.stringify({
-          action: 'verify',
-          tx_ref: latestTxRef,
-          tenant_org_id: orgContext?.org_id,
-        }),
+      const result = await callPsp(activePsp, {
+        action: 'verify',
+        tx_ref: latestTxRef,
+        tenant_org_id: orgContext?.org_id,
       });
-      const result = await response.json();
       if (result.status === 'successful') {
+        localStorage.removeItem('nutro:pending-tx-ref');
+        localStorage.removeItem('nutro:pending-psp');
+        setLatestTxRef(null);
         await refresh();
         showSaved('Subscription confirmed for this tenant.');
       } else {
-        setError(result.message || 'Payment verification could not be completed yet.');
+        setError(result.message || result.error || 'Payment verification could not be completed yet.');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Verification failed');
@@ -637,14 +658,23 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
     }
   };
 
+  // If we just came back from a PSP's hosted checkout page, auto-verify once.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('billing') === 'success' && latestTxRef && activePsp && !pspChecking) {
+      void handleVerifyPayment();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pspChecking]);
+
   return (
     <div className="space-y-5">
       <h2 className="font-extrabold" style={{ color: theme.text }}>Subscription & Billing</h2>
 
       {isTrialActive && (
-        <div className="p-4 rounded-xl" style={{ background: '#0369A110', border: '1px solid #0369A130' }}>
+        <div className="p-4 rounded-xl" style={{ background: theme.primary + '10', border: `1px solid ${theme.primary}30` }}>
           <div className="flex items-center justify-between mb-1">
-            <span className="font-bold" style={{ color: '#0369A1' }}>Free Trial Active</span>
+            <span className="font-bold" style={{ color: theme.primary }}>Free Trial Active</span>
             <span className="text-xs font-bold" style={{ color: theme.textMuted }}>{daysLeft} days left</span>
           </div>
           <p className="text-sm" style={{ color: theme.textMuted }}>Every plan includes a 7-day free trial. No credit card required to start.</p>
@@ -676,16 +706,24 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
               <div className="text-xs mt-1" style={{ color: theme.textMuted }}>{p.features}</div>
               <div className="text-[10px] mt-1 font-semibold" style={{ color: theme.primary }}>KDS & Thermal included</div>
               <button
-                onClick={() => handleSubscribe(p.name)}
-                disabled={paying || isCurrent}
+                onClick={() => void handleSubscribe(p.name)}
+                disabled={paying || isCurrent || pspChecking || !activePsp}
                 className="w-full mt-3 py-2 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-50"
                 style={{ background: isCurrent ? '#22c55e' : theme.primary }}>
-                {isCurrent ? 'Current Plan' : paying ? 'Processing...' : 'Subscribe'}
+                {isCurrent ? 'Current Plan' : paying ? 'Redirecting...' : pspChecking ? 'Loading...' : 'Subscribe'}
               </button>
             </div>
           );
         })}
       </div>
+
+      {!pspChecking && !activePsp && (
+        <div className="p-3 rounded-xl" style={{ background: '#f59e0b10', border: '1px solid #f59e0b30' }}>
+          <span className="text-sm font-semibold" style={{ color: '#f59e0b' }}>
+            No payment provider is configured yet. Add either Flutterwave (FLW_SECRET_KEY) or PayUnit (PAYUNIT_API_USER / PAYUNIT_API_PASSWORD / PAYUNIT_APP_TOKEN) as Supabase Edge Function secrets to accept real subscriptions.
+          </span>
+        </div>
+      )}
 
       {error && (
         <div className="p-3 rounded-xl" style={{ background: '#ef444410', border: '1px solid #ef444430' }}>
@@ -695,7 +733,7 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
 
       {latestTxRef && (
         <button
-          onClick={handleVerifyPayment}
+          onClick={() => void handleVerifyPayment()}
           disabled={verifying}
           className="w-full py-2.5 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50"
           style={{ background: theme.primary }}
@@ -708,93 +746,18 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
         <div className="flex items-start gap-2">
           <CreditCard size={16} className="mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
           <div>
-            <p className="text-xs font-bold mb-1" style={{ color: theme.text }}>Payment via Flutterwave</p>
+            <p className="text-xs font-bold mb-1" style={{ color: theme.text }}>
+              {activePsp === 'payunit' ? 'Payment via PayUnit' : activePsp === 'flutterwave' ? 'Payment via Flutterwave' : 'Payments'}
+            </p>
             <p className="text-xs" style={{ color: theme.textMuted }}>
-              We use Flutterwave to securely process payments. Supports cards, mobile money, bank transfers, and USSD across Africa and beyond.
+              {activePsp === 'payunit'
+                ? "We use PayUnit to securely process payments. Supports mobile money, cards, and bank transfers across Africa."
+                : "We use Flutterwave to securely process payments. Supports cards, mobile money, bank transfers, and USSD across Africa and beyond."}
+              {' '}Clicking Subscribe takes you to the provider's own secure checkout page — Nutro never sees your card or mobile money details.
             </p>
           </div>
         </div>
       </div>
-
-      {/* Flutterwave simulated subscription checkout */}
-      <AnimatePresence>
-        {showFwModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85">
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
-              className="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl bg-white text-gray-800">
-              <div className="p-6 text-center bg-[#f5a623] text-white">
-                <div className="text-xs font-bold uppercase tracking-wider opacity-90">Flutterwave Merchant API</div>
-                <div className="text-3xl font-extrabold mt-1">
-                  ${selectedPeriod === 'annual'
-                    ? Math.round((PLANS.find(p => p.name === fwPlan)?.price ?? 0) * 10)
-                    : (PLANS.find(p => p.name === fwPlan)?.price ?? 0)
-                  }
-                  <span className="text-sm font-normal">/{selectedPeriod === 'annual' ? 'yr' : 'mo'}</span>
-                </div>
-                <div className="text-[10px] opacity-80 mt-1">Subscription Ref: SUB-FLW-{Date.now().toString().slice(-6)}</div>
-              </div>
-              <div className="p-6 space-y-4">
-                {fwStep === 'details' && (
-                  <>
-                    <h3 className="text-sm font-extrabold text-gray-800">Enter Subscription Payment Details</h3>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Card Number</label>
-                      <input value={fwCard} onChange={e => setFwCard(e.target.value)} placeholder="4000 1234 5678 9010"
-                        className="w-full px-4 py-2.5 rounded-xl text-sm border border-gray-300 outline-none text-gray-800 focus:border-[#f5a623]" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Expiry Date</label>
-                        <input placeholder="MM/YY" className="w-full px-4 py-2.5 rounded-xl text-sm border border-gray-300 outline-none text-gray-800 focus:border-[#f5a623]" />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">CVV</label>
-                        <input placeholder="123" className="w-full px-4 py-2.5 rounded-xl text-sm border border-gray-300 outline-none text-gray-800 focus:border-[#f5a623]" />
-                      </div>
-                    </div>
-                    <button onClick={() => setFwStep('otp')} className="w-full py-3 rounded-xl font-bold text-sm text-white bg-[#f5a623]">
-                      Proceed to OTP verification
-                    </button>
-                  </>
-                )}
-                {fwStep === 'otp' && (
-                  <>
-                    <div className="text-center">
-                      <div className="text-xs font-bold text-gray-500 mb-1 uppercase">Enter 6-Digit OTP</div>
-                      <p className="text-xs text-gray-400 mb-4">A simulated OTP has been sent to your phone</p>
-                      <input value={fwOtp} onChange={e => setFwOtp(e.target.value)} placeholder="123456" maxLength={6}
-                        className="w-32 px-4 py-2.5 rounded-xl text-center text-lg font-bold border border-gray-300 outline-none text-gray-800 focus:border-[#22c55e]" />
-                    </div>
-                    <button
-                      onClick={async () => {
-                        setFwStep('success');
-                        await completeSimulatedSubscription();
-                        setTimeout(() => {
-                          setShowFwModal(false);
-                        }, 2000);
-                      }}
-                      className="w-full py-3 rounded-xl font-bold text-sm text-white bg-[#22c55e] mt-4">
-                      Verify & Activate Subscription
-                    </button>
-                  </>
-                )}
-                {fwStep === 'success' && (
-                  <div className="text-center py-6">
-                    <div className="w-12 h-12 rounded-full bg-green-100 text-green-500 flex items-center justify-center mx-auto mb-3">
-                      <Check size={24} />
-                    </div>
-                    <h4 className="text-base font-extrabold text-gray-800">SaaS Subscription Activated</h4>
-                    <p className="text-xs text-gray-400 mt-1">Connecting back to Nutro SaaS...</p>
-                  </div>
-                )}
-                <div className="text-center pt-2">
-                  <button onClick={() => setShowFwModal(false)} className="text-xs text-gray-400 font-semibold hover:underline">Cancel Payment</button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

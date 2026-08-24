@@ -229,7 +229,7 @@ export default function LandingPage() {
         }}>
         <div className="section-shell px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#16A34A' }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: theme.primary }}>
               <Logo size={18} color="#fff" />
             </div>
             <div className="flex flex-col leading-none">

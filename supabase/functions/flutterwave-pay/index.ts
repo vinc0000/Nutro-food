@@ -14,7 +14,7 @@ const PLAN_PRICES: Record<string, { monthly: number; annual: number }> = {
 };
 
 interface OrgContext {
-  org: string;
+  org_id: string;
   org_name: string;
   billing_email: string | null;
   currency: string | null;
@@ -161,15 +161,22 @@ Deno.serve(async (req: Request) => {
       tenant_org_id?: string;
     };
 
+    if (action === "status") {
+      return new Response(JSON.stringify({ configured: Boolean(Deno.env.get("FLW_SECRET_KEY")) }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const orgData = await getOrgContext(supabase, userData.user.id);
-    if (!orgData?.org) {
+    if (!orgData?.org_id) {
       return new Response(JSON.stringify({ error: "Could not find organization context for this user" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const orgId = orgData.org;
+    const orgId = orgData.org_id;
     const orgName = orgData.org_name || userData.user.email || "Nutro tenant";
     const billingEmail = orgData.billing_email || userData.user.email;
 

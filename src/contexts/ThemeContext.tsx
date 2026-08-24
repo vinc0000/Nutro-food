@@ -50,7 +50,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [themeName, setThemeName] = useState<ThemeName>(() => {
     const stored = localStorage.getItem('nutro-theme') as ThemeName;
     const valid: ThemeName[] = ['ocean', 'emerald', 'slate'];
-    return valid.includes(stored) ? stored : 'emerald';
+    return valid.includes(stored) ? stored : 'ocean';
   });
 
   const theme = useMemo(() => THEMES[themeName], [themeName]);
