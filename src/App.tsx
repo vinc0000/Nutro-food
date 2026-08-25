@@ -24,6 +24,7 @@ const SuperAdminAdmins = lazy(() => import('@/pages/super-admin/Admins'));
 
 const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'));
 const AdminMenu = lazy(() => import('@/pages/admin/Menu'));
+const AdminIntegrations = lazy(() => import('@/pages/admin/Integrations'));
 const AdminOrders = lazy(() => import('@/pages/admin/Orders'));
 const AdminStaff = lazy(() => import('@/pages/admin/Staff'));
 const AdminSettings = lazy(() => import('@/pages/admin/Settings'));
@@ -72,6 +73,7 @@ export default function App() {
                 <Route path="orders" element={<AdminOrders />} />
                 <Route path="reports" element={<AdminReports />} />
                 <Route path="staff" element={<AdminStaff />} />
+                <Route path="integrations" element={<AdminIntegrations />} />
                 <Route path="settings" element={<AdminSettings />} />
               </Route>
 

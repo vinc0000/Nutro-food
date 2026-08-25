@@ -677,7 +677,7 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
             <span className="font-bold" style={{ color: theme.primary }}>Free Trial Active</span>
             <span className="text-xs font-bold" style={{ color: theme.textMuted }}>{daysLeft} days left</span>
           </div>
-          <p className="text-sm" style={{ color: theme.textMuted }}>Every plan includes a 7-day free trial. No credit card required to start.</p>
+          <p className="text-sm" style={{ color: theme.textMuted }}>Every plan includes a 14-day free trial. No credit card required to start.</p>
         </div>
       )}
 

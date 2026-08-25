@@ -42,7 +42,7 @@ function createDemoStore() {
         owner_id: 'demo-admin',
         plan: 'premium',
         plan_status: 'active',
-        trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         billing_email: 'demo@nutro.app',
         referral_code: 'NUTRO7',
         created_at: now,
@@ -145,6 +145,7 @@ function createDemoStore() {
     user_org_roles: [
       { id: 'membership-demo-admin', user_id: 'demo-admin', org_id: orgId, branch_id: null, role_name: 'owner', permissions: {}, is_active: true, created_at: now },
     ] as Array<Record<string, unknown>>,
+    integrations: [] as Array<Record<string, unknown>>,
     session: null as Record<string, unknown> | null,
   };
 }
@@ -283,6 +284,8 @@ function createMockSupabaseClient() {
       limitValue: null as number | null,
       updateValues: null as Record<string, unknown> | null,
       insertValues: null as Record<string, unknown> | null,
+      upsertValues: null as Record<string, unknown> | null,
+      upsertConflictKeys: [] as string[],
       deleteFlag: false,
     };
 
@@ -300,6 +303,27 @@ function createMockSupabaseClient() {
           id: `${table}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           created_at: new Date().toISOString(),
           ...state.insertValues,
+        };
+        items.push(inserted);
+        (store as Record<string, unknown>)[table] = items;
+        writeStore(store);
+        return { data: [inserted], error: null };
+      }
+
+      if (state.upsertValues) {
+        const keys = state.upsertConflictKeys.length ? state.upsertConflictKeys : Object.keys(state.upsertValues);
+        const existingIndex = items.findIndex((item) => keys.every((k) => item[k] === (state.upsertValues as Record<string, unknown>)[k]));
+        if (existingIndex >= 0) {
+          const updated = { ...items[existingIndex], ...state.upsertValues };
+          items[existingIndex] = updated;
+          (store as Record<string, unknown>)[table] = items;
+          writeStore(store);
+          return { data: [updated], error: null };
+        }
+        const inserted = {
+          id: `${table}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          created_at: new Date().toISOString(),
+          ...state.upsertValues,
         };
         items.push(inserted);
         (store as Record<string, unknown>)[table] = items;
@@ -350,6 +374,11 @@ function createMockSupabaseClient() {
       state.insertValues = values;
       return builder;
     };
+    builder.upsert = (values: Record<string, unknown>, options?: { onConflict?: string }) => {
+      state.upsertValues = values;
+      state.upsertConflictKeys = options?.onConflict ? options.onConflict.split(',').map((s) => s.trim()) : [];
+      return builder;
+    };
     builder.delete = () => {
       state.deleteFlag = true;
       return builder;
@@ -374,6 +403,7 @@ function createMockSupabaseClient() {
       limit: (value: number) => SupabaseBuilder;
       update: (values: Record<string, unknown>) => SupabaseBuilder;
       insert: (values: Record<string, unknown>) => SupabaseBuilder;
+      upsert: (values: Record<string, unknown>, options?: { onConflict?: string }) => SupabaseBuilder;
       delete: () => SupabaseBuilder;
       maybeSingle: <T = Record<string, unknown>>() => Promise<{ data: T | null; error: any }>;
       then: (callback: (result: { data: any[]; error: null }) => void) => Promise<void>;
@@ -458,7 +488,7 @@ function createMockSupabaseClient() {
           owner_id: (store.session as any)?.user?.id ?? 'demo-admin',
           plan: String(params?.p_plan ?? 'premium'),
           plan_status: 'active',
-          trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
           billing_email: String(params?.p_billing_email ?? 'demo@nutro.app'),
           referral_code: 'NUTRO7',
           created_at: new Date().toISOString(),

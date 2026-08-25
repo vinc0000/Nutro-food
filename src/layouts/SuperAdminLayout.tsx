@@ -20,7 +20,7 @@ const NAV = [
 ];
 
 const NOTIFICATIONS = [
-  { id: 1, title: 'New tenant registered', desc: 'Sakura Lounge started 7-day trial', time: '5m ago', color: '#22c55e' },
+  { id: 1, title: 'New tenant registered', desc: 'Sakura Lounge started 14-day trial', time: '5m ago', color: '#22c55e' },
   { id: 2, title: 'Payment received', desc: 'Nile Kitchen paid $189 (Enterprise)', time: '1h ago', color: '#22c55e' },
   { id: 3, title: 'Tenant suspended', desc: 'Casa Verde - payment failure', time: '3h ago', color: '#ef4444' },
   { id: 4, title: 'New sales rep added', desc: 'Sophie Mensah joined', time: '6h ago', color: '#3b82f6' },

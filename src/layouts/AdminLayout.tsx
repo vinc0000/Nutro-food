@@ -4,7 +4,7 @@ import {
   LayoutDashboard, UtensilsCrossed, Users,
   Settings, LogOut, ChevronLeft, ChevronRight, Monitor,
   ChefHat, Bell, Tablet, FileBarChart, ShieldCheck, Menu as MenuIcon,
-  X, ChevronDown, Languages
+  X, ChevronDown, Languages, Plug
 } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,6 +22,7 @@ const NAV = [
   { to: '/app/kds', icon: ChefHat, labelKey: 'layout.kds', external: true },
   { to: '/app/admin/reports', icon: FileBarChart, labelKey: 'layout.reports' },
   { to: '/app/admin/staff', icon: Users, labelKey: 'layout.staff' },
+  { to: '/app/admin/integrations', icon: Plug, labelKey: 'layout.integrations' },
   { to: '/app/admin/settings', icon: Settings, labelKey: 'layout.settings' },
 ];
 

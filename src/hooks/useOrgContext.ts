@@ -35,8 +35,8 @@ export interface PlanInfo {
 
 const PLAN_FEATURES: Record<string, string[]> = {
   starter: ['pos', 'menu', 'orders', 'basic_reports', 'tables', 'kds', 'staff'],
-  premium: ['pos', 'menu', 'orders', 'basic_reports', 'advanced_reports', 'tables', 'kds', 'staff', 'inventory', 'crm', 'multi_branch'],
-  enterprise: ['pos', 'menu', 'orders', 'basic_reports', 'advanced_reports', 'tables', 'kds', 'staff', 'inventory', 'crm', 'multi_branch', 'white_label', 'api_access', 'advanced_analytics'],
+  premium: ['pos', 'menu', 'orders', 'basic_reports', 'advanced_reports', 'tables', 'kds', 'staff', 'inventory', 'crm', 'multi_branch', 'integrations'],
+  enterprise: ['pos', 'menu', 'orders', 'basic_reports', 'advanced_reports', 'tables', 'kds', 'staff', 'inventory', 'crm', 'multi_branch', 'white_label', 'api_access', 'advanced_analytics', 'integrations'],
 };
 
 export function useOrgContext() {
