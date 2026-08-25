@@ -12,7 +12,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { COUNTRIES, CURRENCIES, LANGUAGES } from '@/lib/countries';
 
-const STEPS = ['Account', 'Business', 'Location', 'Plan'];
+const STEPS = ['Account', 'Location', 'Business', 'Plan'];
 
 const PLANS = [
   { name: 'Starter', price: 29, color: '#94A3B8', desc: '1 location, 10 tables', features: ['Digital Menu', 'KDS', 'Basic Reports'] },
@@ -47,8 +47,8 @@ export default function SignupPage() {
 
   const canProceed = () => {
     if (step === 0) return fullName.length > 1 && email.includes('@') && password.length >= 8;
-    if (step === 1) return restaurantName.length > 1 && phone.length > 3;
-    if (step === 2) return country.length > 0 && city.length > 0;
+    if (step === 1) return country.length > 0 && city.length > 0;
+    if (step === 2) return restaurantName.length > 1 && phone.length > 3;
     if (step === 3) return plan.length > 0;
     return false;
   };
@@ -58,10 +58,12 @@ export default function SignupPage() {
     handleSubmit();
   };
 
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
+
   const handleSubmit = async () => {
     setError(null);
     setLoading(true);
-    const { error } = await signUp(email, password, fullName, {
+    const { error, needsEmailConfirmation } = await signUp(email, password, fullName, {
       orgName: restaurantName,
       plan: plan.toLowerCase(),
       branchName: 'Main Branch',
@@ -69,10 +71,11 @@ export default function SignupPage() {
       city,
       currency,
       language,
-      phone,
+      phone: phone ? `+${selectedCountry?.dialCode ?? ''} ${phone}` : '',
     });
     setLoading(false);
     if (error) { setError(error); setStep(0); return; }
+    if (needsEmailConfirmation) { setNeedsConfirmation(true); return; }
     navigate('/app/admin', { replace: true });
   };
 
@@ -86,6 +89,25 @@ export default function SignupPage() {
     <div className="min-h-screen flex items-center justify-center px-4 py-8 relative overflow-hidden">
       <AuthBackground />
 
+      {needsConfirmation ? (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md relative z-10">
+          <div className="rounded-2xl p-8 text-center" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: theme.primary + '15' }}>
+              <Mail size={26} style={{ color: theme.primary }} />
+            </div>
+            <h1 className="text-lg font-bold mb-2" style={{ color: theme.text }}>Check your email</h1>
+            <p className="text-sm mb-1" style={{ color: theme.textMuted }}>
+              We sent a confirmation link to <strong style={{ color: theme.text }}>{email}</strong>.
+            </p>
+            <p className="text-sm" style={{ color: theme.textMuted }}>
+              Click it to activate your account — your 14-day free trial for {restaurantName} starts as soon as you sign in.
+            </p>
+            <Link to="/auth/login" className="inline-block mt-6 px-5 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>
+              Go to Sign In
+            </Link>
+          </div>
+        </motion.div>
+      ) : (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-lg relative z-10">
         <div className="text-center mb-6">
           <Link to="/" className="inline-flex items-center gap-3">
@@ -168,8 +190,47 @@ export default function SignupPage() {
               </motion.div>
             )}
 
-            {/* Step 1: Business */}
+            {/* Step 1: Location */}
             {step === 1 && (
+              <motion.div key="location" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+                <h2 className="text-lg font-bold mb-1" style={{ color: theme.text }}>Where is your restaurant?</h2>
+                <p className="text-sm mb-5" style={{ color: theme.textMuted }}>We auto-detect your currency based on country.</p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>{t('auth.country')}</label>
+                    <div className="relative">
+                      <MapPin size={15} className="absolute left-3 top-1/2 -translate-y-1/2 z-10" style={{ color: theme.textMuted }} />
+                      <select value={country} onChange={e => onCountryChange(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm outline-none appearance-none cursor-pointer"
+                        style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>
+                        {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>{t('auth.city')}</label>
+                    <input type="text" required value={city} onChange={e => setCity(e.target.value)} placeholder="Dubai"
+                      className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                      style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}
+                      onFocus={e => e.target.style.borderColor = theme.primary} onBlur={e => e.target.style.borderColor = theme.border} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>{t('auth.currencyAuto')}</label>
+                    <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: theme.primary + '10', border: `1px solid ${theme.primary}30` }}>
+                      <span className="text-lg">{CURRENCIES.find(c => c.code === currency)?.symbol ?? '$'}</span>
+                      <div>
+                        <div className="text-sm font-bold" style={{ color: theme.text }}>{currency}</div>
+                        <div className="text-xs" style={{ color: theme.textMuted }}>{CURRENCIES.find(c => c.code === currency)?.name ?? ''}</div>
+                      </div>
+                      <Check size={16} className="ml-auto" style={{ color: theme.primary }} />
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step 2: Business */}
+            {step === 2 && (
               <motion.div key="business" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
                 <h2 className="text-lg font-bold mb-1" style={{ color: theme.text }}>Tell us about your restaurant</h2>
                 <p className="text-sm mb-5" style={{ color: theme.textMuted }}>This information appears on your receipts and tablet menu.</p>
@@ -208,45 +269,6 @@ export default function SignupPage() {
                         style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>
                         {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.flag} {l.name} ({l.nativeName})</option>)}
                       </select>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Step 2: Location */}
-            {step === 2 && (
-              <motion.div key="location" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                <h2 className="text-lg font-bold mb-1" style={{ color: theme.text }}>Where is your restaurant?</h2>
-                <p className="text-sm mb-5" style={{ color: theme.textMuted }}>We auto-detect your currency based on country.</p>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>{t('auth.country')}</label>
-                    <div className="relative">
-                      <MapPin size={15} className="absolute left-3 top-1/2 -translate-y-1/2 z-10" style={{ color: theme.textMuted }} />
-                      <select value={country} onChange={e => onCountryChange(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm outline-none appearance-none cursor-pointer"
-                        style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>
-                        {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>{t('auth.city')}</label>
-                    <input type="text" required value={city} onChange={e => setCity(e.target.value)} placeholder="Dubai"
-                      className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
-                      style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}
-                      onFocus={e => e.target.style.borderColor = theme.primary} onBlur={e => e.target.style.borderColor = theme.border} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>{t('auth.currencyAuto')}</label>
-                    <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: theme.primary + '10', border: `1px solid ${theme.primary}30` }}>
-                      <span className="text-lg">{CURRENCIES.find(c => c.code === currency)?.symbol ?? '$'}</span>
-                      <div>
-                        <div className="text-sm font-bold" style={{ color: theme.text }}>{currency}</div>
-                        <div className="text-xs" style={{ color: theme.textMuted }}>{CURRENCIES.find(c => c.code === currency)?.name ?? ''}</div>
-                      </div>
-                      <Check size={16} className="ml-auto" style={{ color: theme.primary }} />
                     </div>
                   </div>
                 </div>
@@ -311,6 +333,7 @@ export default function SignupPage() {
           <p>By signing up, you agree to our Terms of Service and Privacy Policy (GDPR/INCO compliant).</p>
         </div>
       </motion.div>
+      )}
     </div>
   );
 }

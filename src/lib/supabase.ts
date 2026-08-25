@@ -44,7 +44,7 @@ function createDemoStore() {
         plan_status: 'active',
         trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         billing_email: 'demo@nutro.app',
-        referral_code: 'NUTRO7',
+        referral_code: 'NUTRO7' as string | null,
         created_at: now,
       },
     ],
@@ -234,6 +234,54 @@ function createMockSupabaseClient() {
         custom_accent_color: null,
         created_at: new Date().toISOString(),
       });
+
+      // Mirrors handle_new_user() server-side: if onboarding data was passed at
+      // signUp() time, provision the tenant right here — no separate RPC call needed,
+      // same as the real trigger.
+      const orgName = options?.data?.org_name ? String(options.data.org_name) : null;
+      if (orgName) {
+        const orgId = `org-${Date.now()}`;
+        const branchId = `branch-${Date.now()}`;
+        store.organizations.push({
+          id: orgId,
+          name: orgName,
+          slug: orgName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          logo_url: null,
+          owner_id: userId,
+          plan: options?.data?.plan ? String(options.data.plan) : 'trial',
+          plan_status: 'trial',
+          trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+          billing_email: email,
+          referral_code: null as string | null,
+          created_at: new Date().toISOString(),
+        });
+        store.branches.push({
+          id: branchId,
+          org_id: orgId,
+          name: options?.data?.branch_name ? String(options.data.branch_name) : 'Main Branch',
+          address: null,
+          city: options?.data?.city ? String(options.data.city) : null,
+          country: options?.data?.country ? String(options.data.country) : null,
+          currency: options?.data?.currency ? String(options.data.currency) : 'USD',
+          timezone: 'UTC',
+          is_active: true,
+          tablet_token: `demo-token-${branchId}`,
+          kds_pin: null,
+          pos_pin_hash: null,
+          created_at: new Date().toISOString(),
+        } as never);
+        (store.user_org_roles as Array<Record<string, unknown>>).push({
+          id: `membership-${Date.now()}`,
+          user_id: userId,
+          org_id: orgId,
+          branch_id: null,
+          role_name: 'owner',
+          permissions: {},
+          is_active: true,
+          created_at: new Date().toISOString(),
+        });
+      }
+
       const session = {
         access_token: `demo-${userId}`,
         token_type: 'bearer',

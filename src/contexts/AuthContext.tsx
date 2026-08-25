@@ -19,7 +19,7 @@ interface AuthContextValue {
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, fullName: string, onboarding?: OnboardingData) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, fullName: string, onboarding?: OnboardingData) => Promise<{ error: string | null; needsEmailConfirmation?: boolean }>;
   signOut: () => Promise<void>;
   isSuperAdmin: boolean;
   hasSystemRole: (role: SystemRole) => boolean;
@@ -75,36 +75,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, fullName: string, onboarding?: OnboardingData) => {
+    // Onboarding data is passed as raw_user_meta_data, read server-side by the
+    // handle_new_user() trigger — NOT as a follow-up RPC call. A follow-up call would
+    // require an active session, which doesn't exist yet if this Supabase project
+    // requires email confirmation before login (the default for new projects). The
+    // trigger runs regardless, so tenant provisioning always succeeds on signup.
     const { data, error } = await supabase.auth.signUp({
       email, password,
-      options: { data: { full_name: fullName } },
+      options: {
+        data: {
+          full_name: fullName,
+          ...(onboarding ? {
+            org_name: onboarding.orgName,
+            plan: onboarding.plan?.toLowerCase(),
+            branch_name: onboarding.branchName || 'Main Branch',
+            country: onboarding.country || null,
+            city: onboarding.city || null,
+            currency: onboarding.currency || 'USD',
+            language: onboarding.language || 'en',
+            phone: onboarding.phone || null,
+          } : {}),
+        },
+      },
     });
     if (error) return { error: error.message };
+    if (!data.user) return { error: 'Signup did not return a user — please try again.' };
 
-    // If onboarding data provided, create the tenant (org + branch + role)
-    if (onboarding && data.user) {
-      try {
-        const { error: rpcError } = await supabase.rpc('create_tenant', {
-          p_org_name: onboarding.orgName,
-          p_plan: onboarding.plan.toLowerCase(),
-          p_billing_email: email,
-          p_branch_name: onboarding.branchName || 'Main Branch',
-          p_country: onboarding.country || null,
-          p_city: onboarding.city || null,
-          p_currency: onboarding.currency || 'USD',
-          p_language: onboarding.language || 'en',
-        });
-        if (rpcError) {
-          console.error('Tenant creation failed:', rpcError.message);
-          return { error: 'Account created but setup incomplete. Please contact support.' };
-        }
-      } catch (err) {
-        console.error('Tenant creation error:', err);
-        return { error: 'Account created but setup incomplete. Please contact support.' };
-      }
-    }
-
-    return { error: null };
+    // If email confirmation is required, signUp() returns a user but no session yet —
+    // tell the caller so it can show a 'check your email' screen instead of trying to
+    // navigate into a guarded route the user can't actually access until they confirm.
+    return { error: null, needsEmailConfirmation: !data.session };
   };
 
   const signOut = async () => { await supabase.auth.signOut(); };
