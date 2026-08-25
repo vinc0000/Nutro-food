@@ -69,7 +69,7 @@ const FEATURES = [
   { icon: ChefHat, title: 'Kitchen Display System', desc: 'KDS temps réel avec timers colorés, alertes allergènes et routage priorité pour des cuisines fluides aux heures de pointe.' },
   { icon: BarChart3, title: 'Analytiques multi-branches', desc: 'Rapports financiers consolidés sur tous les sites avec dashboards revenus temps réel et benchmarking de performance.' },
   { icon: Shield, title: 'Contrôle d\'accès RBAC', desc: 'Contrôle d\'accès granulaire par rôle — du Super Admin au personnel cuisine avec permissions personnalisées par site.' },
-  { icon: Globe, title: 'Multi-langue & multi-devise', desc: 'Servez vos clients en EN, FR, AR, ES avec changement de devise en direct USD, EUR, AED, XAF, NGN, GBP et plus.' },
+  { icon: Globe, title: 'Multi-langue & multi-devise', desc: 'Servez vos clients en EN, FR, AR avec changement de devise en direct USD, EUR, AED, XAF, NGN, GBP et plus.' },
 ];
 
 const WHY_US = [

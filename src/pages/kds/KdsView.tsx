@@ -32,62 +32,6 @@ function TimerBadge({ minutes }: { minutes: number }) {
   );
 }
 
-const SEED_TICKETS: KdsTicket[] = [
-  {
-    id: '1',
-    orderNum: '#1042',
-    tableLabel: 'Table 4',
-    type: 'dine_in',
-    status: 'preparing',
-    items: [
-      { name: 'Wagyu Burger', qty: 2, mods: ['No onion', 'Extra cheese'] },
-      { name: 'Truffle Fries', qty: 2, mods: [] },
-    ],
-    allergyAlert: 'DAIRY ALLERGY - No cheese on burger #2',
-    createdAt: new Date(Date.now() - 8 * 60000),
-    startedAt: new Date(Date.now() - 5 * 60000),
-  },
-  {
-    id: '2',
-    orderNum: '#1041',
-    tableLabel: 'Table 7',
-    type: 'dine_in',
-    status: 'new',
-    items: [
-      { name: 'Seafood Pasta', qty: 1, mods: ['Extra sauce'] },
-      { name: 'Caesar Salad', qty: 1, mods: ['Dressing on side'] },
-      { name: 'Sparkling Water', qty: 2, mods: [] },
-    ],
-    createdAt: new Date(Date.now() - 13 * 60000),
-  },
-  {
-    id: '3',
-    orderNum: '#1043',
-    tableLabel: 'Takeaway',
-    type: 'takeaway',
-    status: 'new',
-    items: [
-      { name: 'Margherita Pizza', qty: 1, mods: [] },
-      { name: 'Fresh Juice', qty: 2, mods: [] },
-    ],
-    createdAt: new Date(Date.now() - 19 * 60000),
-  },
-  {
-    id: '4',
-    orderNum: '#1040',
-    tableLabel: 'Table 2',
-    type: 'dine_in',
-    status: 'preparing',
-    items: [
-      { name: 'Grilled Salmon', qty: 2, mods: ['Lemon on side', 'No garlic'] },
-      { name: 'Creme Brulee', qty: 2, mods: [] },
-    ],
-    allergyAlert: 'NUT ALLERGY - Check creme brulee preparation',
-    createdAt: new Date(Date.now() - 7 * 60000),
-    startedAt: new Date(Date.now() - 4 * 60000),
-  },
-];
-
 const COLUMNS: { key: KdsTicket['status']; label: string; color: string }[] = [
   { key: 'new', label: 'New Orders', color: '#eab308' },
   { key: 'preparing', label: 'Preparing', color: '#3b82f6' },
