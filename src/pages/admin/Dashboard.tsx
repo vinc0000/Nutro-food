@@ -49,17 +49,24 @@ export default function AdminDashboard() {
       today.setHours(0, 0, 0, 0);
       const branchId = orgContext.branch_id;
 
-      const [ordersRes, tablesRes] = await Promise.all([
+      const [recentOrdersRes, todaysOrdersRes, tablesRes] = await Promise.all([
         supabase.from('orders').select('id, order_number, order_type, status, total_amount, created_at, table_id')
           .eq('branch_id', branchId).order('created_at', { ascending: false }).limit(10),
+        // Today's revenue/count must be computed from EVERY order placed today, not
+        // just whichever ones happen to land in the 10-most-recent list above — a
+        // branch doing more than 10 orders/day (the common case) would otherwise
+        // silently undercount both figures.
+        supabase.from('orders').select('total_amount')
+          .eq('branch_id', branchId).gte('created_at', today.toISOString()),
         supabase.from('restaurant_tables').select('id, status').eq('branch_id', branchId),
       ]);
 
-      if (ordersRes.data) {
-        setOrders(ordersRes.data as OrderRow[]);
-        const todays = ordersRes.data.filter(o => new Date(o.created_at) >= today);
-        setTodayOrders(todays.length);
-        setTodayRevenue(todays.reduce((sum, o) => sum + Number(o.total_amount), 0));
+      if (recentOrdersRes.data) {
+        setOrders(recentOrdersRes.data as OrderRow[]);
+      }
+      if (todaysOrdersRes.data) {
+        setTodayOrders(todaysOrdersRes.data.length);
+        setTodayRevenue(todaysOrdersRes.data.reduce((sum, o) => sum + Number(o.total_amount), 0));
       }
 
       if (tablesRes.data) {

@@ -15,7 +15,7 @@ import { usePlanInfo, useOrgContext } from '@/hooks/useOrgContext';
 import { CURRENCIES } from '@/lib/countries';
 import { supabase } from '@/lib/supabase';
 
-interface CartItem { id: string; name: string; price: number; qty: number; }
+interface CartItem { id: string; name: string; price: number; qty: number; taxRate: number; }
 interface TabletOrder {
   id: string; tableNum: string; items: { name: string; qty: number; price: number }[];
   total: number; status: 'pending' | 'accepted' | 'rejected'; time: string;
@@ -206,10 +206,14 @@ export default function PosTerminal() {
       time: 'Just now',
     }));
 
-  const posMenu = menuItems.map(item => ({ id: item.id, name: item.name, price: item.price, cat: item.category, calories: item.calories, available: item.available && item.stock > 0, image: item.image }));
+  const posMenu = menuItems.map(item => ({ id: item.id, name: item.name, price: item.price, cat: item.category, calories: item.calories, available: item.available && item.stock > 0, image: item.image, taxRate: item.taxRate }));
   const filtered = posMenu.filter(i => (cat === 'All' || i.cat === cat) && i.name.toLowerCase().includes(search.toLowerCase()));
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
-  const tax = subtotal * 0.05;
+  // Each menu item carries its own admin-configured tax rate (Menu.tsx lets a manager
+  // set this per item, and shows it on the item card) — a single flat 5% here was
+  // silently ignoring that and applying UAE's rate to every branch regardless of its
+  // actual country, and to every item regardless of what the admin set for it.
+  const tax = cart.reduce((s, i) => s + i.price * i.qty * (i.taxRate / 100), 0);
   const total = subtotal + tax;
   const cashGivenAmount = cashGiven ? parseFloat(cashGiven) : NaN;
   const isCashAmountValid = !Number.isNaN(cashGivenAmount) && cashGivenAmount >= total;
@@ -221,7 +225,7 @@ export default function PosTerminal() {
     setCart(prev => {
       const existing = prev.find(c => c.id === item.id);
       if (existing) return prev.map(c => c.id === item.id ? { ...c, qty: c.qty + 1 } : c);
-      return [...prev, { id: item.id, name: item.name, price: item.price, qty: 1 }];
+      return [...prev, { id: item.id, name: item.name, price: item.price, qty: 1, taxRate: item.taxRate }];
     });
   };
 
@@ -283,7 +287,7 @@ export default function PosTerminal() {
     void updateOrder(id, o => ({ ...o, status: 'preparing' }));
     const order = orders.find(o => o.id === id);
     if (order) {
-      setCart(order.items.map((it, i) => ({ id: it.id || `to-${i}`, name: it.name, price: it.price, qty: it.qty })));
+      setCart(order.items.map((it, i) => ({ id: it.id || `to-${i}`, name: it.name, price: it.price, qty: it.qty, taxRate: menuItems.find(m => m.id === it.id)?.taxRate ?? 0 })));
       const num = order.tableLabel.replace('Table ', '');
       setSelectedTable(num);
       setShowTabletOrders(false);
@@ -459,7 +463,7 @@ export default function PosTerminal() {
           <div className="p-3 sm:p-4 space-y-2 flex-shrink-0" style={{ borderTop: `1px solid ${theme.border}` }}>
             <div className="rounded-2xl p-3" style={{ background: theme.bg, border: `1px solid ${theme.border}` }}>
               <div className="flex justify-between text-xs" style={{ color: theme.textMuted }}><span>Subtotal</span><span>{currencySymbol}{subtotal.toFixed(2)}</span></div>
-              <div className="flex justify-between text-xs mt-1" style={{ color: theme.textMuted }}><span>Tax (5%)</span><span>{currencySymbol}{tax.toFixed(2)}</span></div>
+              <div className="flex justify-between text-xs mt-1" style={{ color: theme.textMuted }}><span>Tax</span><span>{currencySymbol}{tax.toFixed(2)}</span></div>
               <div className="flex justify-between font-extrabold text-base mt-2" style={{ color: theme.text }}>
                 <span>Total</span><span style={{ color: theme.primary }}>{currencySymbol}{total.toFixed(2)}</span>
               </div>
@@ -642,7 +646,7 @@ export default function PosTerminal() {
               </div>
               <div className="border-t border-dashed border-gray-300 pt-3 text-xs space-y-1">
                 <div className="flex justify-between"><span>Subtotal</span><span>{currencySymbol}{subtotal.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span>Tax (5%)</span><span>{currencySymbol}{tax.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>Tax</span><span>{currencySymbol}{tax.toFixed(2)}</span></div>
                 <div className="flex justify-between font-bold text-sm"><span>TOTAL</span><span>{currencySymbol}{total.toFixed(2)}</span></div>
                 {payMethod === 'cash' && cashGiven && <div className="flex justify-between"><span>Cash</span><span>{currencySymbol}{cashGivenAmount.toFixed(2)}</span></div>}
                 {payMethod === 'cash' && <div className="flex justify-between"><span>Change</span><span>{currencySymbol}{change.toFixed(2)}</span></div>}
