@@ -77,13 +77,22 @@ export default function TabletMenu() {
   const { menuItems } = useSharedMenu(resolvedBranchId);
   const { addOrder } = useSharedOrders(resolvedBranchId);
 
-  const [currency, setCurrency] = useState(() => {
-    return localStorage.getItem('nutro:settings:currency') ?? 'USD';
-  });
-
+  const [currency, setCurrency] = useState('USD');
   const [isOnline, setIsOnline] = useState(() => typeof window !== 'undefined' ? window.navigator.onLine : true);
-  const [brandLogo] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('nutro:settings:logoUrl') ?? '' : '');
-  const [brandName] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('nutro:settings:name') ?? 'Le Maison Dubai' : 'Le Maison Dubai');
+  const [brandLogo, setBrandLogo] = useState('');
+  const [brandName, setBrandName] = useState('Nutro');
+
+  useEffect(() => {
+    if (!resolvedBranchId) return;
+    supabase.from('branch_public_info').select('*').eq('id', resolvedBranchId).maybeSingle<{
+      name: string; currency: string | null; logo_url: string | null;
+    }>().then(({ data }) => {
+      if (!data) return;
+      setBrandName(data.name ?? 'Nutro');
+      setCurrency(data.currency ?? 'USD');
+      setBrandLogo(data.logo_url ?? '');
+    });
+  }, [resolvedBranchId]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);

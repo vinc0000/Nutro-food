@@ -13,6 +13,7 @@ import { useSharedMenu } from '@/lib/menuStore';
 import { useSharedOrders, SharedOrder } from '@/lib/ordersStore';
 import { usePlanInfo, useOrgContext } from '@/hooks/useOrgContext';
 import { CURRENCIES } from '@/lib/countries';
+import { supabase } from '@/lib/supabase';
 
 interface CartItem { id: string; name: string; price: number; qty: number; }
 interface TabletOrder {
@@ -128,15 +129,30 @@ export default function PosTerminal() {
   const { menuItems } = useSharedMenu(orgContext?.branch_id ?? null);
   const PLAN_TABLE_LIMIT = plan === 'starter' ? 10 : (plan === 'premium' ? 30 : 999);
 
-  const currencyCode = localStorage.getItem('nutro:settings:currency') ?? orgContext?.currency ?? 'USD';
+  const currencyCode = orgContext?.currency ?? 'USD';
   const currencySymbol = CURRENCIES.find(c => c.code === currencyCode)?.symbol ?? '$';
 
   const [isOnline, setIsOnline] = useState(() => typeof window !== 'undefined' ? window.navigator.onLine : true);
-  const [brandName] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('nutro:settings:name') ?? orgContext?.org_name ?? 'Le Maison Dubai' : 'Le Maison Dubai');
-  const [brandAddress] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('nutro:settings:address') ?? '123 Main St, Dubai' : '123 Main St, Dubai');
-  const [brandPhone] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('nutro:settings:phone') ?? '+971 XX XXX XXXX' : '+971 XX XXX XXXX');
-  const [brandInstagram] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('nutro:settings:instagram') ?? 'https://instagram.com/yourrestaurant' : 'https://instagram.com/yourrestaurant');
-  const [brandTiktok] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('nutro:settings:tiktok') ?? 'https://tiktok.com/@yourrestaurant' : 'https://tiktok.com/@yourrestaurant');
+  const [brandProfile, setBrandProfile] = useState({
+    name: orgContext?.org_name ?? 'Nutro', address: '', phone: '', instagram: '', tiktok: '',
+  });
+  const { name: brandName, address: brandAddress, phone: brandPhone, instagram: brandInstagram, tiktok: brandTiktok } = brandProfile;
+
+  useEffect(() => {
+    if (!orgContext?.branch_id) return;
+    supabase.from('branches').select('*').eq('id', orgContext.branch_id).maybeSingle<{
+      name: string; address: string | null; contact_phone: string | null; instagram_url: string | null; tiktok_url: string | null;
+    }>().then(({ data }) => {
+      if (!data) return;
+      setBrandProfile({
+        name: data.name ?? orgContext.org_name ?? 'Nutro',
+        address: data.address ?? '',
+        phone: data.contact_phone ?? '',
+        instagram: data.instagram_url ?? '',
+        tiktok: data.tiktok_url ?? '',
+      });
+    });
+  }, [orgContext?.branch_id, orgContext?.org_name]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);

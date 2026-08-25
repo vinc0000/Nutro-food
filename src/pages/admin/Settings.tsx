@@ -24,29 +24,31 @@ export default function AdminSettings() {
 
   const showSaved = (msg: string) => { setSavedMsg(msg); setTimeout(() => setSavedMsg(''), 2500); };
 
-  // General settings state
-  const [restaurantName, setRestaurantName] = useState(() => localStorage.getItem('nutro:settings:name') ?? orgContext?.org_name ?? 'Le Dubai Maison');
-  const [address, setAddress] = useState(() => localStorage.getItem('nutro:settings:address') ?? '123 Main St, Dubai');
-  const [email, setEmail] = useState(() => localStorage.getItem('nutro:settings:email') ?? 'info@restaurant.com');
-  const [phone, setPhone] = useState(() => localStorage.getItem('nutro:settings:phone') ?? '+971 XX XXX XXXX');
+  // General settings state — loaded from the real branches row once orgContext
+  // resolves (see the loadBranchProfile effect below), not localStorage: this data
+  // must be the same for every device/staff member viewing this org, not per-browser.
+  const [restaurantName, setRestaurantName] = useState('');
+  const [address, setAddress] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
 
   // Localization settings state
-  const [country, setCountry] = useState(() => localStorage.getItem('nutro:settings:country') ?? 'AE');
-  const [stateRegion, setStateRegion] = useState(() => localStorage.getItem('nutro:settings:state') ?? 'Dubai');
-  const [city, setCity] = useState(() => localStorage.getItem('nutro:settings:city') ?? 'Dubai');
-  const [sector, setSector] = useState(() => localStorage.getItem('nutro:settings:sector') ?? 'Downtown');
-  const [landmark, setLandmark] = useState(() => localStorage.getItem('nutro:settings:landmark') ?? 'Near Burj Khalifa');
-  const [currency, setCurrency] = useState(() => localStorage.getItem('nutro:settings:currency') ?? 'AED');
+  const [country, setCountry] = useState('AE');
+  const [stateRegion, setStateRegion] = useState('');
+  const [city, setCity] = useState('');
+  const [sector, setSector] = useState('');
+  const [landmark, setLandmark] = useState('');
+  const [currency, setCurrency] = useState('AED');
   const [language, setLanguage] = useState(() => localStorage.getItem('nutro:settings:language') ?? 'en');
 
   // Social & Stamp state
-  const [instagram, setInstagram] = useState(() => localStorage.getItem('nutro:settings:instagram') ?? 'https://instagram.com/yourrestaurant');
-  const [tiktok, setTiktok] = useState(() => localStorage.getItem('nutro:settings:tiktok') ?? 'https://tiktok.com/@yourrestaurant');
-  const [facebook, setFacebook] = useState(() => localStorage.getItem('nutro:settings:facebook') ?? 'https://facebook.com/yourrestaurant');
-  const [whatsapp, setWhatsapp] = useState(() => localStorage.getItem('nutro:settings:whatsapp') ?? '+971 XX XXX XXXX');
-  const [googleReviews, setGoogleReviews] = useState(() => localStorage.getItem('nutro:settings:googleReviews') ?? 'https://g.page/r/yourrestaurant');
-  const [stampUrl, setStampUrl] = useState(() => localStorage.getItem('nutro:settings:stampUrl') ?? '');
-  const [logoUrl, setLogoUrl] = useState(() => localStorage.getItem('nutro:settings:logoUrl') ?? '');
+  const [instagram, setInstagram] = useState('');
+  const [tiktok, setTiktok] = useState('');
+  const [facebook, setFacebook] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
+  const [googleReviews, setGoogleReviews] = useState('');
+  const [stampUrl, setStampUrl] = useState('');
+  const [logoUrl, setLogoUrl] = useState('');
 
   // Notifications state
   const [notifNewOrder, setNotifNewOrder] = useState(() => JSON.parse(localStorage.getItem('nutro:settings:notifNewOrder') ?? 'true'));
@@ -56,42 +58,68 @@ export default function AdminSettings() {
   const [notifDailyRev, setNotifDailyRev] = useState(() => JSON.parse(localStorage.getItem('nutro:settings:notifDailyRev') ?? 'true'));
   const [notifStaffClock, setNotifStaffClock] = useState(() => JSON.parse(localStorage.getItem('nutro:settings:notifStaffClock') ?? 'true'));
 
-  useEffect(() => {
-    if (orgContext) {
-      if (!localStorage.getItem('nutro:settings:name')) setRestaurantName(orgContext.org_name);
-      if (!localStorage.getItem('nutro:settings:country')) setCountry(orgContext.country === 'United Arab Emirates' ? 'AE' : 'US');
-      if (!localStorage.getItem('nutro:settings:city')) setCity(orgContext.city ?? 'Dubai');
-      if (!localStorage.getItem('nutro:settings:currency')) setCurrency(orgContext.currency ?? 'AED');
-    }
-  }, [orgContext]);
+  const [profileLoading, setProfileLoading] = useState(true);
 
-  const saveGeneral = () => {
-    localStorage.setItem('nutro:settings:name', restaurantName);
-    localStorage.setItem('nutro:settings:address', address);
-    localStorage.setItem('nutro:settings:email', email);
-    localStorage.setItem('nutro:settings:phone', phone);
+  useEffect(() => {
+    if (!orgContext?.branch_id) { setProfileLoading(false); return; }
+    let cancelled = false;
+    setProfileLoading(true);
+    supabase.from('branches').select('*').eq('id', orgContext.branch_id).maybeSingle<{
+      name: string; address: string | null; contact_email: string | null; contact_phone: string | null;
+      country: string | null; state_region: string | null; city: string | null; sector: string | null;
+      landmark: string | null; currency: string | null;
+      instagram_url: string | null; tiktok_url: string | null; facebook_url: string | null;
+      whatsapp_number: string | null; google_reviews_url: string | null; stamp_url: string | null; logo_url: string | null;
+    }>().then(({ data }) => {
+      if (cancelled || !data) { setProfileLoading(false); return; }
+      setRestaurantName(data.name ?? orgContext.org_name ?? '');
+      setAddress(data.address ?? '');
+      setEmail(data.contact_email ?? '');
+      setPhone(data.contact_phone ?? '');
+      setCountry(data.country === 'United Arab Emirates' ? 'AE' : (data.country ?? 'AE'));
+      setStateRegion(data.state_region ?? '');
+      setCity(data.city ?? '');
+      setSector(data.sector ?? '');
+      setLandmark(data.landmark ?? '');
+      setCurrency(data.currency ?? 'AED');
+      setInstagram(data.instagram_url ?? '');
+      setTiktok(data.tiktok_url ?? '');
+      setFacebook(data.facebook_url ?? '');
+      setWhatsapp(data.whatsapp_number ?? '');
+      setGoogleReviews(data.google_reviews_url ?? '');
+      setStampUrl(data.stamp_url ?? '');
+      setLogoUrl(data.logo_url ?? '');
+      setProfileLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [orgContext?.branch_id, orgContext?.org_name]);
+
+  const saveGeneral = async () => {
+    if (!orgContext?.branch_id) return;
+    const { error } = await supabase.from('branches').update({
+      name: restaurantName, address, contact_email: email, contact_phone: phone,
+    } as never).eq('id', orgContext.branch_id);
+    if (error) { showSaved(`Could not save: ${error.message}`); return; }
     showSaved('Restaurant profile saved successfully');
   };
 
-  const saveLocalization = () => {
-    localStorage.setItem('nutro:settings:country', country);
-    localStorage.setItem('nutro:settings:state', stateRegion);
-    localStorage.setItem('nutro:settings:city', city);
-    localStorage.setItem('nutro:settings:sector', sector);
-    localStorage.setItem('nutro:settings:landmark', landmark);
-    localStorage.setItem('nutro:settings:currency', currency);
+  const saveLocalization = async () => {
+    if (!orgContext?.branch_id) return;
     localStorage.setItem('nutro:settings:language', language);
+    const { error } = await supabase.from('branches').update({
+      country, state_region: stateRegion, city, sector, landmark, currency,
+    } as never).eq('id', orgContext.branch_id);
+    if (error) { showSaved(`Could not save: ${error.message}`); return; }
     showSaved('Localization settings saved successfully');
   };
 
-  const saveSocial = () => {
-    localStorage.setItem('nutro:settings:instagram', instagram);
-    localStorage.setItem('nutro:settings:tiktok', tiktok);
-    localStorage.setItem('nutro:settings:facebook', facebook);
-    localStorage.setItem('nutro:settings:whatsapp', whatsapp);
-    localStorage.setItem('nutro:settings:googleReviews', googleReviews);
-    localStorage.setItem('nutro:settings:stampUrl', stampUrl);
-    localStorage.setItem('nutro:settings:logoUrl', logoUrl);
+  const saveSocial = async () => {
+    if (!orgContext?.branch_id) return;
+    const { error } = await supabase.from('branches').update({
+      instagram_url: instagram, tiktok_url: tiktok, facebook_url: facebook,
+      whatsapp_number: whatsapp, google_reviews_url: googleReviews, stamp_url: stampUrl, logo_url: logoUrl,
+    } as never).eq('id', orgContext.branch_id);
+    if (error) { showSaved(`Could not save: ${error.message}`); return; }
     showSaved('Social and branding options saved successfully');
   };
 
@@ -167,7 +195,7 @@ export default function AdminSettings() {
               <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+971 XX XXX XXXX" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
                 style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
             </div>
-            <button onClick={saveGeneral} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>Save Changes</button>
+            <button onClick={() => void saveGeneral()} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>Save Changes</button>
           </div>
         )}
 
@@ -245,7 +273,7 @@ export default function AdminSettings() {
                 </select>
               </div>
             </div>
-            <button onClick={saveLocalization} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>Save Localization</button>
+            <button onClick={() => void saveLocalization()} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>Save Localization</button>
           </div>
         )}
 
@@ -308,7 +336,7 @@ export default function AdminSettings() {
                 }} className="px-4 py-2.5 rounded-xl text-sm font-bold" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>Upload Logo</button>
               </div>
             </div>
-            <button onClick={saveSocial} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>Save Social & Branding</button>
+            <button onClick={() => void saveSocial()} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>Save Social & Branding</button>
           </div>
         )}
 

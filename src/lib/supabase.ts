@@ -76,7 +76,7 @@ function createDemoStore() {
       { id: 'oi-4', order_id: 'ord-2', menu_item_id: 'item-3', name: 'Vegan Buddha Bowl', unit_price: 18, quantity: 1, subtotal: 18, modifiers: [], notes: null, created_at: new Date().toISOString() },
     ],
     branch_public_info: [
-      { id: branchId, name: 'Main Branch', currency: 'AED', country: 'United Arab Emirates', city: 'Dubai', tablet_token: 'demo-tablet-token' },
+      { id: branchId, name: 'Main Branch', currency: 'AED', country: 'United Arab Emirates', city: 'Dubai', tablet_token: 'demo-tablet-token', logo_url: null as string | null },
     ],
     menu_categories: [
       { id: 'cat-starters', branch_id: branchId, name: 'Starters', description: null, sort_order: 0, icon: null, is_active: true, created_at: now },
