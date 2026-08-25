@@ -341,6 +341,25 @@ function createMockSupabaseClient() {
           updated.push(next);
           return next;
         });
+
+        // Mirror the real restore_stock_on_order_cancel trigger: reject/cancel in
+        // the POS shouldn't leak stock forever now that placing an order actually
+        // decrements it (see the order_items insert branch above).
+        if (table === 'orders') {
+          const values = state.updateValues as Record<string, unknown>;
+          for (const order of updated) {
+            const wasCancelled = items.find((i) => i.id === order.id)?.status === 'cancelled';
+            if (values.status === 'cancelled' && !wasCancelled) {
+              const menuItems = store.menu_items as Array<Record<string, unknown>>;
+              const orderItems = (store.order_items as Array<Record<string, unknown>>).filter((oi) => oi.order_id === order.id);
+              for (const oi of orderItems) {
+                const menuItem = menuItems.find((m) => m.id === oi.menu_item_id);
+                if (menuItem) menuItem.stock = Number(menuItem.stock ?? 0) + Number(oi.quantity ?? 0);
+              }
+            }
+          }
+        }
+
         writeStore(store);
         return { data: updated, error: null };
       }
