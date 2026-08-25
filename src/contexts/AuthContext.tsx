@@ -11,6 +11,7 @@ export interface OnboardingData {
   currency?: string;
   language?: string;
   phone?: string;
+  referralCode?: string;
 }
 
 interface AuthContextValue {
@@ -94,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             currency: onboarding.currency || 'USD',
             language: onboarding.language || 'en',
             phone: onboarding.phone || null,
+            referral_code: onboarding.referralCode || null,
           } : {}),
         },
       },

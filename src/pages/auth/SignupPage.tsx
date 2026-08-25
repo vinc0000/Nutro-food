@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Mail, Lock, User, Eye, EyeOff, AlertCircle, Check,
@@ -25,6 +25,12 @@ export default function SignupPage() {
   const { theme } = useTheme();
   const { t } = useLocale();
   const navigate = useNavigate();
+  // A sales rep's referral link is ?ref=<their code> (SalesReps.tsx generates one per
+  // rep). Captured here and passed through to create_tenant so commission tracking —
+  // which reads organizations.referral_code — has something real to match against,
+  // instead of every signup leaving it null forever.
+  const [searchParams] = useSearchParams();
+  const referralCode = searchParams.get('ref');
 
   const [step, setStep] = useState(0);
   const [fullName, setFullName] = useState('');
@@ -72,6 +78,7 @@ export default function SignupPage() {
       currency,
       language,
       phone: phone ? `+${selectedCountry?.dialCode ?? ''} ${phone}` : '',
+      referralCode: referralCode || undefined,
     });
     setLoading(false);
     if (error) { setError(error); setStep(0); return; }
