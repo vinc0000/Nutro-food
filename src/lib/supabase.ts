@@ -409,6 +409,38 @@ function createMockSupabaseClient() {
 
   const rpc = async (name: string, params?: Record<string, unknown>) => {
     const store = readStore();
+    if (name === 'add_staff_member') {
+      // Demo mode has one seeded admin and no real multi-account auth, so unlike
+      // the real add_staff_member() there's no meaningful org-membership check to
+      // perform here — just mirror the write so the Staff page works the same way.
+      const id = `membership-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      store.user_org_roles.push({
+        id,
+        user_id: params?.p_user_id,
+        org_id: params?.p_org_id,
+        branch_id: null,
+        role_name: params?.p_role_name,
+        permissions: params?.p_permissions ?? {},
+        is_active: true,
+        created_at: new Date().toISOString(),
+      });
+      writeStore(store);
+      return { data: id, error: null };
+    }
+    if (name === 'update_staff_member') {
+      const row = store.user_org_roles.find((r) => r.id === params?.p_membership_id);
+      if (!row) return { data: false, error: null };
+      row.role_name = params?.p_role_name;
+      row.is_active = params?.p_is_active;
+      writeStore(store);
+      return { data: true, error: null };
+    }
+    if (name === 'remove_staff_member') {
+      const before = store.user_org_roles.length;
+      store.user_org_roles = store.user_org_roles.filter((r) => r.id !== params?.p_membership_id);
+      writeStore(store);
+      return { data: store.user_org_roles.length < before, error: null };
+    }
     if (name === 'get_next_order_number') {
       // Mirrors the real get_next_order_number() migration: one atomically-
       // incrementing counter per branch instead of client-side randomness, so
