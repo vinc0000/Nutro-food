@@ -19,7 +19,7 @@ export interface SharedOrder {
   type: OrderType;
   status: OrderStatus;
   payment: PaymentStatus;
-  paymentMethod?: 'cash' | 'card' | 'tap' | 'gift_card' | 'flutterwave' | null;
+  paymentMethod?: 'cash' | 'card' | 'tap' | 'gift_card' | 'mobile_money' | null;
   cashierId?: string | null;
   refundAmount: number;
   refundedAt?: string | null;
@@ -78,7 +78,7 @@ function rowToShared(row: OrderRow, items: OrderItemRow[]): SharedOrder {
     type: row.order_type,
     status: row.status,
     payment: row.payment_status === 'paid' ? 'paid' : 'unpaid',
-    paymentMethod: (['cash', 'card', 'tap', 'gift_card', 'flutterwave'] as const).includes(row.payment_method as any) ? (row.payment_method as SharedOrder['paymentMethod']) : null,
+    paymentMethod: (['cash', 'card', 'tap', 'gift_card', 'mobile_money'] as const).includes(row.payment_method as any) ? (row.payment_method as SharedOrder['paymentMethod']) : null,
     cashierId: row.cashier_id,
     refundAmount: Number(row.refund_amount ?? 0),
     refundedAt: row.refunded_at,

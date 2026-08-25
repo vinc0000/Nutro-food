@@ -24,7 +24,7 @@ interface TabletOrder {
 const CATEGORIES = ['All', 'Starters', 'Mains', 'Desserts', 'Drinks', 'Snacks'];
 
 const tableColor: Record<string, string> = { available: '#22c55e', occupied: '#ef4444', reserved: '#eab308', cleaning: '#94a3b8' };
-type PayMethod = 'cash' | 'card' | 'tap' | 'gift_card' | 'flutterwave';
+type PayMethod = 'cash' | 'card' | 'tap' | 'gift_card' | 'mobile_money';
 
 function PinGuard({ onUnlock }: { onUnlock: () => void }) {
   const { theme } = useTheme();
@@ -525,24 +525,26 @@ export default function PosTerminal() {
                   <div className="grid grid-cols-3 gap-2 mb-4">
                     {([ { key: 'cash', label: 'Cash', icon: Banknote }, { key: 'card', label: 'Card', icon: CreditCard },
                        { key: 'tap', label: 'Tap to Pay', icon: Smartphone }, { key: 'gift_card', label: 'Gift Card', icon: Gift },
-                       { key: 'flutterwave', label: 'Flutterwave', icon: CreditCard }
+                       { key: 'mobile_money', label: 'Mobile Money', icon: CreditCard }
                      ] as { key: PayMethod; label: string; icon: typeof Banknote }[]).map(m => (
                       <button key={m.key} onClick={() => setPayMethod(m.key)}
                         className="flex flex-col items-center gap-1.5 py-3 rounded-xl text-xs font-bold transition-all"
                         style={{
-                          background: payMethod === m.key ? (m.key === 'flutterwave' ? '#f5a623' : theme.primary) : theme.bg,
+                          background: payMethod === m.key ? (m.key === 'mobile_money' ? '#f5a623' : theme.primary) : theme.bg,
                           color: payMethod === m.key ? '#fff' : theme.textMuted,
-                          border: `1px solid ${payMethod === m.key ? (m.key === 'flutterwave' ? '#f5a623' : theme.primary) : theme.border}`
+                          border: `1px solid ${payMethod === m.key ? (m.key === 'mobile_money' ? '#f5a623' : theme.primary) : theme.border}`
                         }}>
                         <m.icon size={18} />{m.label}
                       </button>
                     ))}
                   </div>
-                  {payMethod === 'flutterwave' && (
+                  {payMethod === 'mobile_money' && (
                     <div className="mb-4 p-3.5 rounded-xl border space-y-2" style={{ background: '#f5a62310', borderColor: '#f5a62330' }}>
-                      <div className="text-xs font-bold" style={{ color: '#f5a623' }}>Flutterwave Merchant API</div>
+                      <div className="text-xs font-bold" style={{ color: '#f5a623' }}>Mobile Money</div>
                       <p className="text-[11px] leading-relaxed" style={{ color: theme.textMuted }}>
-                        Enter customer phone number below to push a USSD/M-Pesa or Card payment request link.
+                        Confirm the customer paid via their mobile money app (M-Pesa, MTN MoMo, etc.) on their own
+                        device, then log their number below for the receipt. This records the payment — it does not
+                        send a live payment request.
                       </p>
                       <input value={cardDetail} onChange={e => setCardDetail(e.target.value)} placeholder="+234 XXX XXX XXXX"
                         className="w-full px-3 py-2 rounded-lg text-xs outline-none"
@@ -589,8 +591,8 @@ export default function PosTerminal() {
                   )}
                   <button onClick={() => void processPayment()} disabled={payMethod === 'cash' && !isCashAmountValid}
                     className="w-full py-3 rounded-xl font-bold text-sm text-white disabled:opacity-50"
-                    style={{ background: payMethod === 'flutterwave' ? '#f5a623' : theme.primary }}>
-                    Confirm {payMethod === 'cash' ? 'Cash' : payMethod === 'card' ? 'Card' : payMethod === 'tap' ? 'Tap' : payMethod === 'flutterwave' ? 'Flutterwave' : 'Gift Card'} Payment
+                    style={{ background: payMethod === 'mobile_money' ? '#f5a623' : theme.primary }}>
+                    Confirm {payMethod === 'cash' ? 'Cash' : payMethod === 'card' ? 'Card' : payMethod === 'tap' ? 'Tap' : payMethod === 'mobile_money' ? 'Mobile Money' : 'Gift Card'} Payment
                   </button>
                 </>
               )}
