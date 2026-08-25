@@ -282,7 +282,7 @@ function createMockSupabaseClient() {
       orderBy: null as { field: string; ascending: boolean } | null,
       limitValue: null as number | null,
       updateValues: null as Record<string, unknown> | null,
-      insertValues: null as Record<string, unknown> | null,
+      insertValues: null as Record<string, unknown> | Record<string, unknown>[] | null,
       deleteFlag: false,
     };
 
@@ -296,15 +296,34 @@ function createMockSupabaseClient() {
       const matches = (item: Record<string, unknown>) => state.filters.every(([field, value]) => item[field] === value);
 
       if (state.insertValues) {
-        const inserted = {
+        // insert() takes either a single row or an array of rows (used by
+        // ordersStore.addOrder's batched order_items insert) — mirror
+        // supabase-js's real behavior instead of assuming one row.
+        const rows = Array.isArray(state.insertValues) ? state.insertValues : [state.insertValues];
+        const inserted = rows.map((row) => ({
           id: `${table}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           created_at: new Date().toISOString(),
-          ...state.insertValues,
-        };
-        items.push(inserted);
+          ...row,
+        }));
+        items.push(...inserted);
         (store as Record<string, unknown>)[table] = items;
+
+        // Mirror the real decrement_menu_item_stock trigger: placing an order
+        // (POS or tablet, either way this table is where line items land)
+        // actually depletes stock instead of only the admin's manual +/-.
+        if (table === 'order_items') {
+          const menuItems = store.menu_items as Array<Record<string, unknown>>;
+          for (const row of inserted) {
+            const menuItemId = (row as Record<string, unknown>).menu_item_id as string | null;
+            const quantity = Number((row as Record<string, unknown>).quantity ?? 0);
+            if (!menuItemId || !quantity) continue;
+            const menuItem = menuItems.find((m) => m.id === menuItemId);
+            if (menuItem) menuItem.stock = Math.max(0, Number(menuItem.stock ?? 0) - quantity);
+          }
+        }
+
         writeStore(store);
-        return { data: [inserted], error: null };
+        return { data: inserted, error: null };
       }
 
       if (state.deleteFlag) {
@@ -346,7 +365,7 @@ function createMockSupabaseClient() {
       state.updateValues = values;
       return builder;
     };
-    builder.insert = (values: Record<string, unknown>) => {
+    builder.insert = (values: Record<string, unknown> | Record<string, unknown>[]) => {
       state.insertValues = values;
       return builder;
     };
@@ -373,7 +392,7 @@ function createMockSupabaseClient() {
       order: (field: string, options?: { ascending?: boolean }) => SupabaseBuilder;
       limit: (value: number) => SupabaseBuilder;
       update: (values: Record<string, unknown>) => SupabaseBuilder;
-      insert: (values: Record<string, unknown>) => SupabaseBuilder;
+      insert: (values: Record<string, unknown> | Record<string, unknown>[]) => SupabaseBuilder;
       delete: () => SupabaseBuilder;
       maybeSingle: <T = Record<string, unknown>>() => Promise<{ data: T | null; error: any }>;
       then: (callback: (result: { data: any[]; error: null }) => void) => Promise<void>;
@@ -400,6 +419,50 @@ function createMockSupabaseClient() {
         data: branch ? [{ id: branch.id, name: branch.name, currency: branch.currency, country: branch.country, city: branch.city }] : [],
         error: null,
       };
+    }
+    if (name === 'add_staff_member') {
+      // Demo mode has one seeded admin and no real multi-account auth, so unlike
+      // the real add_staff_member() there's no meaningful org-membership check to
+      // perform here — just mirror the write so the Staff page works the same way.
+      const id = `membership-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      store.user_org_roles.push({
+        id,
+        user_id: params?.p_user_id,
+        org_id: params?.p_org_id,
+        branch_id: null,
+        role_name: params?.p_role_name,
+        permissions: params?.p_permissions ?? {},
+        is_active: true,
+        created_at: new Date().toISOString(),
+      });
+      writeStore(store);
+      return { data: id, error: null };
+    }
+    if (name === 'update_staff_member') {
+      const row = store.user_org_roles.find((r) => r.id === params?.p_membership_id);
+      if (!row) return { data: false, error: null };
+      row.role_name = params?.p_role_name;
+      row.is_active = params?.p_is_active;
+      writeStore(store);
+      return { data: true, error: null };
+    }
+    if (name === 'remove_staff_member') {
+      const before = store.user_org_roles.length;
+      store.user_org_roles = store.user_org_roles.filter((r) => r.id !== params?.p_membership_id);
+      writeStore(store);
+      return { data: store.user_org_roles.length < before, error: null };
+    }
+    if (name === 'get_next_order_number') {
+      // Mirrors the real get_next_order_number() migration: one atomically-
+      // incrementing counter per branch instead of client-side randomness, so
+      // demo mode can't produce duplicate ticket numbers either.
+      const branchIdParam = String(params?.p_branch_id ?? 'demo-branch');
+      const counters = (store as unknown as { orderCounters?: Record<string, number> }).orderCounters ?? {};
+      const next = (counters[branchIdParam] ?? 1000) + 1;
+      counters[branchIdParam] = next;
+      (store as unknown as { orderCounters?: Record<string, number> }).orderCounters = counters;
+      writeStore(store);
+      return { data: `#${next}`, error: null };
     }
     if (name === 'get_user_org_context') {
       const currentUser = store.session?.user as { id?: string; email?: string } | undefined;

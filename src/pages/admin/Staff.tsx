@@ -125,16 +125,15 @@ export default function AdminStaff() {
       custom: {},
     };
 
-    const { error: insertError } = await supabase.from('user_org_roles').insert({
-      user_id: existingProfile.id,
-      org_id: orgId,
-      role_name: addRole,
-      permissions: permissionsByRole[addRole] ?? {},
-      is_active: true,
-    } as never);
+    const { data: newId, error: insertError } = await supabase.rpc('add_staff_member', {
+      p_org_id: orgId,
+      p_user_id: existingProfile.id,
+      p_role_name: addRole,
+      p_permissions: permissionsByRole[addRole] ?? {},
+    });
 
     setAddBusy(false);
-    if (insertError) { setAddError(insertError.message); return; }
+    if (insertError || !newId) { setAddError(insertError?.message ?? 'Could not add staff member — check permissions'); return; }
 
     setShowAdd(false);
     setAddEmail('');
@@ -145,8 +144,8 @@ export default function AdminStaff() {
 
   const confirmDelete = async () => {
     if (!deleteConfirm) return;
-    const { error } = await supabase.from('user_org_roles').delete().eq('id', deleteConfirm.membershipId);
-    if (error) { showToast(`Failed: ${error.message}`); setDeleteConfirm(null); return; }
+    const { data: ok, error } = await supabase.rpc('remove_staff_member', { p_membership_id: deleteConfirm.membershipId });
+    if (error || !ok) { showToast(`Failed: ${error?.message ?? 'check permissions'}`); setDeleteConfirm(null); return; }
     showToast(`${deleteConfirm.name} removed from the team`);
     setDeleteConfirm(null);
     loadStaff();
@@ -154,11 +153,12 @@ export default function AdminStaff() {
 
   const saveEdit = async () => {
     if (!editStaff) return;
-    const { error } = await supabase
-      .from('user_org_roles')
-      .update({ role_name: editStaff.role, is_active: editStaff.active })
-      .eq('id', editStaff.membershipId);
-    if (error) { showToast(`Failed: ${error.message}`); return; }
+    const { data: ok, error } = await supabase.rpc('update_staff_member', {
+      p_membership_id: editStaff.membershipId,
+      p_role_name: editStaff.role,
+      p_is_active: editStaff.active,
+    });
+    if (error || !ok) { showToast(`Failed: ${error?.message ?? 'check permissions'}`); return; }
     setEditStaff(null);
     showToast('Staff member updated');
     loadStaff();

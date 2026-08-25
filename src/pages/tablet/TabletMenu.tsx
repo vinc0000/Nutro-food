@@ -145,7 +145,6 @@ export default function TabletMenu() {
 
   const placeOrderDirectly = async () => {
     const orderId = 'order-' + Date.now();
-    const orderNum = '#' + Math.floor(1000 + Math.random() * 9000);
     const combinedNotes = [
       customAllergy ? 'ALLERGY WARNING: ' + customAllergy : '',
       orderNote ? 'NOTE: ' + orderNote : ''
@@ -153,7 +152,7 @@ export default function TabletMenu() {
 
     const newOrder: SharedOrder = {
       id: orderId,
-      orderNumber: orderNum,
+      orderNumber: '', // assigned atomically by addOrder() via the DB — see ordersStore.ts
       tableLabel: 'Table ' + (editableTableNum || '1'),
       type: 'dine_in',
       status: 'pending',

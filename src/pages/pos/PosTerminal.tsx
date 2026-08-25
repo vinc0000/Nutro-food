@@ -170,6 +170,7 @@ export default function PosTerminal() {
   const [cardDetail, setCardDetail] = useState('');
   const [cashGiven, setCashGiven] = useState('');
   const [showReceipt, setShowReceipt] = useState(false);
+  const [lastOrderNumber, setLastOrderNumber] = useState<string | null>(null);
   const [showZReport, setShowZReport] = useState(false);
   const [zReportPrinted, setZReportPrinted] = useState(0);
   const [showManagerPin, setShowManagerPin] = useState(false);
@@ -216,6 +217,7 @@ export default function PosTerminal() {
     // If it is an accepted tablet order, update its payment and keep/ensure status in useSharedOrders
     const existingTabletOrder = orders.find(o => o.source === 'tablet' && o.tableLabel === 'Table ' + selectedTable && o.status === 'pending');
     if (existingTabletOrder) {
+      setLastOrderNumber(existingTabletOrder.orderNumber);
       await updateOrder(existingTabletOrder.id, o => ({
         ...o,
         payment: 'paid',
@@ -227,10 +229,9 @@ export default function PosTerminal() {
     } else {
       // Create a brand new POS order
       const orderId = 'order-' + Date.now();
-      const orderNum = '#' + (1042 + orderCount + 1);
       const newOrder: SharedOrder = {
         id: orderId,
-        orderNumber: orderNum,
+        orderNumber: '', // assigned atomically by addOrder() via the DB — see ordersStore.ts
         tableLabel: selectedTable ? 'Table ' + selectedTable : (orderType === 'takeaway' ? 'Takeaway' : 'Delivery'),
         type: orderType,
         status: 'preparing', // Send to KDS immediately
@@ -251,7 +252,8 @@ export default function PosTerminal() {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-      await addOrder(newOrder);
+      const orderNumber = await addOrder(newOrder);
+      setLastOrderNumber(orderNumber ?? null);
     }
 
     setPaidSuccess(true);
@@ -611,7 +613,7 @@ export default function PosTerminal() {
               </div>
               <div className="border-t border-b border-dashed border-gray-300 py-3 mb-3 text-xs">
                 <div className="flex justify-between mb-1"><span>Table: {tables.find(t => t.id === selectedTable)?.name ?? (selectedTable ? `T${selectedTable}` : '-')}</span><span>Cashier: {profile?.full_name ?? 'Staff'}</span></div>
-                <div className="flex justify-between"><span>Date: {new Date().toLocaleString()}</span><span>Order: #{1042 + orderCount}</span></div>
+                <div className="flex justify-between"><span>Date: {new Date().toLocaleString()}</span><span>Order: {lastOrderNumber ?? '—'}</span></div>
                 <div className="flex justify-between mt-1"><span>Payment: {payMethod.toUpperCase()}</span>{cardDetail && <span>Ref: {cardDetail}</span>}</div>
               </div>
               <div className="space-y-1 mb-3 text-xs">
