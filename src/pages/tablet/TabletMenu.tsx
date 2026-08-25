@@ -22,7 +22,7 @@ interface MenuItem {
   id: string; name: string; category: string; price: number; calories: number;
   protein: number; carbs: number; fats: number; weight: number; description: string; image: string;
   halal: boolean; vegan: boolean; glutenFree: boolean; nutFree: boolean; spicy: boolean;
-  ingredients: string[]; allergens: string[]; stock: number; portionSize: string;
+  ingredients: string[]; allergens: string[]; stock: number; portionSize: string; taxRate: number;
 }
 
 const CATS = ['All', 'Starters', 'Mains', 'Desserts', 'Drinks', 'Snacks'];
@@ -141,6 +141,10 @@ export default function TabletMenu() {
   };
 
   const cartTotal = cart.reduce((s, c) => s + c.item.price * c.qty, 0);
+  // Each menu item carries its own admin-configured tax rate — a flat 5% here
+  // ignored that entirely and applied UAE's rate to every branch/item regardless
+  // of what was actually set (see the matching POS fix).
+  const cartTax = cart.reduce((s, c) => s + c.item.price * c.qty * (c.item.taxRate / 100), 0);
   const cartCount = cart.reduce((s, c) => s + c.qty, 0);
 
   const placeOrderDirectly = async () => {
@@ -165,8 +169,8 @@ export default function TabletMenu() {
         qty: c.qty
       })),
       subtotal: cartTotal,
-      tax: cartTotal * 0.05,
-      total: cartTotal * 1.05,
+      tax: cartTax,
+      total: cartTotal + cartTax,
       source: 'tablet',
       note: combinedNotes || undefined,
       createdAt: new Date().toISOString(),
