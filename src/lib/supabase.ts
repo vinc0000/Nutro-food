@@ -61,7 +61,7 @@ function createDemoStore() {
         is_active: true,
         tablet_token: 'demo-tablet-token' as string | null,
         kds_pin: '1234' as string | null,
-        pos_pin_hash: '1234' as string | null,
+        pos_pin_hash: 'demo-pin-1234' as string | null, // demo PIN is 1234 — matches verify_branch_pos_pin's mock format below
         created_at: now,
       },
     ],
@@ -508,6 +508,29 @@ function createMockSupabaseClient() {
       return { data: true, error: null };
     }
 
+    if (name === 'set_branch_pos_pin') {
+      // Was entirely unhandled: the mock rpc's default fallback (data: null, error:
+      // null) let Settings.tsx's "if (rpcError) throw" pass silently, so demo mode
+      // showed "PIN saved successfully" without saving anything.
+      const targetBranchId = String(params?.p_branch_id ?? '');
+      const pin = String(params?.p_pin ?? '');
+      if (pin.length < 4) return { data: false, error: null };
+      const branch = store.branches.find((b) => b.id === targetBranchId);
+      if (!branch) return { data: false, error: null };
+      // Demo mode has no pgcrypto/bcrypt available client-side; this prefix-tagged
+      // value is only ever compared against by the matching verify handler below,
+      // never treated as a real hash — same non-goal as set_staff_pin's demo-hash-*.
+      (branch as { pos_pin_hash: string | null }).pos_pin_hash = `demo-pin-${pin}`;
+      writeStore(store);
+      return { data: true, error: null };
+    }
+    if (name === 'verify_branch_pos_pin') {
+      const targetBranchId = String(params?.p_branch_id ?? '');
+      const pin = String(params?.p_pin ?? '');
+      const branch = store.branches.find((b) => b.id === targetBranchId);
+      const ok = Boolean(branch?.pos_pin_hash) && branch?.pos_pin_hash === `demo-pin-${pin}`;
+      return { data: ok, error: null };
+    }
     if (name === 'set_staff_pin') {
       const targetUserId = String(params?.p_target_user_id ?? '');
       const pin = String(params?.p_pin ?? '');
