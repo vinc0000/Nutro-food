@@ -150,7 +150,7 @@ export default function AdminSettings() {
           <div>
             <h3 className="text-sm font-bold text-red-500">Période d'essai expirée / Abonnement requis</h3>
             <p className="text-xs mt-1" style={{ color: theme.textMuted }}>
-              Votre période d'essai gratuite de 7 jours est terminée. Veuillez vous abonner ci-dessous pour débloquer immédiatement l'accès complet à tous vos outils (POS, KDS, Menus, Rapports).
+              Votre période d'essai gratuite de 14 jours est terminée. Veuillez vous abonner ci-dessous pour débloquer immédiatement l'accès complet à tous vos outils (POS, KDS, Menus, Rapports).
             </p>
           </div>
         </div>
