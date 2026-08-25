@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { COUNTRIES, CURRENCIES, LANGUAGES } from '@/lib/countries';
+import { supabase } from '@/lib/supabase';
 
 const STEPS = ['Account', 'Location', 'Business', 'Plan'];
 
@@ -80,10 +81,20 @@ export default function SignupPage() {
       phone: phone ? `+${selectedCountry?.dialCode ?? ''} ${phone}` : '',
       referralCode: referralCode || undefined,
     });
+    if (error) { setLoading(false); setError(error); setStep(0); return; }
+    if (needsEmailConfirmation) { setLoading(false); setNeedsConfirmation(true); return; }
+
+    // Same reasoning as LoginPage: land the three platform-owner accounts on
+    // /app/super-admin rather than the generic /app/admin, fetched fresh since
+    // AuthContext's profile hasn't necessarily caught up with this signup yet.
+    const { data: { user: freshUser } } = await supabase.auth.getUser();
+    let destination = '/app/admin';
+    if (freshUser) {
+      const { data: freshProfile } = await supabase.from('profiles').select('system_role').eq('id', freshUser.id).maybeSingle<{ system_role: string }>();
+      if (freshProfile?.system_role === 'super_admin') destination = '/app/super-admin';
+    }
     setLoading(false);
-    if (error) { setError(error); setStep(0); return; }
-    if (needsEmailConfirmation) { setNeedsConfirmation(true); return; }
-    navigate('/app/admin', { replace: true });
+    navigate(destination, { replace: true });
   };
 
   const onCountryChange = (code: string) => {
