@@ -131,14 +131,48 @@ export function useSharedOrders(branchId: string | null) {
 
   useEffect(() => { load(); }, [load]);
 
+  // Keep every screen (POS, KDS, tablet, admin) in sync without a manual refresh.
+  // The KDS view badges itself "LIVE" — this is what actually makes that true:
+  // any insert/update/delete on this branch's orders or order_items re-pulls the
+  // list. We refetch wholesale rather than patching in place because an order's
+  // items live in a separate table and row-level payloads don't include them.
+  useEffect(() => {
+    if (!branchId) return;
+    const channel = supabase
+      .channel(`orders-branch-${branchId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `branch_id=eq.${branchId}` }, () => {
+        load();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => {
+        load();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [branchId, load]);
+
   const addOrder = useCallback(async (order: SharedOrder) => {
     if (!branchId) return;
     const orderId = genId();
 
+    // Order numbers are handed out atomically by the DB (see migration
+    // 20260825010000) instead of trusting whatever the caller computed —
+    // client-side counting/randomness can't guarantee uniqueness across two
+    // concurrent POS sessions or a POS order landing at the same moment as a
+    // tablet order.
+    const { data: orderNumberData, error: numberError } = await supabase.rpc('get_next_order_number', {
+      p_branch_id: branchId,
+    });
+    if (numberError || !orderNumberData) {
+      setError(numberError?.message ?? 'Could not assign an order number — please try again.');
+      return;
+    }
+    const orderNumber = orderNumberData as string;
+
     const { error: insertError } = await supabase.from('orders').insert({
       id: orderId,
       branch_id: branchId,
-      order_number: order.orderNumber,
+      order_number: orderNumber,
       table_label: order.tableLabel,
       order_type: order.type,
       status: order.status,
@@ -154,19 +188,32 @@ export function useSharedOrders(branchId: string | null) {
     } as never);
     if (insertError) { setError(insertError.message); return; }
 
-    for (const item of order.items) {
-      await supabase.from('order_items').insert({
-        id: genId(),
-        order_id: orderId,
-        menu_item_id: item.id,
-        name: item.name,
-        unit_price: item.price,
-        quantity: item.qty,
-        subtotal: item.price * item.qty,
-      } as never);
+    // Insert every line item in a single batched call instead of one request per
+    // item: it's faster, and it means we get one error we can react to instead of
+    // silently losing whichever items happened to fail mid-loop.
+    if (order.items.length > 0) {
+      const { error: itemsError } = await supabase.from('order_items').insert(
+        order.items.map((item) => ({
+          id: genId(),
+          order_id: orderId,
+          menu_item_id: item.id,
+          name: item.name,
+          unit_price: item.price,
+          quantity: item.qty,
+          subtotal: item.price * item.qty,
+        })) as never
+      );
+      if (itemsError) {
+        // The order row exists but has no items — remove it rather than leaving a
+        // ghost order behind for the kitchen/POS to choke on.
+        await supabase.from('orders').delete().eq('id', orderId);
+        setError(itemsError.message);
+        return;
+      }
     }
 
-    setOrders((prev) => [{ ...order, id: orderId }, ...prev]);
+    setOrders((prev) => [{ ...order, id: orderId, orderNumber }, ...prev]);
+    return orderNumber;
   }, [branchId]);
 
   const updateOrder = useCallback(async (id: string, updater: (order: SharedOrder) => SharedOrder) => {

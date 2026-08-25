@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Edit2, Trash2, Shield, Key, AlertTriangle, Archive, X, Check, Loader2 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -50,7 +50,7 @@ export default function AdminStaff() {
   const [toast, setToast] = useState<string | null>(null);
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
 
-  const loadStaff = async () => {
+  const loadStaff = useCallback(async () => {
     if (!orgId) return;
     setLoading(true);
     setLoadError(null);
@@ -85,9 +85,9 @@ export default function AdminStaff() {
 
     setStaff(withProfiles);
     setLoading(false);
-  };
+  }, [orgId]);
 
-  useEffect(() => { loadStaff(); }, [orgId]);
+  useEffect(() => { loadStaff(); }, [loadStaff]);
 
   // Adds an EXISTING Nutro account to this org. We don't fabricate a "staff invitation
   // email" here for the same reason as the Super Admin panel: sending real invite
@@ -125,16 +125,15 @@ export default function AdminStaff() {
       custom: {},
     };
 
-    const { error: insertError } = await supabase.from('user_org_roles').insert({
-      user_id: existingProfile.id,
-      org_id: orgId,
-      role_name: addRole,
-      permissions: permissionsByRole[addRole] ?? {},
-      is_active: true,
-    } as never);
+    const { data: newId, error: insertError } = await supabase.rpc('add_staff_member', {
+      p_org_id: orgId,
+      p_user_id: existingProfile.id,
+      p_role_name: addRole,
+      p_permissions: permissionsByRole[addRole] ?? {},
+    });
 
     setAddBusy(false);
-    if (insertError) { setAddError(insertError.message); return; }
+    if (insertError || !newId) { setAddError(insertError?.message ?? 'Could not add staff member — check permissions'); return; }
 
     setShowAdd(false);
     setAddEmail('');
@@ -145,8 +144,8 @@ export default function AdminStaff() {
 
   const confirmDelete = async () => {
     if (!deleteConfirm) return;
-    const { error } = await supabase.from('user_org_roles').delete().eq('id', deleteConfirm.membershipId);
-    if (error) { showToast(`Failed: ${error.message}`); setDeleteConfirm(null); return; }
+    const { data: ok, error } = await supabase.rpc('remove_staff_member', { p_membership_id: deleteConfirm.membershipId });
+    if (error || !ok) { showToast(`Failed: ${error?.message ?? 'check permissions'}`); setDeleteConfirm(null); return; }
     showToast(`${deleteConfirm.name} removed from the team`);
     setDeleteConfirm(null);
     loadStaff();
@@ -154,11 +153,12 @@ export default function AdminStaff() {
 
   const saveEdit = async () => {
     if (!editStaff) return;
-    const { error } = await supabase
-      .from('user_org_roles')
-      .update({ role_name: editStaff.role, is_active: editStaff.active })
-      .eq('id', editStaff.membershipId);
-    if (error) { showToast(`Failed: ${error.message}`); return; }
+    const { data: ok, error } = await supabase.rpc('update_staff_member', {
+      p_membership_id: editStaff.membershipId,
+      p_role_name: editStaff.role,
+      p_is_active: editStaff.active,
+    });
+    if (error || !ok) { showToast(`Failed: ${error?.message ?? 'check permissions'}`); return; }
     setEditStaff(null);
     showToast('Staff member updated');
     loadStaff();

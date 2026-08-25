@@ -61,7 +61,7 @@ function createDemoStore() {
         is_active: true,
         tablet_token: 'demo-tablet-token' as string | null,
         kds_pin: '1234' as string | null,
-        pos_pin_hash: '1234' as string | null,
+        pos_pin_hash: 'demo-pin-1234' as string | null, // demo PIN is 1234 — matches verify_branch_pos_pin's mock format below
         created_at: now,
       },
     ],
@@ -283,7 +283,7 @@ function createMockSupabaseClient() {
       orderBy: null as { field: string; ascending: boolean } | null,
       limitValue: null as number | null,
       updateValues: null as Record<string, unknown> | null,
-      insertValues: null as Record<string, unknown> | null,
+      insertValues: null as Record<string, unknown> | Record<string, unknown>[] | null,
       upsertValues: null as Record<string, unknown> | null,
       upsertConflictKeys: [] as string[],
       deleteFlag: false,
@@ -299,15 +299,34 @@ function createMockSupabaseClient() {
       const matches = (item: Record<string, unknown>) => state.filters.every(([field, value]) => item[field] === value);
 
       if (state.insertValues) {
-        const inserted = {
+        // insert() takes either a single row or an array of rows (used by
+        // ordersStore.addOrder's batched order_items insert) — mirror
+        // supabase-js's real behavior instead of assuming one row.
+        const rows = Array.isArray(state.insertValues) ? state.insertValues : [state.insertValues];
+        const inserted = rows.map((row) => ({
           id: `${table}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           created_at: new Date().toISOString(),
-          ...state.insertValues,
-        };
-        items.push(inserted);
+          ...row,
+        }));
+        items.push(...inserted);
         (store as Record<string, unknown>)[table] = items;
+
+        // Mirror the real decrement_menu_item_stock trigger: placing an order
+        // (POS or tablet, either way this table is where line items land)
+        // actually depletes stock instead of only the admin's manual +/-.
+        if (table === 'order_items') {
+          const menuItems = store.menu_items as Array<Record<string, unknown>>;
+          for (const row of inserted) {
+            const menuItemId = (row as Record<string, unknown>).menu_item_id as string | null;
+            const quantity = Number((row as Record<string, unknown>).quantity ?? 0);
+            if (!menuItemId || !quantity) continue;
+            const menuItem = menuItems.find((m) => m.id === menuItemId);
+            if (menuItem) menuItem.stock = Math.max(0, Number(menuItem.stock ?? 0) - quantity);
+          }
+        }
+
         writeStore(store);
-        return { data: [inserted], error: null };
+        return { data: inserted, error: null };
       }
 
       if (state.upsertValues) {
@@ -346,6 +365,25 @@ function createMockSupabaseClient() {
           updated.push(next);
           return next;
         });
+
+        // Mirror the real restore_stock_on_order_cancel trigger: reject/cancel in
+        // the POS shouldn't leak stock forever now that placing an order actually
+        // decrements it (see the order_items insert branch above).
+        if (table === 'orders') {
+          const values = state.updateValues as Record<string, unknown>;
+          for (const order of updated) {
+            const wasCancelled = items.find((i) => i.id === order.id)?.status === 'cancelled';
+            if (values.status === 'cancelled' && !wasCancelled) {
+              const menuItems = store.menu_items as Array<Record<string, unknown>>;
+              const orderItems = (store.order_items as Array<Record<string, unknown>>).filter((oi) => oi.order_id === order.id);
+              for (const oi of orderItems) {
+                const menuItem = menuItems.find((m) => m.id === oi.menu_item_id);
+                if (menuItem) menuItem.stock = Number(menuItem.stock ?? 0) + Number(oi.quantity ?? 0);
+              }
+            }
+          }
+        }
+
         writeStore(store);
         return { data: updated, error: null };
       }
@@ -370,7 +408,7 @@ function createMockSupabaseClient() {
       state.updateValues = values;
       return builder;
     };
-    builder.insert = (values: Record<string, unknown>) => {
+    builder.insert = (values: Record<string, unknown> | Record<string, unknown>[]) => {
       state.insertValues = values;
       return builder;
     };
@@ -402,7 +440,7 @@ function createMockSupabaseClient() {
       order: (field: string, options?: { ascending?: boolean }) => SupabaseBuilder;
       limit: (value: number) => SupabaseBuilder;
       update: (values: Record<string, unknown>) => SupabaseBuilder;
-      insert: (values: Record<string, unknown>) => SupabaseBuilder;
+      insert: (values: Record<string, unknown> | Record<string, unknown>[]) => SupabaseBuilder;
       upsert: (values: Record<string, unknown>, options?: { onConflict?: string }) => SupabaseBuilder;
       delete: () => SupabaseBuilder;
       maybeSingle: <T = Record<string, unknown>>() => Promise<{ data: T | null; error: any }>;
@@ -420,6 +458,61 @@ function createMockSupabaseClient() {
 
   const rpc = async (name: string, params?: Record<string, unknown>) => {
     const store = readStore();
+    if (name === 'resolve_branch_by_tablet_token') {
+      // Mirrors the real resolve_branch_by_tablet_token() migration: look a
+      // branch up by its exact token instead of exposing tablet_token through
+      // a broadly-selectable table/view.
+      const token = String(params?.p_token ?? '');
+      const branch = store.branch_public_info.find((b) => b.tablet_token === token);
+      return {
+        data: branch ? [{ id: branch.id, name: branch.name, currency: branch.currency, country: branch.country, city: branch.city }] : [],
+        error: null,
+      };
+    }
+    if (name === 'add_staff_member') {
+      // Demo mode has one seeded admin and no real multi-account auth, so unlike
+      // the real add_staff_member() there's no meaningful org-membership check to
+      // perform here — just mirror the write so the Staff page works the same way.
+      const id = `membership-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      store.user_org_roles.push({
+        id,
+        user_id: params?.p_user_id,
+        org_id: params?.p_org_id,
+        branch_id: null,
+        role_name: params?.p_role_name,
+        permissions: params?.p_permissions ?? {},
+        is_active: true,
+        created_at: new Date().toISOString(),
+      });
+      writeStore(store);
+      return { data: id, error: null };
+    }
+    if (name === 'update_staff_member') {
+      const row = store.user_org_roles.find((r) => r.id === params?.p_membership_id);
+      if (!row) return { data: false, error: null };
+      row.role_name = params?.p_role_name;
+      row.is_active = params?.p_is_active;
+      writeStore(store);
+      return { data: true, error: null };
+    }
+    if (name === 'remove_staff_member') {
+      const before = store.user_org_roles.length;
+      store.user_org_roles = store.user_org_roles.filter((r) => r.id !== params?.p_membership_id);
+      writeStore(store);
+      return { data: store.user_org_roles.length < before, error: null };
+    }
+    if (name === 'get_next_order_number') {
+      // Mirrors the real get_next_order_number() migration: one atomically-
+      // incrementing counter per branch instead of client-side randomness, so
+      // demo mode can't produce duplicate ticket numbers either.
+      const branchIdParam = String(params?.p_branch_id ?? 'demo-branch');
+      const counters = (store as unknown as { orderCounters?: Record<string, number> }).orderCounters ?? {};
+      const next = (counters[branchIdParam] ?? 1000) + 1;
+      counters[branchIdParam] = next;
+      (store as unknown as { orderCounters?: Record<string, number> }).orderCounters = counters;
+      writeStore(store);
+      return { data: `#${next}`, error: null };
+    }
     if (name === 'get_user_org_context') {
       const currentUser = store.session?.user as { id?: string; email?: string } | undefined;
       const profile = store.profiles.find((entry) => entry.id === currentUser?.id) ?? null;
@@ -464,6 +557,29 @@ function createMockSupabaseClient() {
       return { data: true, error: null };
     }
 
+    if (name === 'set_branch_pos_pin') {
+      // Was entirely unhandled: the mock rpc's default fallback (data: null, error:
+      // null) let Settings.tsx's "if (rpcError) throw" pass silently, so demo mode
+      // showed "PIN saved successfully" without saving anything.
+      const targetBranchId = String(params?.p_branch_id ?? '');
+      const pin = String(params?.p_pin ?? '');
+      if (pin.length < 4) return { data: false, error: null };
+      const branch = store.branches.find((b) => b.id === targetBranchId);
+      if (!branch) return { data: false, error: null };
+      // Demo mode has no pgcrypto/bcrypt available client-side; this prefix-tagged
+      // value is only ever compared against by the matching verify handler below,
+      // never treated as a real hash — same non-goal as set_staff_pin's demo-hash-*.
+      (branch as { pos_pin_hash: string | null }).pos_pin_hash = `demo-pin-${pin}`;
+      writeStore(store);
+      return { data: true, error: null };
+    }
+    if (name === 'verify_branch_pos_pin') {
+      const targetBranchId = String(params?.p_branch_id ?? '');
+      const pin = String(params?.p_pin ?? '');
+      const branch = store.branches.find((b) => b.id === targetBranchId);
+      const ok = Boolean(branch?.pos_pin_hash) && branch?.pos_pin_hash === `demo-pin-${pin}`;
+      return { data: ok, error: null };
+    }
     if (name === 'set_staff_pin') {
       const targetUserId = String(params?.p_target_user_id ?? '');
       const pin = String(params?.p_pin ?? '');
@@ -487,7 +603,7 @@ function createMockSupabaseClient() {
           logo_url: null,
           owner_id: (store.session as any)?.user?.id ?? 'demo-admin',
           plan: String(params?.p_plan ?? 'premium'),
-          plan_status: 'active',
+          plan_status: 'trial',
           trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
           billing_email: String(params?.p_billing_email ?? 'demo@nutro.app'),
           referral_code: 'NUTRO7',
@@ -534,7 +650,23 @@ function createMockSupabaseClient() {
     }),
   };
 
-  return { auth, from, rpc, storage };
+  // Demo mode has no real backend to push changes from, so realtime is a no-op stub
+  // that still satisfies the same shape the real client exposes (channel(...).on(...).subscribe()),
+  // so callers like useSharedOrders/useSharedMenu don't need to special-case demo mode.
+  const channel = (_name: string) => {
+    const builder = {
+      on: () => builder,
+      subscribe: () => builder,
+    };
+    return builder;
+  };
+  const removeChannel = (_channel: unknown) => {};
+
+  // Cast to the real client's type: this is a mock, not a structural subtype of
+  // SupabaseClient (it only implements the handful of methods this app actually
+  // calls), so without the cast every caller would see a real-client | mock-client
+  // union and TS would reject calls like the postgres_changes overload of .on().
+  return { auth, from, rpc, storage, channel, removeChannel } as unknown as ReturnType<typeof createClient>;
 }
 
 const supabaseClient = isSupabaseConfigured ? createClient(supabaseUrl!, supabaseAnonKey!) : createMockSupabaseClient();

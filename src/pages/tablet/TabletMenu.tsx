@@ -51,9 +51,10 @@ export default function TabletMenu() {
 
   // A real customer-facing tablet is unauthenticated, so it must identify its own
   // branch from the URL — either directly (?branch=<id>) or via a QR-provisioned
-  // token (?token=<tablet_token>, resolved against the public branch_public_info
-  // view). When neither is present (e.g. previewing from the admin sidebar while
-  // logged in), fall back to the signed-in admin's own branch.
+  // token (?token=<tablet_token>, resolved server-side via resolve_branch_by_tablet_token
+  // — a SECURITY DEFINER function, not a public column, so the token can be presented
+  // but never listed/enumerated). When neither is present (e.g. previewing from the
+  // admin sidebar while logged in), fall back to the signed-in admin's own branch.
   const branchParam = searchParams.get('branch');
   const tokenParam = searchParams.get('token');
   const { orgContext } = useOrgContext();
@@ -63,11 +64,11 @@ export default function TabletMenu() {
     if (branchParam) { setResolvedBranchId(branchParam); return; }
     if (tokenParam) {
       supabase
-        .from('branch_public_info')
-        .select('id,name,currency,country,city')
-        .eq('tablet_token', tokenParam)
-        .maybeSingle<{ id: string }>()
-        .then(({ data }) => setResolvedBranchId(data?.id ?? null));
+        .rpc('resolve_branch_by_tablet_token', { p_token: tokenParam })
+        .then(({ data }) => {
+          const row = (data as Array<{ id: string }> | null)?.[0];
+          setResolvedBranchId(row?.id ?? null);
+        });
       return;
     }
     setResolvedBranchId(orgContext?.branch_id ?? null);
@@ -144,7 +145,6 @@ export default function TabletMenu() {
 
   const placeOrderDirectly = async () => {
     const orderId = 'order-' + Date.now();
-    const orderNum = '#' + Math.floor(1000 + Math.random() * 9000);
     const combinedNotes = [
       customAllergy ? 'ALLERGY WARNING: ' + customAllergy : '',
       orderNote ? 'NOTE: ' + orderNote : ''
@@ -152,7 +152,7 @@ export default function TabletMenu() {
 
     const newOrder: SharedOrder = {
       id: orderId,
-      orderNumber: orderNum,
+      orderNumber: '', // assigned atomically by addOrder() via the DB — see ordersStore.ts
       tableLabel: 'Table ' + (editableTableNum || '1'),
       type: 'dine_in',
       status: 'pending',
