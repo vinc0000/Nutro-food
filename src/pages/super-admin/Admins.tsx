@@ -103,7 +103,9 @@ export default function SuperAdminAdmins() {
     loadAdmins();
   };
 
-  const isLastAdmin = admins.length <= 1;
+  // Never let the team drop below 2 — a single remaining super admin with no backup
+  // is one lost password away from nobody being able to manage the platform at all.
+  const isProtectedByMinimum = admins.length <= 2;
 
   return (
     <div className="space-y-6">
@@ -141,7 +143,7 @@ export default function SuperAdminAdmins() {
         <div className="space-y-3">
           {admins.map(admin => {
             const isSelf = admin.id === currentProfile?.id;
-            const protectedFromDeletion = isSelf || isLastAdmin;
+            const protectedFromDeletion = isSelf || isProtectedByMinimum;
             return (
               <div key={admin.id} className="flex items-center gap-4 p-4 rounded-2xl"
                 style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
