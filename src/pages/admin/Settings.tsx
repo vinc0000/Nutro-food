@@ -582,7 +582,7 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [latestTxRef, setLatestTxRef] = useState<string | null>(() => localStorage.getItem('nutro:pending-tx-ref'));
-  const [activePsp, setActivePsp] = useState<'flutterwave' | 'payunit' | null>(() => (localStorage.getItem('nutro:pending-psp') as 'flutterwave' | 'payunit' | null));
+  const [activePsp, setActivePsp] = useState<'flutterwave' | 'payunit' | 'stripe' | 'paystack' | null>(() => (localStorage.getItem('nutro:pending-psp') as 'flutterwave' | 'payunit' | 'stripe' | 'paystack' | null));
   const [pspChecking, setPspChecking] = useState(true);
 
   const PLANS = [
@@ -591,7 +591,7 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
     { name: 'enterprise', label: 'Enterprise', price: 189, color: theme.primary, features: 'Unlimited everything, API access' },
   ];
 
-  const callPsp = async (psp: 'flutterwave' | 'payunit', payload: Record<string, unknown>) => {
+  const callPsp = async (psp: 'flutterwave' | 'payunit' | 'stripe' | 'paystack', payload: Record<string, unknown>) => {
     const { data: session } = await supabase.auth.getSession();
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${psp}-pay`, {
       method: 'POST',
@@ -604,23 +604,28 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
     return response.json();
   };
 
-  // PayUnit and Flutterwave are both supported — whichever one has real API
-  // credentials configured in Supabase secrets is the one that gets used. If both are
-  // configured, PayUnit takes priority (it's the newer, Africa-focused addition); if
-  // neither is configured yet, subscribing is disabled with an explanatory message
-  // rather than faking a successful payment.
+  // PayUnit, Flutterwave, Stripe and Paystack are all supported — whichever one has
+  // real API credentials configured in Supabase secrets is the one that gets used. If
+  // several are configured, priority is PayUnit > Flutterwave > Stripe > Paystack (the
+  // first two were already live for this tenant base; Stripe/Paystack are additive). If
+  // none are configured yet, subscribing is disabled with an explanatory message rather
+  // than faking a successful payment.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setPspChecking(true);
       try {
-        const [payunitStatus, flutterwaveStatus] = await Promise.all([
+        const [payunitStatus, flutterwaveStatus, stripeStatus, paystackStatus] = await Promise.all([
           callPsp('payunit', { action: 'status' }).catch(() => ({ configured: false })),
           callPsp('flutterwave', { action: 'status' }).catch(() => ({ configured: false })),
+          callPsp('stripe', { action: 'status' }).catch(() => ({ configured: false })),
+          callPsp('paystack', { action: 'status' }).catch(() => ({ configured: false })),
         ]);
         if (cancelled) return;
         if (payunitStatus?.configured) setActivePsp('payunit');
         else if (flutterwaveStatus?.configured) setActivePsp('flutterwave');
+        else if (stripeStatus?.configured) setActivePsp('stripe');
+        else if (paystackStatus?.configured) setActivePsp('paystack');
         else setActivePsp(null);
       } finally {
         if (!cancelled) setPspChecking(false);
@@ -631,7 +636,7 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
 
   const handleSubscribe = async (planName: string) => {
     if (!activePsp) {
-      setError('Payments are not configured yet. Add Flutterwave or PayUnit API credentials to Supabase secrets to enable subscriptions.');
+      setError('Payments are not configured yet. Add Flutterwave, PayUnit, Stripe or Paystack API credentials to Supabase secrets to enable subscriptions.');
       return;
     }
     setError(null);
@@ -764,7 +769,7 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
       {!pspChecking && !activePsp && (
         <div className="p-3 rounded-xl" style={{ background: '#f59e0b10', border: '1px solid #f59e0b30' }}>
           <span className="text-sm font-semibold" style={{ color: '#f59e0b' }}>
-            No payment provider is configured yet. Add either Flutterwave (FLW_SECRET_KEY) or PayUnit (PAYUNIT_API_USER / PAYUNIT_API_PASSWORD / PAYUNIT_APP_TOKEN) as Supabase Edge Function secrets to accept real subscriptions.
+            No payment provider is configured yet. Add Flutterwave (FLW_SECRET_KEY), PayUnit (PAYUNIT_API_USER / PAYUNIT_API_PASSWORD / PAYUNIT_APP_TOKEN), Stripe (STRIPE_SECRET_KEY) or Paystack (PAYSTACK_SECRET_KEY) as Supabase Edge Function secrets to accept real subscriptions.
           </span>
         </div>
       )}
@@ -791,12 +796,22 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
           <CreditCard size={16} className="mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
           <div>
             <p className="text-xs font-bold mb-1" style={{ color: theme.text }}>
-              {activePsp === 'payunit' ? 'Payment via PayUnit' : activePsp === 'flutterwave' ? 'Payment via Flutterwave' : 'Payments'}
+              {activePsp === 'payunit' ? 'Payment via PayUnit'
+                : activePsp === 'flutterwave' ? 'Payment via Flutterwave'
+                : activePsp === 'stripe' ? 'Payment via Stripe'
+                : activePsp === 'paystack' ? 'Payment via Paystack'
+                : 'Payments'}
             </p>
             <p className="text-xs" style={{ color: theme.textMuted }}>
               {activePsp === 'payunit'
                 ? "We use PayUnit to securely process payments. Supports mobile money, cards, and bank transfers across Africa."
-                : "We use Flutterwave to securely process payments. Supports cards, mobile money, bank transfers, and USSD across Africa and beyond."}
+                : activePsp === 'flutterwave'
+                ? "We use Flutterwave to securely process payments. Supports cards, mobile money, bank transfers, and USSD across Africa and beyond."
+                : activePsp === 'stripe'
+                ? "We use Stripe to securely process payments. Supports cards and popular wallets worldwide."
+                : activePsp === 'paystack'
+                ? "We use Paystack to securely process payments. Supports cards, bank transfers, and mobile money across Africa."
+                : ""}
               {' '}Clicking Subscribe takes you to the provider's own secure checkout page — Nutro never sees your card or mobile money details.
             </p>
           </div>

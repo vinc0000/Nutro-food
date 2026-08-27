@@ -186,6 +186,18 @@ function createMockSupabaseClient() {
       const store = readStore();
       return { data: { session: store.session ?? null } };
     },
+    // Was entirely missing: LoginPage.tsx and SignupPage.tsx both `await
+    // supabase.auth.getUser()` directly (uncaught) right after a successful sign-in to
+    // decide the post-login redirect. With no getUser on the mock, that call threw
+    // "supabase.auth.getUser is not a function" — confirmed via a live browser test —
+    // which stopped execution before `navigate()` ran, i.e. demo-mode login silently
+    // failed to complete this step. Mirrors the real client: returns the current
+    // session's user, or null if there isn't one, never throws.
+    getUser: async () => {
+      const store = readStore();
+      const user = (store.session as { user?: Record<string, unknown> } | null)?.user ?? null;
+      return { data: { user }, error: null };
+    },
     onAuthStateChange: (callback: (event: string, session: Record<string, unknown> | null) => void) => {
       const listener = () => callback('SIGNED_IN', readStore().session ?? null);
       if (typeof window !== 'undefined') {

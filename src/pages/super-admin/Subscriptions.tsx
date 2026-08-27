@@ -63,7 +63,7 @@ export default function SuperAdminSubscriptions() {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold flex items-center gap-2" style={{ color: theme.text }}><CreditCard size={20} /> Subscriptions</h1>
-        <p className="text-sm mt-1" style={{ color: theme.textMuted }}>Every subscription attempt across all tenants — real rows from the subscriptions table, written by the PayUnit/Flutterwave edge functions</p>
+        <p className="text-sm mt-1" style={{ color: theme.textMuted }}>Every subscription attempt across all tenants — real rows from the subscriptions table, written by the PayUnit/Flutterwave/Stripe/Paystack edge functions</p>
       </div>
 
       <div className="rounded-2xl p-5" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
