@@ -296,6 +296,7 @@ export const CURRENCIES: Currency[] = [
   { code: "CNY", name: "Chinese Yuan", symbol: "¥", rate: 7.24 },
   { code: "CHF", name: "Swiss Franc", symbol: "CHF", rate: 0.9 },
   { code: "CAD", name: "Canadian Dollar", symbol: "C$", rate: 1.37 },
+  { code: "MXN", name: "Mexican Peso", symbol: "$", rate: 17.8 },
   { code: "AUD", name: "Australian Dollar", symbol: "A$", rate: 1.52 },
   // East & Southeast Asia
   { code: "HKD", name: "Hong Kong Dollar", symbol: "HK$", rate: 7.81 },

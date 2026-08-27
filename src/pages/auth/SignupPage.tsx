@@ -45,10 +45,11 @@ export default function SignupPage() {
 
   const selectedCountry = COUNTRIES.find(c => c.code === country);
 
+  const phoneDigits = phone.replace(/\D/g, '');
   const canProceed = () => {
     if (step === 0) return fullName.length > 1 && email.includes('@') && password.length >= 8;
-    if (step === 1) return country.length > 0 && city.length > 0;
-    if (step === 2) return restaurantName.length > 1 && phone.length > 3;
+    if (step === 1) return country.length > 0 && city.trim().length > 0;
+    if (step === 2) return restaurantName.trim().length > 1 && phoneDigits.length >= 6 && phoneDigits.length <= 14;
     if (step === 3) return plan.length > 0;
     return false;
   };
