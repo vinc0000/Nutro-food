@@ -725,15 +725,28 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
         {PLANS.map(p => {
           const price = selectedPeriod === 'annual' ? Math.round(p.price * 10) : p.price;
           const isCurrent = plan === p.name && planStatus === 'active';
+          // Billing is always actually charged in USD (see the payunit-pay/
+          // flutterwave-pay edge functions) — that's independent of the tenant's
+          // own operating currency (branches.currency, used for their customers'
+          // orders) and isn't changed here. This only adds an automatic, approximate
+          // conversion to the tenant's currency alongside it, using the same real
+          // rate table (CURRENCIES) the public pricing page already converts with —
+          // shown as an estimate, never in place of the actual USD amount that gets
+          // charged, so there's no risk of the displayed price disagreeing with what
+          // PayUnit/Flutterwave actually bills.
+          const tenantCurrency = CURRENCIES.find(c => c.code === orgContext?.currency);
+          const convertedPrice = tenantCurrency && tenantCurrency.code !== 'USD' ? Math.round(price * tenantCurrency.rate) : null;
           return (
             <div key={p.name} className="p-4 rounded-xl transition-all"
               style={{ background: theme.bg, border: `2px solid ${isCurrent ? '#22c55e' : p.color + '40'}` }}>
               <div className="font-bold text-sm mb-1" style={{ color: p.color }}>{p.label}</div>
               <div className="text-lg font-extrabold" style={{ color: theme.text }}>
-                {/* Subscription billing is always USD (see the payunit-pay/flutterwave-pay edge functions) — this is Nutro's own fee, independent of the tenant's branches.currency used for their customers' orders. */}
                 ${price}
                 <span className="text-xs font-normal" style={{ color: theme.textMuted }}>/{selectedPeriod === 'annual' ? 'yr' : 'mo'}</span>
               </div>
+              {convertedPrice !== null && (
+                <div className="text-xs font-semibold" style={{ color: theme.textMuted }}>≈ {tenantCurrency!.symbol}{convertedPrice.toLocaleString()} — billed in USD</div>
+              )}
               <div className="text-xs mt-1" style={{ color: theme.textMuted }}>{p.features}</div>
               <div className="text-[10px] mt-1 font-semibold" style={{ color: theme.primary }}>KDS & Thermal included</div>
               <button
