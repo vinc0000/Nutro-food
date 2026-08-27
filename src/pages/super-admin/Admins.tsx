@@ -84,6 +84,13 @@ export default function SuperAdminAdmins() {
     setInviteBusy(false);
     if (updateError) { setInviteError(updateError.message); return; }
 
+    await supabase.rpc('log_audit_event', {
+      p_action: 'promoted_super_admin',
+      p_target_type: 'profile',
+      p_target_id: (existing as { id: string }).id,
+      p_target_label: inviteEmail,
+    });
+
     setShowInvite(false);
     setInviteEmail('');
     showToast(`${inviteEmail} is now a Super Admin`);
@@ -98,6 +105,14 @@ export default function SuperAdminAdmins() {
       .eq('id', deleteConfirm.id);
 
     if (error) { showToast(`Failed: ${error.message}`); setDeleteConfirm(null); return; }
+
+    await supabase.rpc('log_audit_event', {
+      p_action: 'revoked_super_admin',
+      p_target_type: 'profile',
+      p_target_id: deleteConfirm.id,
+      p_target_label: deleteConfirm.email,
+    });
+
     showToast(`Access revoked for ${deleteConfirm.email}`);
     setDeleteConfirm(null);
     loadAdmins();

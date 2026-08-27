@@ -1,30 +1,54 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Building2, Users, DollarSign, ShieldCheck,
   LogOut, ChevronLeft, ChevronRight, Bell, Menu as MenuIcon, X,
-  Languages, ChevronDown, Check
+  Languages, ChevronDown, Check, Users2, CreditCard, KeyRound, ScrollText,
+  Activity, BarChart3, LifeBuoy, Code2, FileBarChart, Settings as SettingsIcon,
+  ArrowLeftCircle,
 } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import ThemeSwitcher from '@/components/ui/ThemeSwitcher';
 import { CURRENCIES, LANGUAGES } from '@/lib/countries';
+import { supabase } from '@/lib/supabase';
 
 const NAV = [
-  { to: '/app/super-admin', icon: LayoutDashboard, label: 'Command Center', end: true },
-  { to: '/app/super-admin/tenants', icon: Building2, label: 'Tenants & Plans' },
+  { to: '/app/super-admin', icon: LayoutDashboard, label: 'Overview', end: true },
+  { to: '/app/super-admin/tenants', icon: Building2, label: 'Tenants' },
+  { to: '/app/super-admin/subscriptions', icon: CreditCard, label: 'Subscriptions' },
+  { to: '/app/super-admin/financials', icon: DollarSign, label: 'Billing' },
+  { to: '/app/super-admin/performance', icon: Activity, label: 'Performance' },
+  { to: '/app/super-admin/analytics', icon: BarChart3, label: 'Analytics' },
+  { to: '/app/super-admin/report', icon: FileBarChart, label: 'Report' },
   { to: '/app/super-admin/sales-reps', icon: Users, label: 'Sales & Reps' },
-  { to: '/app/super-admin/financials', icon: DollarSign, label: 'Financials' },
+  { to: '/app/super-admin/users', icon: Users2, label: 'Users' },
+  { to: '/app/super-admin/roles', icon: KeyRound, label: 'Roles' },
   { to: '/app/super-admin/admins', icon: ShieldCheck, label: 'Super Admins' },
+  { to: '/app/super-admin/support', icon: LifeBuoy, label: 'Support' },
+  { to: '/app/super-admin/api', icon: Code2, label: 'API' },
+  { to: '/app/super-admin/audit', icon: ScrollText, label: 'Audit' },
+  { to: '/app/super-admin/settings', icon: SettingsIcon, label: 'Settings' },
 ];
 
-const NOTIFICATIONS = [
-  { id: 1, title: 'New tenant registered', desc: 'Sakura Lounge started 14-day trial', time: '5m ago', color: '#22c55e' },
-  { id: 2, title: 'Payment received', desc: 'Nile Kitchen paid $189 (Enterprise)', time: '1h ago', color: '#22c55e' },
-  { id: 3, title: 'Tenant suspended', desc: 'Casa Verde - payment failure', time: '3h ago', color: '#ef4444' },
-  { id: 4, title: 'New sales rep added', desc: 'Sophie Mensah joined', time: '6h ago', color: '#3b82f6' },
-];
+interface LiveNotification {
+  id: string;
+  title: string;
+  desc: string;
+  time: string;
+  color: string;
+}
+
+function timeAgo(isoDate: string): string {
+  const diffMs = Date.now() - new Date(isoDate).getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
 
 export default function SuperAdminLayout() {
   const { profile, signOut, user } = useAuth();
@@ -37,12 +61,45 @@ export default function SuperAdminLayout() {
   const [showLocale, setShowLocale] = useState(false);
   const [lang, setLang] = useState('en');
   const [currency, setCurrency] = useState('USD');
-  const [notifList, setNotifList] = useState(NOTIFICATIONS);
+  const [notifList, setNotifList] = useState<LiveNotification[]>([]);
   const [toast, setToast] = useState<string | null>(null);
 
   const selectedCurrency = CURRENCIES.find(c => c.code === currency);
   const selectedLang = LANGUAGES.find(l => l.code === lang);
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
+
+  // Real recent-activity feed instead of a hardcoded fake list — pulled from the
+  // actual tables these events live in (new orgs, successful payments, open tickets),
+  // merged and sorted by recency.
+  useEffect(() => {
+    const loadNotifications = async () => {
+      const [orgsRes, subsRes, ticketsRes] = await Promise.all([
+        supabase.from('organizations').select('name, created_at').order('created_at', { ascending: false }).limit(5),
+        supabase.from('subscriptions').select('org_id, amount, currency, plan, paid_at').eq('status', 'successful').order('paid_at', { ascending: false }).limit(5),
+        supabase.from('support_tickets').select('subject, org_id, created_at').eq('status', 'open').order('created_at', { ascending: false }).limit(5),
+      ]);
+
+      const orgIds = [...new Set((subsRes.data as Array<{ org_id: string }> ?? []).concat(ticketsRes.data as Array<{ org_id: string }> ?? []).map(r => r.org_id))];
+      const { data: orgNames } = orgIds.length ? await supabase.from('organizations').select('id, name').in('id', orgIds) : { data: [] };
+      const orgNameById = new Map((orgNames as Array<{ id: string; name: string }> ?? []).map(o => [o.id, o.name]));
+
+      const items: LiveNotification[] = [
+        ...((orgsRes.data as Array<{ name: string; created_at: string }> ?? []).map((o, i) => ({
+          id: `org-${i}-${o.created_at}`, title: 'New tenant registered', desc: `${o.name} joined the platform`, time: o.created_at, color: '#22c55e',
+        }))),
+        ...((subsRes.data as Array<{ org_id: string; amount: number; currency: string; plan: string; paid_at: string }> ?? []).map((s, i) => ({
+          id: `sub-${i}-${s.paid_at}`, title: 'Payment received', desc: `${orgNameById.get(s.org_id) ?? 'A tenant'} paid ${s.currency} ${s.amount} (${s.plan})`, time: s.paid_at, color: '#22c55e',
+        }))),
+        ...((ticketsRes.data as Array<{ subject: string; org_id: string; created_at: string }> ?? []).map((t, i) => ({
+          id: `ticket-${i}-${t.created_at}`, title: 'New support ticket', desc: `${orgNameById.get(t.org_id) ?? 'A tenant'}: ${t.subject}`, time: t.created_at, color: '#eab308',
+        }))),
+      ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 8)
+       .map(n => ({ ...n, time: timeAgo(n.time) }));
+
+      setNotifList(items);
+    };
+    loadNotifications();
+  }, []);
 
   const markAllRead = () => {
     setNotifList([]);
@@ -133,6 +190,12 @@ export default function SuperAdminLayout() {
             <div className="text-[11px] truncate" style={{ color: theme.primary }}>Super Admin</div>
           </div>
         )}
+        <button onClick={() => navigate('/app/admin')}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold hover:opacity-80"
+          style={{ color: theme.textMuted }} title={collapsed ? 'Back to Platform' : undefined}>
+          <ArrowLeftCircle size={16} className="flex-shrink-0" />
+          {!collapsed && 'Back to Platform'}
+        </button>
         <button onClick={() => { signOut(); navigate('/'); }}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold hover:opacity-80"
           style={{ color: theme.textMuted }} title={collapsed ? 'Sign Out' : undefined}>
