@@ -306,12 +306,47 @@ function createMockSupabaseClient() {
     },
   };
 
-  const runQuery = (table: string, filters: Array<[string, unknown]>, orderBy: { field: string; ascending: boolean } | null, limitValue: number | null) => {
+  // A single filter predicate accumulated by .eq/.neq/.gt/.gte/.lt/.lte/.in/.is/.not
+  // (mirrors the small subset of PostgREST's query builder this app actually calls
+  // client-side — see the grep-verified call sites: SuperAdminLayout.tsx, Support.tsx,
+  // Report.tsx, Performance.tsx, Subscriptions.tsx and admin/Dashboard.tsx use .in()/
+  // .not()/.gte(), none of which the mock previously implemented, so every one of
+  // those pages threw "supabase.from(...).select(...).gte is not a function" (etc.)
+  // in demo mode instead of rendering).
+  type QueryFilter = { field: string; op: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'is' | 'not_is'; value: unknown };
+
+  const matchesFilter = (item: Record<string, unknown>, filter: QueryFilter): boolean => {
+    const actual = item[filter.field];
+    switch (filter.op) {
+      case 'eq':
+        return actual === filter.value;
+      case 'neq':
+        return actual !== filter.value;
+      case 'gt':
+        return (actual as any) > (filter.value as any);
+      case 'gte':
+        return (actual as any) >= (filter.value as any);
+      case 'lt':
+        return (actual as any) < (filter.value as any);
+      case 'lte':
+        return (actual as any) <= (filter.value as any);
+      case 'in':
+        return Array.isArray(filter.value) && (filter.value as unknown[]).includes(actual);
+      case 'is':
+        return actual === filter.value;
+      case 'not_is':
+        return actual !== filter.value;
+      default:
+        return true;
+    }
+  };
+
+  const runQuery = (table: string, filters: Array<QueryFilter>, orderBy: { field: string; ascending: boolean } | null, limitValue: number | null) => {
     const store = readStore();
     const items = (store as Record<string, unknown>)[table] as Array<Record<string, unknown>> | undefined;
     if (!Array.isArray(items)) return [];
 
-    const data = items.filter((item) => filters.every(([field, value]) => item[field] === value));
+    const data = items.filter((item) => filters.every((filter) => matchesFilter(item, filter)));
     if (orderBy) {
       data.sort((a, b) => {
         const aValue = a[orderBy.field] as any;
@@ -327,7 +362,7 @@ function createMockSupabaseClient() {
   const from = (table: string) => {
     const builder: Record<string, unknown> = {};
     const state = {
-      filters: [] as Array<[string, unknown]>,
+      filters: [] as Array<QueryFilter>,
       orderBy: null as { field: string; ascending: boolean } | null,
       limitValue: null as number | null,
       updateValues: null as Record<string, unknown> | null,
@@ -344,7 +379,7 @@ function createMockSupabaseClient() {
       const items = (store as Record<string, unknown>)[table] as Array<Record<string, unknown>> | undefined;
       if (!Array.isArray(items)) return { data: [] as Array<Record<string, unknown>>, error: null };
 
-      const matches = (item: Record<string, unknown>) => state.filters.every(([field, value]) => item[field] === value);
+      const matches = (item: Record<string, unknown>) => state.filters.every((filter) => matchesFilter(item, filter));
 
       if (state.insertValues) {
         // insert() takes either a single row or an array of rows (used by
@@ -441,7 +476,44 @@ function createMockSupabaseClient() {
 
     builder.select = () => builder;
     builder.eq = (field: string, value: unknown) => {
-      state.filters.push([field, value]);
+      state.filters.push({ field, op: 'eq', value });
+      return builder;
+    };
+    builder.neq = (field: string, value: unknown) => {
+      state.filters.push({ field, op: 'neq', value });
+      return builder;
+    };
+    builder.gt = (field: string, value: unknown) => {
+      state.filters.push({ field, op: 'gt', value });
+      return builder;
+    };
+    builder.gte = (field: string, value: unknown) => {
+      state.filters.push({ field, op: 'gte', value });
+      return builder;
+    };
+    builder.lt = (field: string, value: unknown) => {
+      state.filters.push({ field, op: 'lt', value });
+      return builder;
+    };
+    builder.lte = (field: string, value: unknown) => {
+      state.filters.push({ field, op: 'lte', value });
+      return builder;
+    };
+    builder.in = (field: string, values: unknown[]) => {
+      state.filters.push({ field, op: 'in', value: values });
+      return builder;
+    };
+    builder.is = (field: string, value: unknown) => {
+      state.filters.push({ field, op: 'is', value });
+      return builder;
+    };
+    builder.not = (field: string, operator: string, value: unknown) => {
+      // Only .not(field, 'is', value) is used anywhere in this codebase (Report.tsx:
+      // .not('paid_at', 'is', null), meaning "paid_at IS NOT NULL"). Other PostgREST
+      // .not() operator negations aren't called client-side, so they're not modeled.
+      if (operator === 'is') {
+        state.filters.push({ field, op: 'not_is', value });
+      }
       return builder;
     };
     builder.order = (field: string, options?: { ascending?: boolean }) => {
@@ -485,6 +557,14 @@ function createMockSupabaseClient() {
       data: Array<Record<string, unknown>>;
       select: (columns?: string) => SupabaseBuilder;
       eq: (field: string, value: unknown) => SupabaseBuilder;
+      neq: (field: string, value: unknown) => SupabaseBuilder;
+      gt: (field: string, value: unknown) => SupabaseBuilder;
+      gte: (field: string, value: unknown) => SupabaseBuilder;
+      lt: (field: string, value: unknown) => SupabaseBuilder;
+      lte: (field: string, value: unknown) => SupabaseBuilder;
+      in: (field: string, values: unknown[]) => SupabaseBuilder;
+      is: (field: string, value: unknown) => SupabaseBuilder;
+      not: (field: string, operator: string, value: unknown) => SupabaseBuilder;
       order: (field: string, options?: { ascending?: boolean }) => SupabaseBuilder;
       limit: (value: number) => SupabaseBuilder;
       update: (values: Record<string, unknown>) => SupabaseBuilder;
