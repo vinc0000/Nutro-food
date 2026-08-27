@@ -88,8 +88,15 @@ export function usePlanInfo(): PlanInfo & { loading: boolean; refresh: () => Pro
   // currency, so it applies the same way everywhere.
   const isSuperAdmin = profile?.system_role === 'super_admin' || orgContext?.org_owner_is_super_admin === true;
 
-  const isTrialActive = isSuperAdmin ? true : (planStatus === 'trial' && daysLeft > 0);
-  const isTrialExpired = isSuperAdmin ? false : (planStatus === 'trial' && daysLeft === 0);
+  // A missing trial_ends_at — orgContext not loaded yet, or genuinely absent — must
+  // never be read as "the trial already ran out". That's an absence of information,
+  // not evidence of expiry: without this guard, daysLeft defaults to 0 above whenever
+  // trialEndsAt is null, which made brand-new signups (and anyone whose org context
+  // hadn't finished loading yet) see an immediately-expired trial and get shoved to
+  // the billing page before their real 14 days had even started.
+  const hasTrialDate = trialEndsAt !== null;
+  const isTrialActive = isSuperAdmin ? true : (planStatus === 'trial' && hasTrialDate && daysLeft > 0);
+  const isTrialExpired = isSuperAdmin ? false : (planStatus === 'trial' && hasTrialDate && daysLeft === 0);
   const isPlanActive = isSuperAdmin ? true : (planStatus === 'active');
   const isSuspended = isSuperAdmin ? false : (planStatus === 'suspended' || isTrialExpired);
 

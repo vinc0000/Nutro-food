@@ -30,9 +30,13 @@ async function getOrgContext(supabase: ReturnType<typeof createClient>, userId: 
 }
 
 function payunitCredentials() {
-  const apiUser = Deno.env.get("PAYUNIT_API_USER");
+  // Accept either naming convention for these secrets — different people setting up
+  // PayUnit reasonably call the same thing different names (API_USER vs
+  // API_USERNAME, APP_TOKEN vs API_KEY), and a name mismatch here silently makes
+  // the whole integration act "not configured" with no indication why.
+  const apiUser = Deno.env.get("PAYUNIT_API_USER") ?? Deno.env.get("PAYUNIT_API_USERNAME");
   const apiPassword = Deno.env.get("PAYUNIT_API_PASSWORD");
-  const appToken = Deno.env.get("PAYUNIT_APP_TOKEN");
+  const appToken = Deno.env.get("PAYUNIT_APP_TOKEN") ?? Deno.env.get("PAYUNIT_API_KEY");
   const mode = Deno.env.get("PAYUNIT_MODE") ?? "test";
   if (!apiUser || !apiPassword || !appToken) return null;
   return {

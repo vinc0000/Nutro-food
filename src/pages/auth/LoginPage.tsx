@@ -40,8 +40,7 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     const { error } = await signIn(email, password);
-    setLoading(false);
-    if (error) { setError(error); return; }
+    if (error) { setLoading(false); setError(error); return; }
 
     // Save/Clear Remembered Email
     if (remember) {
@@ -50,7 +49,26 @@ export default function LoginPage() {
       localStorage.removeItem('nutro:remembered-email');
     }
 
-    navigate(from, { replace: true });
+    // `from` (where the guard bounced them from before login) always wins. Otherwise,
+    // a super admin should land on /app/super-admin, not the generic /app/admin
+    // default — that page is empty/useless for an account with no restaurant org of
+    // its own, which reads as "no access" even though nothing is actually blocking
+    // them, just routing them to the wrong place. Fetched fresh here rather than read
+    // from AuthContext's `profile`, since that's populated by an async
+    // onAuthStateChange side effect that isn't guaranteed to have resolved yet at
+    // this exact point in the login flow.
+    const hasExplicitFrom = Boolean((location.state as { from?: { pathname: string } })?.from);
+    let destination = from;
+    if (!hasExplicitFrom) {
+      const { data: { user: freshUser } } = await supabase.auth.getUser();
+      if (freshUser) {
+        const { data: freshProfile } = await supabase.from('profiles').select('system_role').eq('id', freshUser.id).maybeSingle<{ system_role: string }>();
+        if (freshProfile?.system_role === 'super_admin') destination = '/app/super-admin';
+      }
+    }
+
+    setLoading(false);
+    navigate(destination, { replace: true });
   };
 
   const handleForgot = async (e: React.FormEvent) => {

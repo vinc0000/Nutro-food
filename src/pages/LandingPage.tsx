@@ -133,7 +133,7 @@ function LegalModal({ type, onClose, theme }: { type: 'privacy' | 'terms' | 'gdp
     terms: [
       'En utilisant Nutro, vous acceptez d\'utiliser la plateforme pour des opérations de restaurant licites uniquement.',
       'Les abonnements sont facturés mensuellement. Vous pouvez annuler à tout moment ; l\'accès continue jusqu\'à la fin de la période de facturation.',
-      'Les essais gratuits durent 7 jours. Aucune carte de crédit n\'est requise pour démarrer un essai.',
+      'Les essais gratuits durent 14 jours. Aucune carte de crédit n\'est requise pour démarrer un essai.',
       'LiAfrik se réserve le droit de suspendre les comptes en cas d\'abus, fraude ou non-paiement.',
       'Pour les conditions complètes, contactez support@liafrik.com.',
     ],
@@ -348,7 +348,7 @@ export default function LandingPage() {
               >
                 <div className="inline-flex items-center gap-2 rounded-full px-4 py-2 mb-8 text-sm font-medium"
                   style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff' }}>
-                  <Sparkles size={14} color="#38BDF8" /> Technologie restaurant entreprise — Essai 7 jours gratuit
+                  <Sparkles size={14} color="#38BDF8" /> Technologie restaurant entreprise — Essai 14 jours gratuit
                 </div>
                 <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight text-white">
                   {SLIDES[currentSlide].title.map((line, i) => (
@@ -551,7 +551,7 @@ export default function LandingPage() {
               <Sparkles size={14} /> Tarification simple
             </div>
             <h2 className="text-4xl md:text-5xl font-bold mb-4" style={{ color: theme.text }}>Démarrez gratuitement. Scalez sans effort.</h2>
-            <p className="text-xl" style={{ color: theme.textMuted }}>Tous les plans incluent KDS & reçus thermiques. Essai 7 jours gratuit. Sans carte de crédit.</p>
+            <p className="text-xl" style={{ color: theme.textMuted }}>Tous les plans incluent KDS & reçus thermiques. Essai 14 jours gratuit. Sans carte de crédit.</p>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
             {PLANS.map((plan, i) => (

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Building2, Globe, Bell, CreditCard, Palette, Stamp, Share2, MapPin, Check, Lock, KeyRound, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { Building2, Globe, Bell, CreditCard, Palette, Stamp, Share2, MapPin, Check, Lock, KeyRound, Eye, EyeOff, AlertTriangle, LifeBuoy, Loader2 } from 'lucide-react';
 import { usePlanInfo } from '@/hooks/useOrgContext';
 import { useTheme, THEMES, ThemeName } from '@/contexts/ThemeContext';
 import { COUNTRIES, CURRENCIES, LANGUAGES } from '@/lib/countries';
@@ -138,6 +138,7 @@ export default function AdminSettings() {
     { id: 'pos', label: 'POS & Security', icon: Lock },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'billing', label: 'Billing', icon: CreditCard },
+    { id: 'support', label: 'Support', icon: LifeBuoy },
   ];
 
   const selectedCountry = COUNTRIES.find(c => c.code === country);
@@ -150,7 +151,7 @@ export default function AdminSettings() {
           <div>
             <h3 className="text-sm font-bold text-red-500">Période d'essai expirée / Abonnement requis</h3>
             <p className="text-xs mt-1" style={{ color: theme.textMuted }}>
-              Votre période d'essai gratuite de 7 jours est terminée. Veuillez vous abonner ci-dessous pour débloquer immédiatement l'accès complet à tous vos outils (POS, KDS, Menus, Rapports).
+              Votre période d'essai gratuite de 14 jours est terminée. Veuillez vous abonner ci-dessous pour débloquer immédiatement l'accès complet à tous vos outils (POS, KDS, Menus, Rapports).
             </p>
           </div>
         </div>
@@ -343,6 +344,7 @@ export default function AdminSettings() {
         {activeTab === 'pos' && <PosSecurityTab theme={theme} showSaved={showSaved} />}
 
         {activeTab === 'billing' && <BillingTab theme={theme} showSaved={showSaved} />}
+        {activeTab === 'support' && <SupportTab theme={theme} showSaved={showSaved} />}
 
         {activeTab === 'notifications' && (
           <div className="space-y-4">
@@ -723,15 +725,28 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
         {PLANS.map(p => {
           const price = selectedPeriod === 'annual' ? Math.round(p.price * 10) : p.price;
           const isCurrent = plan === p.name && planStatus === 'active';
+          // Billing is always actually charged in USD (see the payunit-pay/
+          // flutterwave-pay edge functions) — that's independent of the tenant's
+          // own operating currency (branches.currency, used for their customers'
+          // orders) and isn't changed here. This only adds an automatic, approximate
+          // conversion to the tenant's currency alongside it, using the same real
+          // rate table (CURRENCIES) the public pricing page already converts with —
+          // shown as an estimate, never in place of the actual USD amount that gets
+          // charged, so there's no risk of the displayed price disagreeing with what
+          // PayUnit/Flutterwave actually bills.
+          const tenantCurrency = CURRENCIES.find(c => c.code === orgContext?.currency);
+          const convertedPrice = tenantCurrency && tenantCurrency.code !== 'USD' ? Math.round(price * tenantCurrency.rate) : null;
           return (
             <div key={p.name} className="p-4 rounded-xl transition-all"
               style={{ background: theme.bg, border: `2px solid ${isCurrent ? '#22c55e' : p.color + '40'}` }}>
               <div className="font-bold text-sm mb-1" style={{ color: p.color }}>{p.label}</div>
               <div className="text-lg font-extrabold" style={{ color: theme.text }}>
-                {/* Subscription billing is always USD (see the payunit-pay/flutterwave-pay edge functions) — this is Nutro's own fee, independent of the tenant's branches.currency used for their customers' orders. */}
                 ${price}
                 <span className="text-xs font-normal" style={{ color: theme.textMuted }}>/{selectedPeriod === 'annual' ? 'yr' : 'mo'}</span>
               </div>
+              {convertedPrice !== null && (
+                <div className="text-xs font-semibold" style={{ color: theme.textMuted }}>≈ {tenantCurrency!.symbol}{convertedPrice.toLocaleString()} — billed in USD</div>
+              )}
               <div className="text-xs mt-1" style={{ color: theme.textMuted }}>{p.features}</div>
               <div className="text-[10px] mt-1 font-semibold" style={{ color: theme.primary }}>KDS & Thermal included</div>
               <button
@@ -786,6 +801,69 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
             </p>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function SupportTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['theme']; showSaved: (msg: string) => void }) {
+  const { orgContext } = useOrgContext();
+  const [tickets, setTickets] = useState<Array<{ id: string; subject: string; status: string; createdAt: string }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const loadTickets = async () => {
+    if (!orgContext?.org_id) { setLoading(false); return; }
+    const { data } = await supabase.from('support_tickets').select('id, subject, status, created_at').eq('org_id', orgContext.org_id).order('created_at', { ascending: false });
+    setTickets((data as Array<{ id: string; subject: string; status: string; created_at: string }> ?? []).map(t => ({ id: t.id, subject: t.subject, status: t.status, createdAt: t.created_at })));
+    setLoading(false);
+  };
+
+  useEffect(() => { loadTickets(); }, [orgContext?.org_id]);
+
+  const submitTicket = async () => {
+    if (!orgContext?.org_id || !subject.trim() || !message.trim()) return;
+    setSubmitting(true);
+    const { error } = await supabase.from('support_tickets').insert({
+      org_id: orgContext.org_id, subject: subject.trim(), message: message.trim(),
+    } as never);
+    setSubmitting(false);
+    if (error) return;
+    setSubject(''); setMessage('');
+    showSaved('Support ticket submitted — our team will get back to you');
+    loadTickets();
+  };
+
+  const statusColor: Record<string, string> = { open: '#eab308', in_progress: '#3b82f6', resolved: '#22c55e', closed: '#6b7280' };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-sm font-bold mb-3" style={{ color: theme.text }}>Contact Support</h3>
+        <div className="space-y-3">
+          <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Subject"
+            className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+          <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder="Describe your issue…" rows={4}
+            className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+          <button onClick={submitTicket} disabled={submitting || !subject.trim() || !message.trim()}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50" style={{ background: theme.primary }}>
+            {submitting && <Loader2 size={14} className="animate-spin" />} Submit Ticket
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-bold mb-3" style={{ color: theme.text }}>Your Tickets</h3>
+        {loading && <p className="text-xs" style={{ color: theme.textMuted }}>Loading…</p>}
+        {!loading && tickets.length === 0 && <p className="text-xs" style={{ color: theme.textMuted }}>No support tickets yet.</p>}
+        {!loading && tickets.map(t => (
+          <div key={t.id} className="flex items-center justify-between p-3 rounded-xl mb-2" style={{ background: theme.bg, border: `1px solid ${theme.border}` }}>
+            <span className="text-sm" style={{ color: theme.text }}>{t.subject}</span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full capitalize" style={{ background: `${statusColor[t.status]}20`, color: statusColor[t.status] }}>{t.status.replace('_', ' ')}</span>
+          </div>
+        ))}
       </div>
     </div>
   );

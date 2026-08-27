@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Mail, Lock, User, Eye, EyeOff, AlertCircle, Check,
@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { COUNTRIES, CURRENCIES, LANGUAGES } from '@/lib/countries';
+import { supabase } from '@/lib/supabase';
 
 const STEPS = ['Account', 'Location', 'Business', 'Plan'];
 
@@ -25,6 +26,12 @@ export default function SignupPage() {
   const { theme } = useTheme();
   const { t } = useLocale();
   const navigate = useNavigate();
+  // A sales rep's referral link is ?ref=<their code> (SalesReps.tsx generates one per
+  // rep). Captured here and passed through to create_tenant so commission tracking —
+  // which reads organizations.referral_code — has something real to match against,
+  // instead of every signup leaving it null forever.
+  const [searchParams] = useSearchParams();
+  const referralCode = searchParams.get('ref');
 
   const [step, setStep] = useState(0);
   const [fullName, setFullName] = useState('');
@@ -73,11 +80,22 @@ export default function SignupPage() {
       currency,
       language,
       phone: phone ? `+${selectedCountry?.dialCode ?? ''} ${phone}` : '',
+      referralCode: referralCode || undefined,
     });
+    if (error) { setLoading(false); setError(error); setStep(0); return; }
+    if (needsEmailConfirmation) { setLoading(false); setNeedsConfirmation(true); return; }
+
+    // Same reasoning as LoginPage: land the three platform-owner accounts on
+    // /app/super-admin rather than the generic /app/admin, fetched fresh since
+    // AuthContext's profile hasn't necessarily caught up with this signup yet.
+    const { data: { user: freshUser } } = await supabase.auth.getUser();
+    let destination = '/app/admin';
+    if (freshUser) {
+      const { data: freshProfile } = await supabase.from('profiles').select('system_role').eq('id', freshUser.id).maybeSingle<{ system_role: string }>();
+      if (freshProfile?.system_role === 'super_admin') destination = '/app/super-admin';
+    }
     setLoading(false);
-    if (error) { setError(error); setStep(0); return; }
-    if (needsEmailConfirmation) { setNeedsConfirmation(true); return; }
-    navigate('/app/admin', { replace: true });
+    navigate(destination, { replace: true });
   };
 
   const onCountryChange = (code: string) => {

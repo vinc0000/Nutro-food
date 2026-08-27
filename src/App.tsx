@@ -21,6 +21,16 @@ const SuperAdminTenants = lazy(() => import('@/pages/super-admin/Tenants'));
 const SuperAdminSalesReps = lazy(() => import('@/pages/super-admin/SalesReps'));
 const SuperAdminFinancials = lazy(() => import('@/pages/super-admin/Financials'));
 const SuperAdminAdmins = lazy(() => import('@/pages/super-admin/Admins'));
+const SuperAdminUsers = lazy(() => import('@/pages/super-admin/PlatformUsers'));
+const SuperAdminSubscriptions = lazy(() => import('@/pages/super-admin/Subscriptions'));
+const SuperAdminRoles = lazy(() => import('@/pages/super-admin/Roles'));
+const SuperAdminAudit = lazy(() => import('@/pages/super-admin/Audit'));
+const SuperAdminPerformance = lazy(() => import('@/pages/super-admin/Performance'));
+const SuperAdminAnalytics = lazy(() => import('@/pages/super-admin/Analytics'));
+const SuperAdminSupport = lazy(() => import('@/pages/super-admin/Support'));
+const SuperAdminApi = lazy(() => import('@/pages/super-admin/Api'));
+const SuperAdminReport = lazy(() => import('@/pages/super-admin/Report'));
+const SuperAdminSettingsPage = lazy(() => import('@/pages/super-admin/PlatformSettings'));
 
 const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'));
 const AdminMenu = lazy(() => import('@/pages/admin/Menu'));
@@ -65,6 +75,16 @@ export default function App() {
                 <Route path="sales-reps" element={<SuperAdminSalesReps />} />
                 <Route path="financials" element={<SuperAdminFinancials />} />
                 <Route path="admins" element={<SuperAdminAdmins />} />
+                <Route path="users" element={<SuperAdminUsers />} />
+                <Route path="subscriptions" element={<SuperAdminSubscriptions />} />
+                <Route path="roles" element={<SuperAdminRoles />} />
+                <Route path="audit" element={<SuperAdminAudit />} />
+                <Route path="performance" element={<SuperAdminPerformance />} />
+                <Route path="analytics" element={<SuperAdminAnalytics />} />
+                <Route path="support" element={<SuperAdminSupport />} />
+                <Route path="api" element={<SuperAdminApi />} />
+                <Route path="report" element={<SuperAdminReport />} />
+                <Route path="settings" element={<SuperAdminSettingsPage />} />
               </Route>
 
               <Route path="/app/admin" element={<AuthGuard><AdminLayout /></AuthGuard>}>

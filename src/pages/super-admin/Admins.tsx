@@ -84,6 +84,13 @@ export default function SuperAdminAdmins() {
     setInviteBusy(false);
     if (updateError) { setInviteError(updateError.message); return; }
 
+    await supabase.rpc('log_audit_event', {
+      p_action: 'promoted_super_admin',
+      p_target_type: 'profile',
+      p_target_id: (existing as { id: string }).id,
+      p_target_label: inviteEmail,
+    });
+
     setShowInvite(false);
     setInviteEmail('');
     showToast(`${inviteEmail} is now a Super Admin`);
@@ -98,12 +105,22 @@ export default function SuperAdminAdmins() {
       .eq('id', deleteConfirm.id);
 
     if (error) { showToast(`Failed: ${error.message}`); setDeleteConfirm(null); return; }
+
+    await supabase.rpc('log_audit_event', {
+      p_action: 'revoked_super_admin',
+      p_target_type: 'profile',
+      p_target_id: deleteConfirm.id,
+      p_target_label: deleteConfirm.email,
+    });
+
     showToast(`Access revoked for ${deleteConfirm.email}`);
     setDeleteConfirm(null);
     loadAdmins();
   };
 
-  const isLastAdmin = admins.length <= 1;
+  // Never let the team drop below 2 — a single remaining super admin with no backup
+  // is one lost password away from nobody being able to manage the platform at all.
+  const isProtectedByMinimum = admins.length <= 2;
 
   return (
     <div className="space-y-6">
@@ -141,7 +158,7 @@ export default function SuperAdminAdmins() {
         <div className="space-y-3">
           {admins.map(admin => {
             const isSelf = admin.id === currentProfile?.id;
-            const protectedFromDeletion = isSelf || isLastAdmin;
+            const protectedFromDeletion = isSelf || isProtectedByMinimum;
             return (
               <div key={admin.id} className="flex items-center gap-4 p-4 rounded-2xl"
                 style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>

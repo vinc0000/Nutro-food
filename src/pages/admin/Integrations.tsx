@@ -1,12 +1,24 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plug, Check, X, Loader2, ExternalLink, Trash2, Users, BookOpen, MessageCircle, Webhook } from 'lucide-react';
+import { Plug, Check, X, Loader2, ExternalLink, Trash2, Users, BookOpen, Webhook } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useOrgContext } from '@/hooks/useOrgContext';
 import { supabase } from '@/lib/supabase';
 import PlanGate from '@/components/ui/PlanGate';
 
 type Provider = 'atlas_crm' | 'libooks' | 'whatsapp' | 'webhook';
+
+// A faithful reproduction of WhatsApp's actual public brand mark — this sandboxed
+// environment has no network access to fetch a real logo image file, but WhatsApp's
+// glyph is simple and well-documented enough to hand-code accurately as SVG, which
+// is a real logo rather than a generic chat-bubble icon standing in for one.
+function WhatsAppLogo({ size = 18 }: { size?: number | string; style?: React.CSSProperties }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="#25D366">
+      <path d="M12.04 2c-5.52 0-10 4.48-10 10 0 1.77.46 3.45 1.28 4.9L2 22l5.25-1.38a9.94 9.94 0 0 0 4.79 1.22h.01c5.52 0 10-4.48 10-10s-4.49-9.84-10.01-9.84zm5.87 14.13c-.25.7-1.45 1.34-2 1.43-.51.08-1.15.11-1.86-.12-.43-.13-.98-.32-1.68-.62-2.96-1.28-4.89-4.25-5.04-4.45-.15-.2-1.2-1.6-1.2-3.05 0-1.45.76-2.16 1.03-2.46.27-.3.6-.37.79-.37.2 0 .4 0 .57.01.18.01.43-.07.67.51.25.6.85 2.07.92 2.22.07.15.12.33.02.53-.1.2-.15.32-.3.5-.15.18-.31.4-.44.53-.15.15-.3.31-.13.61.17.3.76 1.25 1.63 2.03 1.12 1 2.06 1.31 2.36 1.46.3.15.47.13.65-.08.18-.2.75-.87.95-1.17.2-.3.4-.25.68-.15.28.1 1.76.83 2.06.98.3.15.5.23.57.35.08.13.08.72-.17 1.42z"/>
+    </svg>
+  );
+}
 
 interface IntegrationRow {
   id: string;
@@ -16,7 +28,7 @@ interface IntegrationRow {
 }
 
 const PROVIDERS: Array<{
-  key: Provider; name: string; description: string; icon: typeof Users; color: string;
+  key: Provider; name: string; description: string; icon: React.ComponentType<{ size?: number | string; style?: React.CSSProperties }>; color: string;
   url: string; keyLabel: string; keyPlaceholder: string;
 }> = [
   {
@@ -30,7 +42,7 @@ const PROVIDERS: Array<{
     url: 'https://libooks.liafrik.com', keyLabel: 'LiBooks API Key', keyPlaceholder: 'lib_live_...',
   },
   {
-    key: 'whatsapp', name: 'WhatsApp Business', icon: MessageCircle, color: '#25D366',
+    key: 'whatsapp', name: 'WhatsApp Business', icon: WhatsAppLogo, color: '#25D366',
     description: 'Send order confirmations and ready-for-pickup alerts to customers over WhatsApp.',
     url: 'https://business.whatsapp.com', keyLabel: 'WhatsApp Cloud API Token', keyPlaceholder: 'EAAG...',
   },

@@ -81,12 +81,23 @@ export default function SuperAdminTenants() {
     if (actionType === 'upgrade') patch = { plan: newPlan, plan_status: 'active' };
     if (actionType === 'suspend') patch = { plan_status: 'suspended' };
     if (actionType === 'extend') {
-      const extended = new Date(Date.now() + 7 * 86400000).toISOString();
+      // Match the platform's actual 14-day trial length everywhere else — this was
+      // hardcoded to 7, a leftover from before the trial length was fixed elsewhere.
+      const extended = new Date(Date.now() + 14 * 86400000).toISOString();
       patch = { trial_ends_at: extended, plan_status: 'trial' };
     }
     const { error } = await supabase.from('organizations').update(patch as never).eq('id', actionTenant.id);
     setBusy(false);
     if (error) { setLoadError(error.message); return; }
+
+    await supabase.rpc('log_audit_event', {
+      p_action: `tenant_${actionType}`,
+      p_target_type: 'organization',
+      p_target_id: actionTenant.id,
+      p_target_label: actionTenant.name,
+      p_details: patch,
+    });
+
     setActionTenant(null); setActionType(null);
     void loadTenants();
   };
