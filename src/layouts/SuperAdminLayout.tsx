@@ -29,6 +29,7 @@ const NAV = [
   { to: '/app/super-admin/support', icon: LifeBuoy, label: 'Support' },
   { to: '/app/super-admin/api', icon: Code2, label: 'API' },
   { to: '/app/super-admin/audit', icon: ScrollText, label: 'Audit' },
+  { to: '/app/super-admin/notifications', icon: Bell, label: 'Notifications' },
   { to: '/app/super-admin/settings', icon: SettingsIcon, label: 'Settings' },
 ];
 

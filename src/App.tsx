@@ -31,6 +31,7 @@ const SuperAdminSupport = lazy(() => import('@/pages/super-admin/Support'));
 const SuperAdminApi = lazy(() => import('@/pages/super-admin/Api'));
 const SuperAdminReport = lazy(() => import('@/pages/super-admin/Report'));
 const SuperAdminSettingsPage = lazy(() => import('@/pages/super-admin/PlatformSettings'));
+const SuperAdminNotifications = lazy(() => import('@/pages/super-admin/Notifications'));
 
 const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'));
 const AdminMenu = lazy(() => import('@/pages/admin/Menu'));
@@ -85,6 +86,7 @@ export default function App() {
                 <Route path="api" element={<SuperAdminApi />} />
                 <Route path="report" element={<SuperAdminReport />} />
                 <Route path="settings" element={<SuperAdminSettingsPage />} />
+                <Route path="notifications" element={<SuperAdminNotifications />} />
               </Route>
 
               <Route path="/app/admin" element={<AuthGuard><AdminLayout /></AuthGuard>}>
