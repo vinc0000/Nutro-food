@@ -53,7 +53,13 @@ export default function AdminMenu() {
     setUploadMessage(null);
   };
 
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
   const saveForm = async () => {
+    setSaveError(null);
+    if (!branchId) { setSaveError('Still loading your branch — please wait a moment and try again.'); return; }
+    setSaving(true);
     if (editing) {
       await updateItem(editing.id, formData);
     } else {
@@ -82,8 +88,17 @@ export default function AdminMenu() {
         portionSize: formData.portionSize ?? 'Regular',
         weight: formData.weight ?? 0,
       };
-      await addItem(newItem);
+      const createdId = await addItem(newItem);
+      setSaving(false);
+      if (!createdId) {
+        // Don't close the form and pretend it worked — addItem() failing (RLS,
+        // network, a bad value) previously closed the form silently either way,
+        // so the item just quietly never existed with no indication why.
+        setSaveError(error ?? 'Could not save this item — please try again.');
+        return;
+      }
     }
+    setSaving(false);
     setShowForm(false);
     setFormData({});
   };
@@ -414,9 +429,14 @@ export default function AdminMenu() {
                   </div>
                 </div>
               </div>
+              {saveError && (
+                <p className="text-xs mt-3 px-3 py-2 rounded-lg" style={{ background: '#ef444410', border: '1px solid #ef444430', color: '#ef4444' }}>{saveError}</p>
+              )}
               <div className="flex gap-3 mt-6">
-                <button onClick={() => void saveForm()} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>{editing ? 'Save Changes' : 'Add Item'}</button>
-                <button onClick={() => setShowForm(false)}
+                <button onClick={() => void saveForm()} disabled={saving} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2" style={{ background: theme.primary }}>
+                  {saving && <Loader2 size={14} className="animate-spin" />} {editing ? 'Save Changes' : 'Add Item'}
+                </button>
+                <button onClick={() => { setShowForm(false); setSaveError(null); }}
                   className="px-4 py-2.5 rounded-xl text-sm font-semibold" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Cancel</button>
               </div>
             </motion.div>

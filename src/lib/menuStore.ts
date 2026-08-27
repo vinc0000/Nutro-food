@@ -188,11 +188,13 @@ export function useSharedMenu(branchId: string | null) {
       .eq('name', categoryName)
       .maybeSingle<{ id: string }>();
     if (existing.data) return existing.data.id;
+    if (existing.error) { setError(existing.error.message); return null; }
 
     const created = await supabase
       .from('menu_categories')
       .insert({ branch_id: branchId, name: categoryName, is_active: true } as never)
       .select();
+    if (created.error) { setError(created.error.message); return null; }
     const row = (created.data as Array<{ id: string }> | null)?.[0];
     return row?.id ?? null;
   }, [branchId]);

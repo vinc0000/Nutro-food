@@ -23,7 +23,14 @@ export default function PosPinGate({ children }: { children: React.ReactNode }) 
   const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
-    if (!branchId) return;
+    // If org loading finished but there's genuinely no branch (e.g. a super admin
+    // with no restaurant of their own), there's nothing to check a PIN against —
+    // resolve immediately instead of leaving checkingPin stuck at its initial
+    // `true` forever, which pinned the whole POS behind an infinite spinner.
+    if (!branchId) {
+      if (!orgLoading) setCheckingPin(false);
+      return;
+    }
     let cancelled = false;
     setCheckingPin(true);
     supabase
@@ -37,7 +44,7 @@ export default function PosPinGate({ children }: { children: React.ReactNode }) 
         setCheckingPin(false);
       });
     return () => { cancelled = true; };
-  }, [branchId]);
+  }, [branchId, orgLoading]);
 
   const submitPin = async () => {
     if (!branchId || pin.length < 4) return;
