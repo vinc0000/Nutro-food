@@ -576,7 +576,7 @@ function PosSecurityTab({ theme, showSaved }: { theme: ReturnType<typeof useThem
 
 function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['theme']; showSaved: (msg: string) => void }) {
   const { plan, planStatus, isTrialActive, daysLeft, refresh } = usePlanInfo();
-  const { orgContext } = useOrgContext();
+  const { orgContext, loading: orgLoading } = useOrgContext();
   const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'annual'>('monthly');
   const [paying, setPaying] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -713,6 +713,12 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
     <div className="space-y-5">
       <h2 className="font-extrabold" style={{ color: theme.text }}>Subscription & Billing</h2>
 
+      {!orgLoading && !orgContext?.org_id && (
+        <div className="p-4 rounded-xl text-sm" style={{ background: '#f59e0b10', border: '1px solid #f59e0b30', color: '#f59e0b' }}>
+          No restaurant is associated with this account, so there's no subscription to manage. This is expected for a platform Super Admin account with no restaurant of its own — a normal tenant account created through Sign Up will have one automatically.
+        </div>
+      )}
+
       {isTrialActive && (
         <div className="p-4 rounded-xl" style={{ background: theme.primary + '10', border: `1px solid ${theme.primary}30` }}>
           <div className="flex items-center justify-between mb-1">
@@ -763,7 +769,7 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
               <div className="text-[10px] mt-1 font-semibold" style={{ color: theme.primary }}>KDS & Thermal included</div>
               <button
                 onClick={() => void handleSubscribe(p.name)}
-                disabled={paying || isCurrent || pspChecking || (!activePsp && availablePsps.length === 0)}
+                disabled={paying || isCurrent || pspChecking || (!activePsp && availablePsps.length === 0) || !orgContext?.org_id}
                 className="w-full mt-3 py-2 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-50"
                 style={{ background: isCurrent ? '#22c55e' : theme.primary }}>
                 {isCurrent ? 'Current Plan' : paying ? 'Redirecting...' : pspChecking ? 'Loading...' : 'Subscribe'}
