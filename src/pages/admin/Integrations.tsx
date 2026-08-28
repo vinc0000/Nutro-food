@@ -29,27 +29,27 @@ interface IntegrationRow {
 
 const PROVIDERS: Array<{
   key: Provider; name: string; description: string; icon: React.ComponentType<{ size?: number | string; style?: React.CSSProperties }>; color: string;
-  url: string; keyLabel: string; keyPlaceholder: string;
+  url: string; keyLabel: string; keyPlaceholder: string; live: boolean;
 }> = [
   {
     key: 'atlas_crm', name: 'Atlas CRM', icon: Users, color: '#0176d3',
     description: 'AI-powered CRM by LiAfrik — sync your customer base for marketing and loyalty campaigns.',
-    url: 'https://atlas.liafrik.com', keyLabel: 'Atlas API Key', keyPlaceholder: 'atlas_live_...',
+    url: 'https://atlas.liafrik.com', keyLabel: 'Atlas API Key', keyPlaceholder: 'atlas_live_...', live: false,
   },
   {
     key: 'libooks', name: 'LiBooks', icon: BookOpen, color: '#0F2A3D',
     description: 'International accounting with OHADA expertise — export sales for bookkeeping, invoicing, and treasury.',
-    url: 'https://libooks.liafrik.com', keyLabel: 'LiBooks API Key', keyPlaceholder: 'lib_live_...',
+    url: 'https://libooks.liafrik.com', keyLabel: 'LiBooks API Key', keyPlaceholder: 'lib_live_...', live: false,
   },
   {
     key: 'whatsapp', name: 'WhatsApp Business', icon: WhatsAppLogo, color: '#25D366',
     description: 'Send order confirmations and ready-for-pickup alerts to customers over WhatsApp.',
-    url: 'https://business.whatsapp.com', keyLabel: 'WhatsApp Cloud API Token', keyPlaceholder: 'EAAG...',
+    url: 'https://business.whatsapp.com', keyLabel: 'WhatsApp Cloud API Token', keyPlaceholder: 'EAAG...', live: false,
   },
   {
     key: 'webhook', name: 'Custom Webhook', icon: Webhook, color: '#8b5cf6',
     description: 'Send a POST request for every new order to Zapier, Make, n8n, or your own endpoint.',
-    url: 'https://zapier.com', keyLabel: 'Webhook URL', keyPlaceholder: 'https://hooks.zapier.com/...',
+    url: 'https://zapier.com', keyLabel: 'Webhook URL', keyPlaceholder: 'https://hooks.zapier.com/...', live: true,
   },
 ];
 
@@ -141,10 +141,18 @@ export default function AdminIntegrations() {
                         ) : (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 inline-block" style={{ background: theme.bg, color: theme.textMuted }}>Not connected</span>
                         )}
+                        {!p.live && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 ml-1 inline-block" style={{ background: '#f59e0b20', color: '#f59e0b' }}>
+                            Coming soon
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
-                  <p className="text-xs mb-4" style={{ color: theme.textMuted }}>{p.description}</p>
+                  <p className="text-xs mb-4" style={{ color: theme.textMuted }}>
+                    {p.description}
+                    {!p.live && <span className="block mt-1" style={{ color: '#f59e0b' }}>Your key is saved, but Nutro doesn't send any data to {p.name} yet — this integration isn't wired up on our side yet.</span>}
+                  </p>
                   {row ? (
                     <button onClick={() => void disconnect(p.key)}
                       className="w-full py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5"
