@@ -1,8 +1,12 @@
 name: Supabase Keep Alive
 
+# Supabase's free tier pauses a project after 7 days with no API activity — this
+# just needs to land well inside that window. Every 5 minutes (288 runs/day) was
+# using far more GitHub Actions minutes than needed for that; once a day at a
+# fixed, low-traffic hour comfortably keeps the project awake at ~1% of the cost.
 on:
   schedule:
-    - cron: "3,8,13,18,23,28,33,38,43,48,53,58 * * * *"
+    - cron: "17 3 * * *"
   workflow_dispatch:
 
 jobs:
