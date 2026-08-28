@@ -18,7 +18,7 @@ function DietBadge({ label, color }: { label: string; color: string }) {
 
 export default function AdminMenu() {
   const { theme } = useTheme();
-  const { orgContext } = useOrgContext();
+  const { orgContext, loading: orgLoading } = useOrgContext();
   const branchId = orgContext?.branch_id ?? null;
   const { menuItems: items, loading, error, addItem, updateItem, deleteItem: removeItem, toggleAvailable: toggleItemAvailable, adjustStock: adjustItemStock } = useSharedMenu(branchId);
   const [search, setSearch] = useState('');
@@ -163,6 +163,12 @@ export default function AdminMenu() {
           <Plus size={16} /> Add Item
         </button>
       </div>
+
+      {!orgLoading && !branchId && (
+        <div className="p-4 rounded-xl text-sm" style={{ background: '#f59e0b10', border: '1px solid #f59e0b30', color: '#f59e0b' }}>
+          No restaurant is associated with this account, so there's no menu to manage yet. This is expected for a platform Super Admin account with no restaurant of its own — a normal tenant account created through Sign Up will have one automatically.
+        </div>
+      )}
 
       {loading && (
         <div className="flex items-center gap-2 p-6 justify-center" style={{ color: theme.textMuted }}>

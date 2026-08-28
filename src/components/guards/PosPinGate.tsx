@@ -1,8 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, createContext, useContext } from 'react';
 import { Lock, Loader2 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useOrgContext } from '@/hooks/useOrgContext';
 import { supabase } from '@/lib/supabase';
+
+// Lets any descendant (e.g. a "Lock" button inside the POS terminal itself) re-lock
+// the terminal without needing to lift PosPinGate's own state up through props.
+// Returns a no-op outside the gate (e.g. when no PIN is set at all) so callers don't
+// need to guard against a missing provider.
+const PosLockContext = createContext<() => void>(() => {});
+export const usePosLock = () => useContext(PosLockContext);
 
 // Settings.tsx lets a branch owner/manager set a POS PIN (set_branch_pos_pin, bcrypt-
 // hashed server-side), and verify_branch_pos_pin already exists to check one — but
@@ -71,7 +78,7 @@ export default function PosPinGate({ children }: { children: React.ReactNode }) 
     );
   }
 
-  if (!pinRequired || unlocked) return <>{children}</>;
+  if (!pinRequired || unlocked) return <PosLockContext.Provider value={() => setUnlocked(false)}>{children}</PosLockContext.Provider>;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6" style={{ background: theme.bg }}>

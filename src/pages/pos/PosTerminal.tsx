@@ -14,6 +14,7 @@ import { useSharedOrders, SharedOrder } from '@/lib/ordersStore';
 import { usePlanInfo, useOrgContext } from '@/hooks/useOrgContext';
 import { CURRENCIES } from '@/lib/countries';
 import { supabase } from '@/lib/supabase';
+import { usePosLock } from '@/components/guards/PosPinGate';
 
 interface CartItem { id: string; name: string; price: number; qty: number; taxRate: number; }
 interface TabletOrder {
@@ -26,63 +27,36 @@ const CATEGORIES = ['All', 'Starters', 'Mains', 'Desserts', 'Drinks', 'Snacks'];
 const tableColor: Record<string, string> = { available: '#22c55e', occupied: '#ef4444', reserved: '#eab308', cleaning: '#94a3b8' };
 type PayMethod = 'cash' | 'card' | 'tap' | 'gift_card' | 'mobile_money';
 
-function PinGuard({ onUnlock }: { onUnlock: () => void }) {
-  const { theme } = useTheme();
-  const { t } = useLocale();
-  const [pin, setPin] = useState('');
-  const [error, setError] = useState(false);
-  const handleKey = (k: string) => {
-    if (pin.length >= 4) return;
-    const next = pin + k;
-    setPin(next);
-    if (next.length === 4) {
-      if (next === '1234') setTimeout(onUnlock, 200);
-      else { setError(true); setTimeout(() => { setPin(''); setError(false); }, 600); }
-    }
-  };
-  return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: theme.bg }}>
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-72 text-center">
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: theme.primary }}>
-          <Monitor size={26} color="#fff" />
-        </div>
-        <h1 className="text-lg font-bold mb-1" style={{ color: theme.text }}>{t('pos.title')}</h1>
-        <p className="text-sm mb-8" style={{ color: theme.textMuted }}>{t('pos.pinPrompt')}</p>
-        <div className="flex justify-center gap-3 mb-6">
-          {[0, 1, 2, 3].map(i => (
-            <div key={i} className={`w-12 h-14 rounded-xl flex items-center justify-center text-2xl font-extrabold border-2 transition-all ${error ? 'animate-pulse' : ''}`}
-              style={{ background: theme.surface, borderColor: pin.length > i ? (error ? '#ef4444' : theme.primary) : theme.border, color: theme.text }}>
-              {pin.length > i ? '\u25CF' : ''}
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, null, 0, 'del'].map((k, i) => (
-            <button key={i} onClick={() => k === 'del' ? setPin(p => p.slice(0, -1)) : k !== null ? handleKey(String(k)) : undefined}
-              disabled={k === null}
-              className="h-14 rounded-xl font-bold text-xl transition-all hover:opacity-80 active:scale-95 disabled:opacity-0"
-              style={{ background: k === 'del' ? '#ef444420' : theme.surface, color: k === 'del' ? '#ef4444' : theme.text, border: `1px solid ${theme.border}` }}>
-              {k === 'del' ? '\u232B' : k}
-            </button>
-          ))}
-        </div>
-        <p className="text-xs mt-4" style={{ color: theme.textMuted }}>{t('pos.demoPin')}</p>
-      </motion.div>
-    </div>
-  );
-}
+// The PinGuard component that used to live here (a hardcoded "1234" check, entirely
+// disconnected from any real data) has been removed. PosPinGate — the parent route
+// wrapper in PosLayout.tsx — already gates entry to the whole POS using the real,
+// admin-configured branch PIN (verify_branch_pos_pin). Keeping a second, fake,
+// always-"1234" gate here didn't add security (anyone could read the source or the
+// on-screen "demo PIN" hint) and actively broke the terminal for anyone who didn't
+// know that undocumented bypass: real staff who correctly entered their actual PIN
+// at the real gate would then hit this second, unrelated prompt with no way to know
+// what to type.
 
-function ManagerPinModal({ onClose, onApprove, theme }: { onClose: () => void; onApprove: () => void; theme: ReturnType<typeof useTheme>['theme'] }) {
+function ManagerPinModal({ onClose, onApprove, theme, branchId }: { onClose: () => void; onApprove: () => void; theme: ReturnType<typeof useTheme>['theme']; branchId: string | null }) {
   const { t } = useLocale();
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const handleKey = (k: string) => {
-    if (pin.length >= 4) return;
+    if (pin.length >= 4 || verifying) return;
     const next = pin + k;
     setPin(next);
     if (next.length === 4) {
-      if (next === '9999') onApprove();
-      else { setError(true); setTimeout(() => { setPin(''); setError(false); }, 600); }
+      if (!branchId) { setError(true); setTimeout(() => { setPin(''); setError(false); }, 600); return; }
+      setVerifying(true);
+      // Real branch PIN check (the same one PosPinGate verifies at entry), not a
+      // hardcoded value — a manager override should require the actual PIN a
+      // manager configured, not a fixed "9999" anyone could look up in the source.
+      supabase.rpc('verify_branch_pos_pin', { p_branch_id: branchId, p_pin: next }).then(({ data: ok }) => {
+        setVerifying(false);
+        if (ok) onApprove();
+        else { setError(true); setTimeout(() => { setPin(''); setError(false); }, 600); }
+      });
     }
   };
   return (
@@ -125,7 +99,8 @@ export default function PosTerminal() {
   const { t } = useLocale();
   const navigate = useNavigate();
   const { plan } = usePlanInfo();
-  const { orgContext } = useOrgContext();
+  const { orgContext, loading: orgLoading } = useOrgContext();
+  const lockPos = usePosLock();
   const { menuItems } = useSharedMenu(orgContext?.branch_id ?? null);
   const PLAN_TABLE_LIMIT = plan === 'starter' ? 10 : (plan === 'premium' ? 30 : 999);
 
@@ -165,7 +140,6 @@ export default function PosTerminal() {
     };
   }, []);
 
-  const [unlocked, setUnlocked] = useState(false);
   const [cat, setCat] = useState('All');
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -302,8 +276,6 @@ export default function PosTerminal() {
     setCart([]); setSelectedTable(null); setIsPaid(false); setCardDetail(''); setCashGiven('');
   };
 
-  if (!unlocked) return <PinGuard onUnlock={() => setUnlocked(true)} />;
-
   return (
     <div className="min-h-screen flex flex-col" style={{ background: theme.bg }}>
       <header className="px-4 sm:px-6 py-3 flex-shrink-0" style={{ background: theme.surface, borderBottom: `1px solid ${theme.border}` }}>
@@ -337,7 +309,7 @@ export default function PosTerminal() {
               <FileText size={12} /> {t('pos.zReport')}
             </button>
             <span className="text-xs font-semibold px-2.5 py-1.5 rounded-full" style={{ color: theme.primary, background: theme.primary + '12' }}>{profile?.full_name ?? 'Cashier'}</span>
-            <button onClick={() => setUnlocked(false)} className="text-xs px-2.5 py-1.5 rounded-full" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>{t('pos.lock')}</button>
+            <button onClick={() => lockPos()} className="text-xs px-2.5 py-1.5 rounded-full" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>{t('pos.lock')}</button>
           </div>
         </div>
       </header>
@@ -770,7 +742,7 @@ export default function PosTerminal() {
 
       <AnimatePresence>
         {showManagerPin && (
-          <ManagerPinModal theme={theme}
+          <ManagerPinModal theme={theme} branchId={orgContext?.branch_id ?? null}
             onClose={() => { setShowManagerPin(false); setPendingAction(null); }}
             onApprove={() => {
               setShowManagerPin(false);
