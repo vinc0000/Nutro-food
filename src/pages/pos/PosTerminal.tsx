@@ -147,6 +147,7 @@ export default function PosTerminal() {
   const [orderType, setOrderType] = useState<'dine_in' | 'takeaway' | 'delivery'>('dine_in');
   const [showPayment, setShowPayment] = useState(false);
   const [payMethod, setPayMethod] = useState<PayMethod>('cash');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [paidSuccess, setPaidSuccess] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
   const [sessionStart] = useState(new Date());
@@ -243,6 +244,7 @@ export default function PosTerminal() {
         tax,
         total,
         source: 'pos',
+        customerPhone: customerPhone.trim() || null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -250,6 +252,7 @@ export default function PosTerminal() {
       setLastOrderNumber(orderNumber ?? null);
     }
 
+    setCustomerPhone('');
     setPaidSuccess(true);
     setIsPaid(true);
     setOrderCount(c => c + 1);
@@ -509,6 +512,12 @@ export default function PosTerminal() {
                         <m.icon size={18} />{m.label}
                       </button>
                     ))}
+                  </div>
+                  <div className="mb-4">
+                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Customer phone (optional — for WhatsApp confirmation)</label>
+                    <input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="+234 XXX XXX XXXX"
+                      className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
+                      style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
                   </div>
                   {payMethod === 'mobile_money' && (
                     <div className="mb-4 p-3.5 rounded-xl border space-y-2" style={{ background: '#f5a62310', borderColor: '#f5a62330' }}>

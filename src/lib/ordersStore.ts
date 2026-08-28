@@ -30,6 +30,7 @@ export interface SharedOrder {
   total: number;
   source: 'pos' | 'tablet';
   note?: string;
+  customerPhone?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -185,6 +186,7 @@ export function useSharedOrders(branchId: string | null) {
       total_amount: order.total,
       source: order.source,
       notes: order.note ?? null,
+      customer_phone: order.customerPhone ?? null,
     } as never);
     if (insertError) { setError(insertError.message); return; }
 

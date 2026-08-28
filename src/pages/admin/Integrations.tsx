@@ -30,6 +30,7 @@ interface IntegrationRow {
 const PROVIDERS: Array<{
   key: Provider; name: string; description: string; icon: React.ComponentType<{ size?: number | string; style?: React.CSSProperties }>; color: string;
   url: string; keyLabel: string; keyPlaceholder: string; live: boolean;
+  extraFields?: Array<{ key: string; label: string; placeholder: string }>;
 }> = [
   {
     key: 'atlas_crm', name: 'Atlas CRM', icon: Users, color: '#0176d3',
@@ -43,8 +44,12 @@ const PROVIDERS: Array<{
   },
   {
     key: 'whatsapp', name: 'WhatsApp Business', icon: WhatsAppLogo, color: '#25D366',
-    description: 'Send order confirmations and ready-for-pickup alerts to customers over WhatsApp.',
-    url: 'https://business.whatsapp.com', keyLabel: 'WhatsApp Cloud API Token', keyPlaceholder: 'EAAG...', live: false,
+    description: 'Send order confirmations to customers over WhatsApp, via Meta\'s real Cloud API.',
+    url: 'https://business.whatsapp.com', keyLabel: 'WhatsApp Cloud API Access Token', keyPlaceholder: 'EAAG...', live: true,
+    extraFields: [
+      { key: 'phone_number_id', label: 'Phone Number ID', placeholder: 'from Meta Business Manager' },
+      { key: 'template_name', label: 'Approved Template Name', placeholder: 'order_confirmation' },
+    ],
   },
   {
     key: 'webhook', name: 'Custom Webhook', icon: Webhook, color: '#8b5cf6',
@@ -62,6 +67,7 @@ export default function AdminIntegrations() {
   const [loading, setLoading] = useState(true);
   const [connectTarget, setConnectTarget] = useState<Provider | null>(null);
   const [apiKeyInput, setApiKeyInput] = useState('');
+  const [extraInputs, setExtraInputs] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -79,12 +85,20 @@ export default function AdminIntegrations() {
 
   const connect = async () => {
     if (!connectTarget || !orgId || !apiKeyInput.trim()) return;
+    const target = PROVIDERS.find(p => p.key === connectTarget);
+    if (target?.extraFields?.some(f => !extraInputs[f.key]?.trim())) {
+      setError('Please fill in every field — WhatsApp needs all three to actually send a message.');
+      return;
+    }
     setBusy(true);
     setError(null);
+    const config: Record<string, string> = {};
+    for (const f of target?.extraFields ?? []) config[f.key] = extraInputs[f.key].trim();
     const { error: upsertError } = await supabase.from('integrations').upsert({
       org_id: orgId,
       provider: connectTarget,
       api_key: apiKeyInput.trim(),
+      config,
       enabled: true,
       connected_at: new Date().toISOString(),
     } as never, { onConflict: 'org_id,provider' } as never);
@@ -92,6 +106,7 @@ export default function AdminIntegrations() {
     if (upsertError) { setError(upsertError.message); return; }
     setConnectTarget(null);
     setApiKeyInput('');
+    setExtraInputs({});
     showToast(`${PROVIDERS.find(p => p.key === connectTarget)?.name} connected`);
     void load();
   };
@@ -160,7 +175,7 @@ export default function AdminIntegrations() {
                       <Trash2 size={12} /> Disconnect
                     </button>
                   ) : (
-                    <button onClick={() => { setConnectTarget(p.key); setApiKeyInput(''); setError(null); }} disabled={!orgId}
+                    <button onClick={() => { setConnectTarget(p.key); setApiKeyInput(''); setExtraInputs({}); setError(null); }} disabled={!orgId}
                       className="w-full py-2 rounded-lg text-xs font-bold text-white disabled:opacity-50 flex items-center justify-center gap-1.5"
                       style={{ background: theme.primary }}>
                       <Plug size={12} /> Connect
@@ -175,10 +190,11 @@ export default function AdminIntegrations() {
         <div className="p-4 rounded-xl mt-4" style={{ background: theme.bg, border: `1px solid ${theme.border}` }}>
           <p className="text-xs" style={{ color: theme.textMuted }}>
             Connecting a provider securely stores its credentials for your organization only (protected by the same
-            role-based access as staff PIN resets and refunds). The two-way data sync for each provider — pushing
-            orders to LiBooks for bookkeeping, pushing customers to Atlas CRM, sending WhatsApp notifications — is
-            being built against each provider's own API next; connecting today reserves your spot and lets us reach
-            out once sync for that provider goes live.
+            role-based access as staff PIN resets and refunds). <strong>Custom Webhook</strong> and <strong>WhatsApp
+            Business</strong> are fully live: a webhook fires a real POST for every new order, and WhatsApp sends a
+            real order-confirmation template message via Meta's Cloud API whenever an order has a customer phone
+            number attached. <strong>Atlas CRM</strong> and <strong>LiBooks</strong> need their own API documentation
+            before Nutro can integrate against them for real — support@liafrik.com can share their API access.
           </p>
         </div>
       </PlanGate>
@@ -198,10 +214,17 @@ export default function AdminIntegrations() {
                 <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>{PROVIDERS.find(p => p.key === connectTarget)?.keyLabel}</label>
                 <input value={apiKeyInput} onChange={e => setApiKeyInput(e.target.value)} placeholder={PROVIDERS.find(p => p.key === connectTarget)?.keyPlaceholder}
                   className="w-full px-4 py-2.5 rounded-xl text-sm outline-none font-mono" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+                {PROVIDERS.find(p => p.key === connectTarget)?.extraFields?.map(f => (
+                  <div key={f.key} className="mt-3">
+                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>{f.label}</label>
+                    <input value={extraInputs[f.key] ?? ''} onChange={e => setExtraInputs(prev => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder}
+                      className="w-full px-4 py-2.5 rounded-xl text-sm outline-none font-mono" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+                  </div>
+                ))}
                 {error && <p className="text-xs mt-2" style={{ color: '#ef4444' }}>{error}</p>}
               </div>
               <div className="flex gap-3 mt-5">
-                <button onClick={() => void connect()} disabled={busy || !apiKeyInput.trim()}
+                <button onClick={() => void connect()} disabled={busy || !apiKeyInput.trim() || (PROVIDERS.find(p => p.key === connectTarget)?.extraFields?.some(f => !extraInputs[f.key]?.trim()) ?? false)}
                   className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-50 flex items-center justify-center gap-2" style={{ background: theme.primary }}>
                   {busy && <Loader2 size={14} className="animate-spin" />} Connect
                 </button>
