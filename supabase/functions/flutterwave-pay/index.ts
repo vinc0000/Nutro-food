@@ -22,7 +22,7 @@ interface OrgContext {
   plan_status: string | null;
 }
 
-async function getOrgContext(supabase: ReturnType<typeof createClient>, userId: string): Promise<OrgContext | null> {
+async function getOrgContext(supabase: ReturnType<typeof createClient>): Promise<OrgContext | null> {
   const { data, error } = await supabase.rpc("get_user_org_context");
   if (error) throw error;
   return (data as OrgContext | null) ?? null;
@@ -152,6 +152,17 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // get_user_org_context() resolves the org via auth.uid() — calling it on the
+    // service-role client above would run it as the service role itself (auth.uid()
+    // = null there), never the real caller, so it would fail this lookup for every
+    // real user. A second client, scoped to this specific request's own JWT, is what
+    // makes auth.uid() actually resolve to the person who's paying.
+    const supabaseAsUser = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
     const { action, plan, billing_period, tx_ref, transaction_id, tenant_org_id } = body as {
       action?: string;
       plan?: string;
@@ -168,7 +179,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const orgData = await getOrgContext(supabase, userData.user.id);
+    const orgData = await getOrgContext(supabaseAsUser);
     if (!orgData?.org_id) {
       return new Response(JSON.stringify({ error: "Could not find organization context for this user" }), {
         status: 400,
