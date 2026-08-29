@@ -30,6 +30,7 @@ interface StaffMember {
   active: boolean;
   since: string;
   permissions: Record<string, string[]> | null;
+  staffCode: string | null;
 }
 
 export default function AdminStaff() {
@@ -46,8 +47,10 @@ export default function AdminStaff() {
   const [addEmail, setAddEmail] = useState('');
   const [addRole, setAddRole] = useState('cashier');
   const [addCustomModules, setAddCustomModules] = useState<ModuleKey[]>([]);
+  const [addPin, setAddPin] = useState('');
   const [addBusy, setAddBusy] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [newStaffCode, setNewStaffCode] = useState<string | null>(null);
 
   const [deleteConfirm, setDeleteConfirm] = useState<StaffMember | null>(null);
   const [resetPinFor, setResetPinFor] = useState<StaffMember | null>(null);
@@ -68,7 +71,7 @@ export default function AdminStaff() {
 
     if (error) { setLoadError(error.message); setLoading(false); return; }
 
-    const rows = (data ?? []) as Array<{ id: string; user_id: string; role_name: string; is_active: boolean; created_at: string; permissions: Record<string, string[]> | null }>;
+    const rows = (data ?? []) as Array<{ id: string; user_id: string; role_name: string; is_active: boolean; created_at: string; permissions: Record<string, string[]> | null; staff_code: string | null }>;
 
     // The mock demo client's .from() builder only supports single-table filtering, so
     // resolve profile details with a second lookup rather than a real join — this keeps
@@ -88,6 +91,7 @@ export default function AdminStaff() {
         active: row.is_active,
         since: row.created_at,
         permissions: row.permissions ?? null,
+        staffCode: row.staff_code ?? null,
       };
     }));
 
@@ -139,21 +143,35 @@ export default function AdminStaff() {
       return;
     }
 
-    const { data: newId, error: insertError } = await supabase.rpc('add_staff_member', {
+    if (addPin && (addPin.length < 4 || addPin.length > 8)) {
+      setAddError('POS PIN must be 4 to 8 digits');
+      setAddBusy(false);
+      return;
+    }
+
+    // add_staff_member creates the membership AND generates its staff_code server-side
+    // (STF-##### — see generate_staff_code), and, if a POS PIN was entered here, sets
+    // it in the same call so the person can log into the POS immediately instead of
+    // needing a separate "Reset PIN" step afterwards.
+    const { data: result, error: insertError } = await supabase.rpc('add_staff_member', {
       p_org_id: orgId,
       p_user_id: existingProfile.id,
       p_role_name: addRole,
       p_permissions: permissionsByRole[addRole] ?? {},
+      p_pos_pin: addPin || null,
     });
 
     setAddBusy(false);
-    if (insertError || !newId) { setAddError(insertError?.message ?? 'Could not add staff member — check permissions'); return; }
+    if (insertError || !result) { setAddError(insertError?.message ?? 'Could not add staff member — check permissions'); return; }
 
+    const staffCode = (result as { staff_code?: string }).staff_code ?? null;
     setShowAdd(false);
     setAddEmail('');
     setAddRole('cashier');
     setAddCustomModules([]);
-    showToast('Staff member added');
+    setAddPin('');
+    setNewStaffCode(staffCode);
+    showToast(staffCode ? `Staff added — code ${staffCode}` : 'Staff member added');
     loadStaff();
   };
 
@@ -263,7 +281,10 @@ export default function AdminStaff() {
                     {isSelf && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: theme.primary + '20', color: theme.primary }}>YOU</span>}
                     {!member.active && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#ef444420', color: '#ef4444' }}>Inactive</span>}
                   </div>
-                  <span className="text-xs" style={{ color: theme.textMuted }}>{member.email} · Since {new Date(member.since).toLocaleDateString()}</span>
+                  <span className="text-xs" style={{ color: theme.textMuted }}>
+                    {member.email} · Since {new Date(member.since).toLocaleDateString()}
+                    {member.staffCode && <> · <span className="font-mono font-bold" style={{ color: theme.text }}>{member.staffCode}</span></>}
+                  </span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <button onClick={() => { setResetPinFor(member); setNewPin(''); }} title="Reset PIN" className="p-1.5 rounded-lg hover:opacity-70" style={{ color: '#f59e0b' }}><Key size={14} /></button>
@@ -328,6 +349,12 @@ export default function AdminStaff() {
                     </div>
                   </div>
                 )}
+                <div>
+                  <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>POS PIN (optional)</label>
+                  <input value={addPin} onChange={e => setAddPin(e.target.value.replace(/\D/g, '').slice(0, 8))} placeholder="4–8 digits, for POS login"
+                    className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+                  <p className="text-[10px] mt-1" style={{ color: theme.textMuted }}>Leave blank to set it later from the team list. A unique staff code is generated automatically for POS sales tracking.</p>
+                </div>
                 {addError && <p className="text-xs" style={{ color: '#ef4444' }}>{addError}</p>}
               </div>
               <div className="flex gap-3 mt-5">
@@ -336,6 +363,22 @@ export default function AdminStaff() {
                 </button>
                 <button onClick={() => setShowAdd(false)} className="px-4 py-2.5 rounded-xl font-bold text-sm" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Cancel</button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {newStaffCode && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={() => setNewStaffCode(null)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="w-full max-w-sm rounded-2xl p-6 text-center" style={{ background: theme.surface, border: `1px solid ${theme.border}` }} onClick={e => e.stopPropagation()}>
+              <Check size={28} style={{ color: '#16A34A', margin: '0 auto 8px' }} />
+              <h2 className="text-lg font-extrabold mb-1" style={{ color: theme.text }}>Staff member added</h2>
+              <p className="text-xs mb-4" style={{ color: theme.textMuted }}>Their sales at the POS will be tracked under this code and their name.</p>
+              <div className="py-3 rounded-xl font-mono text-2xl font-extrabold mb-4" style={{ background: theme.bg, color: theme.primary, border: `1px solid ${theme.border}` }}>{newStaffCode}</div>
+              <button onClick={() => setNewStaffCode(null)} className="w-full py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: theme.primary }}>Got it</button>
             </motion.div>
           </motion.div>
         )}
