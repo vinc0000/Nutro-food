@@ -10,20 +10,21 @@ import Logo from '@/components/Logo';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLocale } from '@/contexts/LocaleContext';
+import { useModuleAccess } from '@/hooks/useOrgContext';
 import ThemeSwitcher from '@/components/ui/ThemeSwitcher';
 import TrialBanner from '@/components/ui/TrialBanner';
 import { CURRENCIES, LANGUAGES } from '@/lib/countries';
 
 const NAV = [
-  { to: '/app/admin', icon: LayoutDashboard, labelKey: 'layout.dashboard', end: true },
-  { to: '/app/tablet', icon: Tablet, labelKey: 'layout.tabletMenu', external: true },
-  { to: '/app/admin/menu', icon: UtensilsCrossed, labelKey: 'layout.menuManager' },
-  { to: '/app/pos', icon: Monitor, labelKey: 'layout.posTerminal', external: true },
-  { to: '/app/kds', icon: ChefHat, labelKey: 'layout.kds', external: true },
-  { to: '/app/admin/reports', icon: FileBarChart, labelKey: 'layout.reports' },
-  { to: '/app/admin/staff', icon: Users, labelKey: 'layout.staff' },
-  { to: '/app/admin/integrations', icon: Plug, labelKey: 'layout.integrations' },
-  { to: '/app/admin/settings', icon: Settings, labelKey: 'layout.settings' },
+  { to: '/app/admin', icon: LayoutDashboard, labelKey: 'layout.dashboard', end: true, module: 'dashboard' as const },
+  { to: '/app/tablet', icon: Tablet, labelKey: 'layout.tabletMenu', external: true, module: 'tablet' as const },
+  { to: '/app/admin/menu', icon: UtensilsCrossed, labelKey: 'layout.menuManager', module: 'menu' as const },
+  { to: '/app/pos', icon: Monitor, labelKey: 'layout.posTerminal', external: true, module: 'pos' as const },
+  { to: '/app/kds', icon: ChefHat, labelKey: 'layout.kds', external: true, module: 'kds' as const },
+  { to: '/app/admin/reports', icon: FileBarChart, labelKey: 'layout.reports', module: 'reports' as const },
+  { to: '/app/admin/staff', icon: Users, labelKey: 'layout.staff', module: 'staff' as const },
+  { to: '/app/admin/integrations', icon: Plug, labelKey: 'layout.integrations', module: 'integrations' as const },
+  { to: '/app/admin/settings', icon: Settings, labelKey: 'layout.settings', module: 'settings' as const },
 ];
 
 export default function AdminLayout() {
@@ -39,6 +40,8 @@ export default function AdminLayout() {
   const [currency, setCurrency] = useState('USD');
 
   const isSuperAdmin = profile?.system_role === 'super_admin';
+  const { can } = useModuleAccess();
+  const visibleNav = isSuperAdmin ? NAV : NAV.filter(item => can(item.module));
   const selectedCurrency = CURRENCIES.find(c => c.code === currency);
   const selectedLang = LANGUAGES.find(l => l.code === lang);
 
@@ -67,7 +70,7 @@ export default function AdminLayout() {
         </button>
       </div>
       <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
-        {NAV.map(item =>
+        {visibleNav.map(item =>
           item.external ? (
             <a key={item.to} href={item.to} target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-80"

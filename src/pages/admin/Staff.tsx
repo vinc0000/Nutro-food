@@ -3,8 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Edit2, Trash2, Shield, Key, AlertTriangle, Archive, X, Check, Loader2 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOrgContext } from '@/hooks/useOrgContext';
+import { useOrgContext, ALL_MODULES, ROLE_MODULE_ACCESS, type ModuleKey } from '@/hooks/useOrgContext';
 import { supabase } from '@/lib/supabase';
+
+const MODULE_LABELS: Record<ModuleKey, string> = {
+  dashboard: 'Dashboard', tablet: 'Tablet Menu', menu: 'Menu Manager', pos: 'POS Terminal',
+  kds: 'KDS', orders: 'Orders', reports: 'Reports', staff: 'Staff & Access', integrations: 'Integrations', settings: 'Settings',
+};
 
 const roleConfig: Record<string, { label: string; color: string; perms: string[] }> = {
   owner: { label: 'Owner', color: '#0369A1', perms: ['Full access', 'Billing', 'All branches'] },
@@ -24,6 +29,7 @@ interface StaffMember {
   role: string;
   active: boolean;
   since: string;
+  permissions: Record<string, string[]> | null;
 }
 
 export default function AdminStaff() {
@@ -39,6 +45,7 @@ export default function AdminStaff() {
   const [showAdd, setShowAdd] = useState(false);
   const [addEmail, setAddEmail] = useState('');
   const [addRole, setAddRole] = useState('cashier');
+  const [addCustomModules, setAddCustomModules] = useState<ModuleKey[]>([]);
   const [addBusy, setAddBusy] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
@@ -61,7 +68,7 @@ export default function AdminStaff() {
 
     if (error) { setLoadError(error.message); setLoading(false); return; }
 
-    const rows = (data ?? []) as Array<{ id: string; user_id: string; role_name: string; is_active: boolean; created_at: string }>;
+    const rows = (data ?? []) as Array<{ id: string; user_id: string; role_name: string; is_active: boolean; created_at: string; permissions: Record<string, string[]> | null }>;
 
     // The mock demo client's .from() builder only supports single-table filtering, so
     // resolve profile details with a second lookup rather than a real join — this keeps
@@ -80,6 +87,7 @@ export default function AdminStaff() {
         role: row.role_name,
         active: row.is_active,
         since: row.created_at,
+        permissions: row.permissions ?? null,
       };
     }));
 
@@ -118,12 +126,18 @@ export default function AdminStaff() {
     }
 
     const permissionsByRole: Record<string, Record<string, string[]>> = {
-      branch_manager: { menu: ['read', 'write'], orders: ['read', 'write'], reports: ['read'], staff: ['read', 'write'] },
-      cashier: { pos: ['read', 'write'], orders: ['read', 'write'] },
-      kitchen_staff: { kds: ['read', 'write'] },
-      accountant: { reports: ['read'] },
-      custom: {},
+      branch_manager: Object.fromEntries(ROLE_MODULE_ACCESS.branch_manager.map(m => [m, ['read', 'write']])),
+      cashier: Object.fromEntries(ROLE_MODULE_ACCESS.cashier.map(m => [m, ['read', 'write']])),
+      kitchen_staff: Object.fromEntries(ROLE_MODULE_ACCESS.kitchen_staff.map(m => [m, ['read', 'write']])),
+      accountant: Object.fromEntries(ROLE_MODULE_ACCESS.accountant.map(m => [m, ['read']])),
+      custom: Object.fromEntries(addCustomModules.map(m => [m, ['read', 'write']])),
     };
+
+    if (addRole === 'custom' && addCustomModules.length === 0) {
+      setAddError('Pick at least one module this custom role can access.');
+      setAddBusy(false);
+      return;
+    }
 
     const { data: newId, error: insertError } = await supabase.rpc('add_staff_member', {
       p_org_id: orgId,
@@ -138,6 +152,7 @@ export default function AdminStaff() {
     setShowAdd(false);
     setAddEmail('');
     setAddRole('cashier');
+    setAddCustomModules([]);
     showToast('Staff member added');
     loadStaff();
   };
@@ -153,10 +168,22 @@ export default function AdminStaff() {
 
   const saveEdit = async () => {
     if (!editStaff) return;
+    if (editStaff.role === 'custom' && Object.keys(editStaff.permissions ?? {}).length === 0) {
+      showToast('Pick at least one module for this custom role');
+      return;
+    }
+    const permissionsForRole: Record<string, Record<string, string[]>> = {
+      branch_manager: Object.fromEntries(ROLE_MODULE_ACCESS.branch_manager.map(m => [m, ['read', 'write']])),
+      cashier: Object.fromEntries(ROLE_MODULE_ACCESS.cashier.map(m => [m, ['read', 'write']])),
+      kitchen_staff: Object.fromEntries(ROLE_MODULE_ACCESS.kitchen_staff.map(m => [m, ['read', 'write']])),
+      accountant: Object.fromEntries(ROLE_MODULE_ACCESS.accountant.map(m => [m, ['read']])),
+      custom: editStaff.permissions ?? {},
+    };
     const { data: ok, error } = await supabase.rpc('update_staff_member', {
       p_membership_id: editStaff.membershipId,
       p_role_name: editStaff.role,
       p_is_active: editStaff.active,
+      p_permissions: permissionsForRole[editStaff.role] ?? {},
     });
     if (error || !ok) { showToast(`Failed: ${error?.message ?? 'check permissions'}`); return; }
     setEditStaff(null);
@@ -256,10 +283,9 @@ export default function AdminStaff() {
         <div className="flex items-center gap-2 mb-4">
           <Shield size={18} style={{ color: theme.primary }} />
           <h2 className="font-extrabold" style={{ color: theme.text }}>Custom Role Builder</h2>
-          <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{ background: '#0369A120', color: '#0369A1' }}>Coming Soon</span>
         </div>
         <p className="text-sm" style={{ color: theme.textMuted }}>
-          Fine-grained, per-permission custom roles aren't wired up yet — today's roles ({Object.values(roleConfig).filter(r => r !== roleConfig.owner && r !== roleConfig.org_owner).map(r => r.label).join(', ')}) come with a fixed permission set. This section will let you toggle individual permissions once that's built.
+          The 5 fixed roles ({Object.values(roleConfig).filter(r => r !== roleConfig.owner && r !== roleConfig.org_owner).map(r => r.label).join(', ')}) come with a preset module list. Pick <strong>Custom Role</strong> when adding or editing a staff member to choose exactly which modules (POS, KDS, Menu, Reports, Staff, Integrations, Settings…) that person can open — access is enforced immediately, both in the sidebar and if they try to open a module directly by URL.
         </p>
       </div>
 
@@ -287,6 +313,21 @@ export default function AdminStaff() {
                     {Object.entries(roleConfig).filter(([key]) => key !== 'owner' && key !== 'org_owner').map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
                   </select>
                 </div>
+                {addRole === 'custom' && (
+                  <div>
+                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Modules this role can access</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {ALL_MODULES.map(m => (
+                        <label key={m} className="flex items-center gap-2 text-xs font-medium cursor-pointer px-3 py-2 rounded-lg" style={{ background: theme.bg, border: `1px solid ${theme.border}` }}>
+                          <input type="checkbox" checked={addCustomModules.includes(m)}
+                            onChange={e => setAddCustomModules(prev => e.target.checked ? [...prev, m] : prev.filter(x => x !== m))}
+                            style={{ accentColor: theme.primary }} />
+                          <span style={{ color: theme.text }}>{MODULE_LABELS[m]}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {addError && <p className="text-xs" style={{ color: '#ef4444' }}>{addError}</p>}
               </div>
               <div className="flex gap-3 mt-5">
@@ -320,6 +361,30 @@ export default function AdminStaff() {
                     {Object.entries(roleConfig).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
                   </select>
                 </div>
+                {editStaff.role === 'custom' && (
+                  <div>
+                    <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Modules this role can access</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {ALL_MODULES.map(m => {
+                        const checked = Object.keys(editStaff.permissions ?? {}).includes(m);
+                        return (
+                          <label key={m} className="flex items-center gap-2 text-xs font-medium cursor-pointer px-3 py-2 rounded-lg" style={{ background: theme.bg, border: `1px solid ${theme.border}` }}>
+                            <input type="checkbox" checked={checked}
+                              onChange={e => setEditStaff(p => {
+                                if (!p) return p;
+                                const current = { ...(p.permissions ?? {}) };
+                                if (e.target.checked) current[m] = ['read', 'write'];
+                                else delete current[m];
+                                return { ...p, permissions: current };
+                              })}
+                              style={{ accentColor: theme.primary }} />
+                            <span style={{ color: theme.text }}>{MODULE_LABELS[m]}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
                   <input type="checkbox" checked={editStaff.active} onChange={e => setEditStaff(p => p ? { ...p, active: e.target.checked } : p)} style={{ accentColor: theme.primary }} />
                   <span style={{ color: theme.text }}>Active</span>

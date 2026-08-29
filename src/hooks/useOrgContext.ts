@@ -33,6 +33,26 @@ export interface PlanInfo {
   canAccess: (feature: string) => boolean;
 }
 
+export type ModuleKey = 'dashboard' | 'tablet' | 'menu' | 'pos' | 'kds' | 'orders' | 'reports' | 'staff' | 'integrations' | 'settings';
+
+export const ALL_MODULES: ModuleKey[] = ['dashboard', 'tablet', 'menu', 'pos', 'kds', 'orders', 'reports', 'staff', 'integrations', 'settings'];
+
+// Canonical module access per fixed role, derived from each role's already-documented
+// permission list shown in Staff.tsx's roleConfig (e.g. branch_manager: "Menu edit,
+// Staff manage, View reports, Approve refunds" -> menu/staff/reports/orders, plus pos
+// since approving a refund happens at the POS). Owner/org_owner are intentionally
+// absent — they always have full, unrestricted access, see useModuleAccess below.
+// This is also the exact shape written to user_org_roles.permissions by
+// addStaffMember()/saveEdit() in Staff.tsx, so a role's enforcement here and what's
+// actually stored for it are always the same source of truth — a custom role is
+// simply whatever module keys are present in its own stored permissions object.
+export const ROLE_MODULE_ACCESS: Record<string, ModuleKey[]> = {
+  branch_manager: ['dashboard', 'tablet', 'menu', 'pos', 'kds', 'orders', 'reports', 'staff'],
+  cashier: ['pos', 'orders'],
+  kitchen_staff: ['kds'],
+  accountant: ['dashboard', 'reports'],
+};
+
 const PLAN_FEATURES: Record<string, string[]> = {
   starter: ['pos', 'menu', 'orders', 'basic_reports', 'tables', 'kds', 'staff'],
   premium: ['pos', 'menu', 'orders', 'basic_reports', 'advanced_reports', 'tables', 'kds', 'staff', 'inventory', 'crm', 'multi_branch', 'integrations'],
@@ -122,3 +142,27 @@ export function usePlanInfo(): PlanInfo & { loading: boolean; refresh: () => Pro
     refresh,
   };
 }
+
+// Real, enforced module access — not cosmetic. Consumed by RouteGuards.tsx (blocks
+// direct URL navigation to a module the role doesn't have, not just hiding the nav
+// link) and AdminLayout (hides nav links the current role can't use). A 'custom' role
+// is whatever module keys exist in its own stored permissions object, set by Staff.tsx's
+// Custom Role Builder — so building that UI and enforcing access here are the same
+// mechanism end to end, not a form that saves to a column nothing reads.
+export function useModuleAccess(): { allowed: ModuleKey[]; can: (m: ModuleKey) => boolean; loading: boolean } {
+  const { orgContext, loading } = useOrgContext();
+  const role = orgContext?.role;
+  const isOwner = role === 'owner' || role === 'org_owner';
+
+  let allowed: ModuleKey[];
+  if (isOwner) {
+    allowed = ALL_MODULES;
+  } else if (role === 'custom') {
+    allowed = Object.keys(orgContext?.permissions ?? {}) as ModuleKey[];
+  } else {
+    allowed = ROLE_MODULE_ACCESS[role ?? ''] ?? [];
+  }
+
+  return { allowed, can: (m: ModuleKey) => allowed.includes(m), loading };
+}
+
