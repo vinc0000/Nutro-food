@@ -74,6 +74,13 @@ Deno.serve(async (req: Request) => {
     };
 
     if (action === "status") {
+      const authHeaderForStatus = req.headers.get("Authorization");
+      if (!authHeaderForStatus) {
+        return new Response(JSON.stringify({ error: "Missing auth header" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       return new Response(JSON.stringify({ configured: Boolean(payunitCredentials()) }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
