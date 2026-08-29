@@ -16,7 +16,6 @@ import TrialBanner from '@/components/ui/TrialBanner';
 import { CURRENCIES, LANGUAGES } from '@/lib/countries';
 
 const NAV = [
-const NAV = [
   { to: '/app/admin', icon: LayoutDashboard, labelKey: 'layout.dashboard', end: true, module: 'dashboard' as const },
   { to: '/app/tablet', icon: Tablet, labelKey: 'layout.tabletMenu', external: true, module: 'tablet' as const },
   { to: '/app/admin/menu', icon: UtensilsCrossed, labelKey: 'layout.menuManager', module: 'menu' as const },

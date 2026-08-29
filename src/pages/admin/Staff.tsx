@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase';
 
 const MODULE_LABELS: Record<ModuleKey, string> = {
   dashboard: 'Dashboard', tablet: 'Tablet Menu', menu: 'Menu Manager', pos: 'POS Terminal',
-  kds: 'KDS', orders: 'Orders', reports: 'Reports', staff: 'Staff & Access', integrations: 'Integrations', settings: 'Settings',
+  kds: 'KDS', orders: 'Orders', reports: 'Reports', staff: 'Staff & Access', integrations: 'Integrations', settings: 'Settings', inventory: 'Inventory',
 };
 
 const roleConfig: Record<string, { label: string; color: string; perms: string[] }> = {
