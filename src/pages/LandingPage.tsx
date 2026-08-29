@@ -551,7 +551,10 @@ export default function LandingPage() {
               <Sparkles size={14} /> Tarification simple
             </div>
             <h2 className="text-4xl md:text-5xl font-bold mb-4" style={{ color: theme.text }}>Démarrez gratuitement. Scalez sans effort.</h2>
-            <p className="text-xl" style={{ color: theme.textMuted }}>Tous les plans incluent KDS & reçus thermiques. Essai 14 jours gratuit. Sans carte de crédit.</p>
+            <p className="text-xl mb-6" style={{ color: theme.textMuted }}>Tous les plans incluent KDS & reçus thermiques. Essai 14 jours gratuit. Sans carte de crédit.</p>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold" style={{ background: theme.primary + '15', color: theme.primary, border: `1px solid ${theme.primary}30` }}>
+              <Sparkles size={14} /> Payez 12 mois, on vous en offre 2 — l'abonnement annuel équivaut à 10 mois facturés
+            </div>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
             {PLANS.map((plan, i) => (
