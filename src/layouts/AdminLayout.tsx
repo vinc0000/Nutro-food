@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, UtensilsCrossed, Users,
   Settings, LogOut, ChevronLeft, ChevronRight, Monitor,
-  ChefHat, Bell, Tablet, FileBarChart, ShieldCheck, Menu as MenuIcon,
+  ChefHat, Bell, Tablet, FileBarChart, ShieldCheck, Menu as MenuIcon, Package,
   X, ChevronDown, Languages, Plug
 } from 'lucide-react';
 import Logo from '@/components/Logo';
@@ -16,12 +16,14 @@ import TrialBanner from '@/components/ui/TrialBanner';
 import { CURRENCIES, LANGUAGES } from '@/lib/countries';
 
 const NAV = [
+const NAV = [
   { to: '/app/admin', icon: LayoutDashboard, labelKey: 'layout.dashboard', end: true, module: 'dashboard' as const },
   { to: '/app/tablet', icon: Tablet, labelKey: 'layout.tabletMenu', external: true, module: 'tablet' as const },
   { to: '/app/admin/menu', icon: UtensilsCrossed, labelKey: 'layout.menuManager', module: 'menu' as const },
   { to: '/app/pos', icon: Monitor, labelKey: 'layout.posTerminal', external: true, module: 'pos' as const },
   { to: '/app/kds', icon: ChefHat, labelKey: 'layout.kds', external: true, module: 'kds' as const },
   { to: '/app/admin/reports', icon: FileBarChart, labelKey: 'layout.reports', module: 'reports' as const },
+  { to: '/app/admin/inventory', icon: Package, labelKey: 'layout.inventory', module: 'inventory' as const },
   { to: '/app/admin/staff', icon: Users, labelKey: 'layout.staff', module: 'staff' as const },
   { to: '/app/admin/integrations', icon: Plug, labelKey: 'layout.integrations', module: 'integrations' as const },
   { to: '/app/admin/settings', icon: Settings, labelKey: 'layout.settings', module: 'settings' as const },

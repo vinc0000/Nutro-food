@@ -34,9 +34,9 @@ export interface PlanInfo {
   canAccess: (feature: string) => boolean;
 }
 
-export type ModuleKey = 'dashboard' | 'tablet' | 'menu' | 'pos' | 'kds' | 'orders' | 'reports' | 'staff' | 'integrations' | 'settings';
+export type ModuleKey = 'dashboard' | 'tablet' | 'menu' | 'pos' | 'kds' | 'orders' | 'reports' | 'staff' | 'integrations' | 'settings' | 'inventory';
 
-export const ALL_MODULES: ModuleKey[] = ['dashboard', 'tablet', 'menu', 'pos', 'kds', 'orders', 'reports', 'staff', 'integrations', 'settings'];
+export const ALL_MODULES: ModuleKey[] = ['dashboard', 'tablet', 'menu', 'pos', 'kds', 'orders', 'reports', 'staff', 'integrations', 'settings', 'inventory'];
 
 // Canonical module access per fixed role, derived from each role's already-documented
 // permission list shown in Staff.tsx's roleConfig (e.g. branch_manager: "Menu edit,
@@ -48,7 +48,7 @@ export const ALL_MODULES: ModuleKey[] = ['dashboard', 'tablet', 'menu', 'pos', '
 // actually stored for it are always the same source of truth — a custom role is
 // simply whatever module keys are present in its own stored permissions object.
 export const ROLE_MODULE_ACCESS: Record<string, ModuleKey[]> = {
-  branch_manager: ['dashboard', 'tablet', 'menu', 'pos', 'kds', 'orders', 'reports', 'staff'],
+  branch_manager: ['dashboard', 'tablet', 'menu', 'pos', 'kds', 'orders', 'reports', 'staff', 'inventory'],
   cashier: ['pos', 'orders'],
   kitchen_staff: ['kds'],
   accountant: ['dashboard', 'reports'],

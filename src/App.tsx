@@ -40,6 +40,7 @@ const AdminOrders = lazy(() => import('@/pages/admin/Orders'));
 const AdminStaff = lazy(() => import('@/pages/admin/Staff'));
 const AdminSettings = lazy(() => import('@/pages/admin/Settings'));
 const AdminReports = lazy(() => import('@/pages/admin/Reports'));
+const AdminInventory = lazy(() => import('@/pages/admin/Inventory'));
 
 const PosTerminal = lazy(() => import('@/pages/pos/PosTerminal'));
 const KdsView = lazy(() => import('@/pages/kds/KdsView'));
@@ -94,6 +95,7 @@ export default function App() {
                 <Route path="menu" element={<AdminMenu />} />
                 <Route path="orders" element={<AdminOrders />} />
                 <Route path="reports" element={<AdminReports />} />
+                <Route path="inventory" element={<AdminInventory />} />
                 <Route path="staff" element={<AdminStaff />} />
                 <Route path="integrations" element={<AdminIntegrations />} />
                 <Route path="settings" element={<AdminSettings />} />
