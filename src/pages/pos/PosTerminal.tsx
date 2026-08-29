@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Monitor, Search, Plus, Minus, X, CreditCard, Banknote, Smartphone, Gift,
   Clock, Printer, ArrowLeft, Check, Hash, Edit2, FileText, Lock,
-  Tablet
+  Tablet, Volume2, VolumeX
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSharedMenu } from '@/lib/menuStore';
 import { useSharedOrders, SharedOrder } from '@/lib/ordersStore';
 import { usePlanInfo, useOrgContext } from '@/hooks/useOrgContext';
+import { playNotificationSound } from '@/lib/notificationSound';
 import { CURRENCIES } from '@/lib/countries';
 import { supabase } from '@/lib/supabase';
 import { usePosLock } from '@/components/guards/PosPinGate';
@@ -163,6 +164,7 @@ export default function PosTerminal() {
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastOrderNumber, setLastOrderNumber] = useState<string | null>(null);
   const [showZReport, setShowZReport] = useState(false);
+  const [zReportMode, setZReportMode] = useState<'x' | 'z'>('z');
   const [zReportPrinted, setZReportPrinted] = useState(0);
   const [showManagerPin, setShowManagerPin] = useState(false);
   const [pendingAction, setPendingAction] = useState<null | 'void'>(null);
@@ -194,6 +196,64 @@ export default function PosTerminal() {
   const isCashAmountValid = !Number.isNaN(cashGivenAmount) && cashGivenAmount >= total;
   const change = isCashAmountValid ? cashGivenAmount - total : 0;
   const pendingTabletOrders = tabletOrders.filter(o => o.status === 'pending');
+  const [posSoundOn, setPosSoundOn] = useState(true);
+  const knownPendingTabletIds = useRef<Set<string> | null>(null);
+
+  // A cashier can't be expected to keep glancing at the tablet-orders badge — this
+  // plays an audible beep the moment a NEW tablet order arrives (not just a silent
+  // count going up), same real-sound mechanism as KDS. Seeds on first render
+  // (skip=true) so opening POS with orders already pending doesn't beep for orders
+  // that aren't actually new.
+  useEffect(() => {
+    const currentIds = new Set(pendingTabletOrders.map(o => o.id));
+    if (knownPendingTabletIds.current === null) {
+      knownPendingTabletIds.current = currentIds;
+      return;
+    }
+    const hasNew = pendingTabletOrders.some(o => !knownPendingTabletIds.current!.has(o.id));
+    if (hasNew) {
+      playNotificationSound(posSoundOn);
+      setShowTabletOrders(true);
+    }
+    knownPendingTabletIds.current = currentIds;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingTabletOrders.map(o => o.id).join(',')]);
+
+  const zReportPrintLimit = orgContext?.z_report_print_limit ?? 2;
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const zReportStorageKey = `nutro:zreport-printed:${orgContext?.branch_id ?? 'branch'}:${todayKey}`;
+
+  // Real day totals for the X/Z report — every order for this branch placed today,
+  // not just what this cashier has rung up since logging in (that's what the header's
+  // sessionSales/orderCount still shows, which is a genuinely different, smaller
+  // number: "since I logged in" vs "the whole branch's day"). A refund reduces net
+  // sales but the order still counts toward order count. Cancelled orders count
+  // toward neither, matching what an owner actually means by "sales today".
+  const todaysOrders = orders.filter(o => o.createdAt.slice(0, 10) === todayKey);
+  const todaysNetSales = todaysOrders
+    .filter(o => o.status !== 'cancelled')
+    .reduce((sum, o) => sum + (o.total - (o.refundAmount || 0)), 0);
+  const todaysOrderCount = todaysOrders.filter(o => o.status !== 'cancelled').length;
+  const todaysByMethod = todaysOrders
+    .filter(o => o.status !== 'cancelled' && o.paymentMethod)
+    .reduce((acc, o) => {
+      const key = o.paymentMethod as string;
+      acc[key] = (acc[key] ?? 0) + (o.total - (o.refundAmount || 0));
+      return acc;
+    }, {} as Record<string, number>);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(zReportStorageKey);
+    setZReportPrinted(stored ? parseInt(stored, 10) || 0 : 0);
+  }, [zReportStorageKey]);
+
+  const printZReport = () => {
+    if (zReportPrinted >= zReportPrintLimit) return;
+    const next = zReportPrinted + 1;
+    setZReportPrinted(next);
+    window.localStorage.setItem(zReportStorageKey, String(next));
+    window.print();
+  };
 
   const addItem = (item: typeof posMenu[number]) => {
     if (!item.available) return;
@@ -308,7 +368,14 @@ export default function PosTerminal() {
               <Tablet size={12} /> {t('pos.tabletOrders')}
               {pendingTabletOrders.length > 0 && <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ background: '#ef4444' }}>{pendingTabletOrders.length}</span>}
             </button>
-            <button onClick={() => setShowZReport(true)} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-full" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>
+            <button onClick={() => setPosSoundOn(p => !p)} title={posSoundOn ? 'Mute new-order sound' : 'Unmute new-order sound'}
+              className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-full" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>
+              {posSoundOn ? <Volume2 size={12} /> : <VolumeX size={12} />}
+            </button>
+            <button onClick={() => { setZReportMode('x'); setShowZReport(true); }} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-full" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>
+              <FileText size={12} /> X-Report
+            </button>
+            <button onClick={() => { setZReportMode('z'); setShowZReport(true); }} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-full" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>
               <FileText size={12} /> {t('pos.zReport')}
             </button>
             <span className="text-xs font-semibold px-2.5 py-1.5 rounded-full" style={{ color: theme.primary, background: theme.primary + '12' }}>{profile?.full_name ?? 'Cashier'}</span>
@@ -650,7 +717,12 @@ export default function PosTerminal() {
         )}
       </AnimatePresence>
 
-      {/* Z-Report modal */}
+      {/* X-Report / Z-Report modal — X is a non-destructive sales snapshot the
+          cashier can pull any number of times during the day; Z is the official
+          end-of-day print, capped at the admin-configured daily limit
+          (Settings > POS & Security) to prevent thermal-roll waste. Both show the
+          same real numbers: every order for this branch placed today, not just
+          this cashier's own session. */}
       <AnimatePresence>
         {showZReport && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -658,31 +730,40 @@ export default function PosTerminal() {
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
               className="w-96 rounded-2xl p-6" style={{ background: theme.surface, border: `1px solid ${theme.border}` }} onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-extrabold flex items-center gap-2" style={{ color: theme.text }}><FileText size={18} /> Z-Report - End of Day</h2>
+                <h2 className="text-lg font-extrabold flex items-center gap-2" style={{ color: theme.text }}>
+                  <FileText size={18} /> {zReportMode === 'z' ? 'Z-Report — End of Day' : 'X-Report — Sales Snapshot'}
+                </h2>
                 <button onClick={() => setShowZReport(false)} style={{ color: theme.textMuted }}><X size={18} /></button>
               </div>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between p-3 rounded-xl" style={{ background: theme.bg }}>
-                  <span style={{ color: theme.textMuted }}>Total Orders</span><span className="font-bold" style={{ color: theme.text }}>{orderCount}</span>
+                  <span style={{ color: theme.textMuted }}>Orders Today (branch)</span><span className="font-bold" style={{ color: theme.text }}>{todaysOrderCount}</span>
                 </div>
                 <div className="flex justify-between p-3 rounded-xl" style={{ background: theme.bg }}>
-                  <span style={{ color: theme.textMuted }}>Total Sales</span><span className="font-bold" style={{ color: theme.primary }}>{currencySymbol}{sessionSales.toFixed(2)}</span>
+                  <span style={{ color: theme.textMuted }}>Net Sales Today (branch)</span><span className="font-bold" style={{ color: theme.primary }}>{currencySymbol}{todaysNetSales.toFixed(2)}</span>
                 </div>
+                {Object.entries(todaysByMethod).map(([method, amount]) => (
+                  <div key={method} className="flex justify-between px-3 text-xs" style={{ color: theme.textMuted }}>
+                    <span className="capitalize">{method.replace('_', ' ')}</span><span>{currencySymbol}{amount.toFixed(2)}</span>
+                  </div>
+                ))}
                 <div className="flex justify-between p-3 rounded-xl" style={{ background: theme.bg }}>
-                  <span style={{ color: theme.textMuted }}>Session Duration</span><span className="font-bold" style={{ color: theme.text }}>{Math.floor((Date.now() - sessionStart.getTime()) / 60000)} min</span>
-                </div>
-                <div className="flex justify-between p-3 rounded-xl" style={{ background: theme.bg }}>
-                  <span style={{ color: theme.textMuted }}>Cashier</span><span className="font-bold" style={{ color: theme.text }}>{profile?.full_name ?? 'Staff'}</span>
+                  <span style={{ color: theme.textMuted }}>Printed By</span><span className="font-bold" style={{ color: theme.text }}>{profile?.full_name ?? 'Staff'}</span>
                 </div>
               </div>
-              <div className="mt-4 p-3 rounded-xl" style={{ background: '#eab30810', border: '1px solid #eab30830' }}>
-                <p className="text-xs" style={{ color: theme.textMuted }}>Prints today: {zReportPrinted}/2. Max 2 prints per day to prevent thermal roll waste.</p>
-              </div>
-              <button onClick={() => { if (zReportPrinted < 2) { setZReportPrinted(p => p + 1); window.print(); } }}
-                disabled={zReportPrinted >= 2}
+              {zReportMode === 'z' && (
+                <div className="mt-4 p-3 rounded-xl" style={{ background: '#eab30810', border: '1px solid #eab30830' }}>
+                  <p className="text-xs" style={{ color: theme.textMuted }}>Prints today: {zReportPrinted}/{zReportPrintLimit}. Set by your admin in Settings &gt; POS &amp; Security to control thermal-roll usage.</p>
+                </div>
+              )}
+              <button onClick={() => zReportMode === 'z' ? printZReport() : window.print()}
+                disabled={zReportMode === 'z' && zReportPrinted >= zReportPrintLimit}
                 className="w-full mt-4 py-3 rounded-xl font-bold text-sm text-white disabled:opacity-40 flex items-center justify-center gap-2"
                 style={{ background: theme.primary }}>
-                <Printer size={16} /> {zReportPrinted >= 2 ? 'Print Limit Reached' : `Print Z-Report (${zReportPrinted}/2)`}
+                <Printer size={16} />
+                {zReportMode === 'x'
+                  ? 'Print X-Report'
+                  : zReportPrinted >= zReportPrintLimit ? 'Print Limit Reached' : `Print Z-Report (${zReportPrinted}/${zReportPrintLimit})`}
               </button>
             </motion.div>
           </motion.div>

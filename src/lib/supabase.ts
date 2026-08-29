@@ -670,6 +670,7 @@ function createMockSupabaseClient() {
           currency: branch?.currency ?? 'AED',
           country: branch?.country ?? 'United Arab Emirates',
           city: branch?.city ?? 'Dubai',
+          z_report_print_limit: (branch as { z_report_print_limit?: number } | undefined)?.z_report_print_limit ?? 2,
           role: profile?.system_role ?? 'user',
           permissions: { menu: ['read', 'write'], orders: ['read', 'write'], reports: ['read'] },
           org_owner_is_super_admin: true,

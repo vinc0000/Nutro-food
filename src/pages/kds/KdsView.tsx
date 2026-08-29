@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSharedOrders } from '@/lib/ordersStore';
 import { useOrgContext } from '@/hooks/useOrgContext';
+import { playNotificationSound } from '@/lib/notificationSound';
 
 interface KdsTicket {
   id: string;
@@ -45,25 +46,12 @@ export default function KdsView() {
   const { orders, updateOrder } = useSharedOrders(orgContext?.branch_id ?? null);
   const [, setTick] = useState(0);
   const [soundOn, setSoundOn] = useState(true);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    audioRef.current = new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=');
-  }, []);
+  const knownTicketIds = useRef<Set<string> | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => setTick((t) => t + 1), 30000);
     return () => clearInterval(interval);
   }, []);
-
-  const playSound = () => {
-    if (soundOn && audioRef.current) {
-      audioRef.current.volume = 0.3;
-      audioRef.current.play().catch(() => {});
-    }
-  };
-
-  void playSound;
 
   // Map shared orders into KDS tickets dynamically, excluding pending tablet orders (validated at POS first)
   const tickets: KdsTicket[] = orders
@@ -91,6 +79,25 @@ export default function KdsView() {
       startedAt: o.createdAt !== o.updatedAt ? new Date(o.updatedAt) : undefined,
     };
   });
+
+  // Real new-ticket detection: the sound function existed before this but was never
+  // actually called anywhere (`void playSound;` silenced the unused-var lint warning
+  // instead of wiring it up), so KDS never made a sound for a new order no matter what
+  // soundOn was set to. This compares this render's ticket ids against the previous
+  // render's; anything new plays the beep. The first render only seeds the known-id
+  // set (skip=true) so opening the screen with existing tickets doesn't fire a burst
+  // of beeps for orders that aren't actually new.
+  useEffect(() => {
+    const currentIds = new Set(tickets.map(t => t.id));
+    if (knownTicketIds.current === null) {
+      knownTicketIds.current = currentIds;
+      return;
+    }
+    const hasNewTicket = tickets.some(t => !knownTicketIds.current!.has(t.id));
+    if (hasNewTicket) playNotificationSound(soundOn);
+    knownTicketIds.current = currentIds;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tickets.map(t => t.id).join(',')]);
 
   const advanceTicket = (id: string) => {
     const order = orders.find(o => o.id === id);

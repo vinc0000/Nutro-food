@@ -13,6 +13,7 @@ export interface OrgContext {
   currency: string;
   country: string | null;
   city: string | null;
+  z_report_print_limit: number;
   role: string;
   permissions: Record<string, string[]> | null;
   // True when this org's owner is a platform Super Admin (e.g. Nutro's own internal
