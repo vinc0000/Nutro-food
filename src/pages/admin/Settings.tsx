@@ -570,6 +570,44 @@ function PosSecurityTab({ theme, showSaved }: { theme: ReturnType<typeof useThem
           </div>
         </div>
       </div>
+
+      <ZReportLimitSection theme={theme} branchId={branchId} showSaved={showSaved} />
+    </div>
+  );
+}
+
+function ZReportLimitSection({ theme, branchId, showSaved }: { theme: ReturnType<typeof useTheme>['theme']; branchId: string | null; showSaved: (msg: string) => void }) {
+  const { orgContext, refresh } = useOrgContext();
+  const [limit, setLimit] = useState(2);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (orgContext?.z_report_print_limit) setLimit(orgContext.z_report_print_limit);
+  }, [orgContext?.z_report_print_limit]);
+
+  const save = async () => {
+    if (!branchId) return;
+    setSaving(true);
+    const { error } = await supabase.from('branches').update({ z_report_print_limit: limit } as never).eq('id', branchId);
+    setSaving(false);
+    if (!error) { showSaved('Z-Report print limit updated'); void refresh(); }
+  };
+
+  return (
+    <div className="p-5 rounded-2xl" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
+      <h3 className="font-bold text-sm mb-1" style={{ color: theme.text }}>Z-Report daily print limit</h3>
+      <p className="text-xs mb-3" style={{ color: theme.textMuted }}>
+        How many times cashiers can print the official Z-Report (end-of-day close) per day, per branch. The X-Report (sales snapshot) is unaffected and can always be printed. This protects thermal paper from being wasted on repeated prints.
+      </p>
+      <div className="flex items-center gap-3">
+        <input type="number" min={1} max={20} value={limit} onChange={e => setLimit(Math.max(1, Math.min(20, parseInt(e.target.value, 10) || 1)))}
+          className="w-24 px-4 py-2.5 rounded-xl text-sm outline-none font-bold text-center" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+        <span className="text-xs" style={{ color: theme.textMuted }}>prints per day</span>
+        <button onClick={() => void save()} disabled={saving || !branchId}
+          className="ml-auto px-4 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50" style={{ background: theme.primary }}>
+          {saving ? 'Saving...' : 'Save'}
+        </button>
+      </div>
     </div>
   );
 }

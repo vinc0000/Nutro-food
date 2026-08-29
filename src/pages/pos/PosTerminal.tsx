@@ -3,14 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Monitor, Search, Plus, Minus, X, CreditCard, Banknote, Smartphone, Gift,
   Clock, Printer, ArrowLeft, Check, Hash, Edit2, FileText, Lock,
-  Tablet, Volume2, VolumeX
+  Tablet, Volume2, VolumeX, Split
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useNavigate } from 'react-router-dom';
 import { useSharedMenu } from '@/lib/menuStore';
-import { useSharedOrders, SharedOrder } from '@/lib/ordersStore';
+import { useSharedOrders, SharedOrder, PaymentSplitEntry } from '@/lib/ordersStore';
 import { usePlanInfo, useOrgContext } from '@/hooks/useOrgContext';
 import { playNotificationSound } from '@/lib/notificationSound';
 import { CURRENCIES } from '@/lib/countries';
@@ -26,7 +26,7 @@ interface TabletOrder {
 const CATEGORIES = ['All', 'Starters', 'Mains', 'Desserts', 'Drinks', 'Snacks'];
 
 const tableColor: Record<string, string> = { available: '#22c55e', occupied: '#ef4444', reserved: '#eab308', cleaning: '#94a3b8' };
-type PayMethod = 'cash' | 'card' | 'tap' | 'gift_card' | 'mobile_money';
+type PayMethod = 'cash' | 'card' | 'tap' | 'gift_card' | 'mobile_money' | 'voucher' | 'credit_note';
 
 // The PinGuard component that used to live here (a hardcoded "1234" check, entirely
 // disconnected from any real data) has been removed. PosPinGate — the parent route
@@ -148,6 +148,11 @@ export default function PosTerminal() {
   const [orderType, setOrderType] = useState<'dine_in' | 'takeaway' | 'delivery'>('dine_in');
   const [showPayment, setShowPayment] = useState(false);
   const [payMethod, setPayMethod] = useState<PayMethod>('cash');
+  const [isSplitPayment, setIsSplitPayment] = useState(false);
+  const [splitEntries, setSplitEntries] = useState<PaymentSplitEntry[]>([
+    { method: 'cash', amount: 0 },
+    { method: 'card', amount: 0 },
+  ]);
   const [customerPhone, setCustomerPhone] = useState('');
   const [paidSuccess, setPaidSuccess] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
@@ -194,6 +199,8 @@ export default function PosTerminal() {
   const total = subtotal + tax;
   const cashGivenAmount = cashGiven ? parseFloat(cashGiven) : NaN;
   const isCashAmountValid = !Number.isNaN(cashGivenAmount) && cashGivenAmount >= total;
+  const splitTotal = splitEntries.reduce((sum, e) => sum + (Number.isFinite(e.amount) ? e.amount : 0), 0);
+  const isSplitAmountValid = splitEntries.filter(e => e.amount > 0).length >= 2 && Math.abs(splitTotal - total) < 0.01;
   const change = isCashAmountValid ? cashGivenAmount - total : 0;
   const pendingTabletOrders = tabletOrders.filter(o => o.status === 'pending');
   const [posSoundOn, setPosSoundOn] = useState(true);
@@ -235,10 +242,21 @@ export default function PosTerminal() {
     .reduce((sum, o) => sum + (o.total - (o.refundAmount || 0)), 0);
   const todaysOrderCount = todaysOrders.filter(o => o.status !== 'cancelled').length;
   const todaysByMethod = todaysOrders
-    .filter(o => o.status !== 'cancelled' && o.paymentMethod)
+    .filter(o => o.status !== 'cancelled')
     .reduce((acc, o) => {
-      const key = o.paymentMethod as string;
-      acc[key] = (acc[key] ?? 0) + (o.total - (o.refundAmount || 0));
+      const net = o.total - (o.refundAmount || 0);
+      if (o.paymentMethod === 'split' && o.paymentSplit) {
+        // A split sale's own components already sum to the order total, so
+        // apportion the (possibly refund-reduced) net amount proportionally
+        // across each method rather than crediting the whole net to 'split'.
+        const splitSum = o.paymentSplit.reduce((s, e) => s + e.amount, 0) || 1;
+        for (const entry of o.paymentSplit) {
+          const share = net * (entry.amount / splitSum);
+          acc[entry.method] = (acc[entry.method] ?? 0) + share;
+        }
+      } else if (o.paymentMethod) {
+        acc[o.paymentMethod] = (acc[o.paymentMethod] ?? 0) + net;
+      }
       return acc;
     }, {} as Record<string, number>);
 
@@ -269,6 +287,9 @@ export default function PosTerminal() {
   };
 
   const processPayment = async () => {
+    const effectivePaymentMethod: PayMethod | 'split' = isSplitPayment ? 'split' : payMethod;
+    const effectivePaymentSplit: PaymentSplitEntry[] | null = isSplitPayment ? splitEntries.filter(e => e.amount > 0) : null;
+
     // If it is an accepted tablet order, update its payment and keep/ensure status in useSharedOrders
     const existingTabletOrder = orders.find(o => o.source === 'tablet' && o.tableLabel === 'Table ' + selectedTable && o.status === 'pending');
     if (existingTabletOrder) {
@@ -276,7 +297,8 @@ export default function PosTerminal() {
       await updateOrder(existingTabletOrder.id, o => ({
         ...o,
         payment: 'paid',
-        paymentMethod: payMethod,
+        paymentMethod: effectivePaymentMethod,
+        paymentSplit: effectivePaymentSplit,
         cashierId: profile?.id ?? null,
         status: 'preparing',
         updatedAt: new Date().toISOString()
@@ -291,7 +313,8 @@ export default function PosTerminal() {
         type: orderType,
         status: 'preparing', // Send to KDS immediately
         payment: 'paid',
-        paymentMethod: payMethod,
+        paymentMethod: effectivePaymentMethod,
+        paymentSplit: effectivePaymentSplit,
         cashierId: profile?.id ?? null,
         refundAmount: 0,
         items: cart.map(c => ({
@@ -313,6 +336,8 @@ export default function PosTerminal() {
     }
 
     setCustomerPhone('');
+    setIsSplitPayment(false);
+    setSplitEntries([{ method: 'cash', amount: 0 }, { method: 'card', amount: 0 }]);
     setPaidSuccess(true);
     setIsPaid(true);
     setOrderCount(c => c + 1);
@@ -564,10 +589,19 @@ export default function PosTerminal() {
                     <div className="text-xs mt-1" style={{ color: theme.textMuted }}>{cart.length} items · Tax included</div>
                     <div className="text-xs mt-1" style={{ color: '#eab308' }}>Receipt locked until payment confirmed</div>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 mb-4">
+                  <button onClick={() => setIsSplitPayment(p => !p)}
+                    className="w-full mb-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2"
+                    style={{ background: isSplitPayment ? theme.primary : theme.bg, color: isSplitPayment ? '#fff' : theme.textMuted, border: `1px solid ${isSplitPayment ? theme.primary : theme.border}` }}>
+                    <Split size={14} /> {isSplitPayment ? 'Split payment enabled' : 'Split this payment across methods'}
+                  </button>
+                  {isSplitPayment ? (
+                    <SplitPaymentForm theme={theme} total={total} currencySymbol={currencySymbol} entries={splitEntries} setEntries={setSplitEntries} />
+                  ) : (
+                    <div className="grid grid-cols-3 gap-2 mb-4">
                     {([ { key: 'cash', label: 'Cash', icon: Banknote }, { key: 'card', label: 'Card', icon: CreditCard },
                        { key: 'tap', label: 'Tap to Pay', icon: Smartphone }, { key: 'gift_card', label: 'Gift Card', icon: Gift },
-                       { key: 'mobile_money', label: 'Mobile Money', icon: CreditCard }
+                       { key: 'mobile_money', label: 'Mobile Money', icon: CreditCard }, { key: 'voucher', label: 'Voucher', icon: Gift },
+                       { key: 'credit_note', label: 'Credit Note', icon: FileText },
                      ] as { key: PayMethod; label: string; icon: typeof Banknote }[]).map(m => (
                       <button key={m.key} onClick={() => setPayMethod(m.key)}
                         className="flex flex-col items-center gap-1.5 py-3 rounded-xl text-xs font-bold transition-all"
@@ -579,14 +613,15 @@ export default function PosTerminal() {
                         <m.icon size={18} />{m.label}
                       </button>
                     ))}
-                  </div>
+                    </div>
+                  )}
                   <div className="mb-4">
                     <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Customer phone (optional — for WhatsApp confirmation)</label>
                     <input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="+234 XXX XXX XXXX"
                       className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
                       style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
                   </div>
-                  {payMethod === 'mobile_money' && (
+                  {payMethod === 'mobile_money' && !isSplitPayment && (
                     <div className="mb-4 p-3.5 rounded-xl border space-y-2" style={{ background: '#f5a62310', borderColor: '#f5a62330' }}>
                       <div className="text-xs font-bold" style={{ color: '#f5a623' }}>Mobile Money</div>
                       <p className="text-[11px] leading-relaxed" style={{ color: theme.textMuted }}>
@@ -599,7 +634,7 @@ export default function PosTerminal() {
                         style={{ background: theme.bg, color: theme.text, border: `1px solid #f5a62350` }} />
                     </div>
                   )}
-                  {(payMethod === 'card' || payMethod === 'tap' || payMethod === 'gift_card') && (
+                  {(payMethod === 'card' || payMethod === 'tap' || payMethod === 'gift_card') && !isSplitPayment && (
                     <div className="mb-4">
                       <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>
                         {payMethod === 'gift_card' ? 'Gift Card Number / Approval Code' : 'Approval Code or Last 4 Digits'}
@@ -609,7 +644,7 @@ export default function PosTerminal() {
                         style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
                     </div>
                   )}
-                  {payMethod === 'cash' && (
+                  {payMethod === 'cash' && !isSplitPayment && (
                     <div className="mb-4 space-y-3">
                       <div>
                         <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Cash Received</label>
@@ -637,10 +672,13 @@ export default function PosTerminal() {
                       )}
                     </div>
                   )}
-                  <button onClick={() => void processPayment()} disabled={payMethod === 'cash' && !isCashAmountValid}
+                  <button onClick={() => void processPayment()}
+                    disabled={isSplitPayment ? !isSplitAmountValid : (payMethod === 'cash' && !isCashAmountValid)}
                     className="w-full py-3 rounded-xl font-bold text-sm text-white disabled:opacity-50"
-                    style={{ background: payMethod === 'mobile_money' ? '#f5a623' : theme.primary }}>
-                    Confirm {payMethod === 'cash' ? 'Cash' : payMethod === 'card' ? 'Card' : payMethod === 'tap' ? 'Tap' : payMethod === 'mobile_money' ? 'Mobile Money' : 'Gift Card'} Payment
+                    style={{ background: payMethod === 'mobile_money' && !isSplitPayment ? '#f5a623' : theme.primary }}>
+                    {isSplitPayment
+                      ? (isSplitAmountValid ? 'Confirm Split Payment' : `Split must total ${currencySymbol}${total.toFixed(2)}`)
+                      : `Confirm ${payMethod === 'cash' ? 'Cash' : payMethod === 'card' ? 'Card' : payMethod === 'tap' ? 'Tap' : payMethod === 'mobile_money' ? 'Mobile Money' : payMethod === 'voucher' ? 'Voucher' : payMethod === 'credit_note' ? 'Credit Note' : 'Gift Card'} Payment`}
                   </button>
                 </>
               )}
@@ -844,3 +882,57 @@ export default function PosTerminal() {
     </div>
   );
 }
+
+const SPLIT_METHOD_LABELS: Record<PaymentSplitEntry['method'], string> = {
+  cash: 'Cash', card: 'Card', tap: 'Tap', gift_card: 'Gift Card',
+  mobile_money: 'Mobile Money', voucher: 'Voucher', credit_note: 'Credit Note',
+};
+
+function SplitPaymentForm({ theme, total, currencySymbol, entries, setEntries }: {
+  theme: ReturnType<typeof useTheme>['theme'];
+  total: number;
+  currencySymbol: string;
+  entries: PaymentSplitEntry[];
+  setEntries: React.Dispatch<React.SetStateAction<PaymentSplitEntry[]>>;
+}) {
+  const splitTotal = entries.reduce((sum, e) => sum + (Number.isFinite(e.amount) ? e.amount : 0), 0);
+  const remaining = total - splitTotal;
+
+  const updateEntry = (index: number, patch: Partial<PaymentSplitEntry>) => {
+    setEntries(prev => prev.map((e, i) => (i === index ? { ...e, ...patch } : e)));
+  };
+  const removeEntry = (index: number) => {
+    setEntries(prev => prev.filter((_, i) => i !== index));
+  };
+  const addEntry = () => {
+    setEntries(prev => [...prev, { method: 'cash', amount: Math.max(0, remaining) }]);
+  };
+
+  return (
+    <div className="mb-4 space-y-2">
+      {entries.map((entry, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <select value={entry.method} onChange={e => updateEntry(i, { method: e.target.value as PaymentSplitEntry['method'] })}
+            className="flex-1 px-3 py-2.5 rounded-xl text-xs font-bold outline-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>
+            {Object.entries(SPLIT_METHOD_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          </select>
+          <input type="number" min="0" step="0.01" value={entry.amount || ''} onChange={e => updateEntry(i, { amount: parseFloat(e.target.value) || 0 })}
+            placeholder="0.00" className="w-28 px-3 py-2.5 rounded-xl text-xs font-bold outline-none text-right"
+            style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+          {entries.length > 2 && (
+            <button onClick={() => removeEntry(i)} style={{ color: theme.textMuted }}><X size={16} /></button>
+          )}
+        </div>
+      ))}
+      <button onClick={addEntry} className="text-xs font-bold" style={{ color: theme.primary }}>+ Add another method</button>
+      <div className="flex justify-between p-3 rounded-xl text-xs font-bold" style={{
+        background: Math.abs(remaining) < 0.01 ? '#22c55e15' : '#ef444415',
+        color: Math.abs(remaining) < 0.01 ? '#22c55e' : '#ef4444',
+      }}>
+        <span>{Math.abs(remaining) < 0.01 ? 'Fully covered' : remaining > 0 ? 'Remaining' : 'Over by'}</span>
+        <span>{currencySymbol}{Math.abs(remaining).toFixed(2)}</span>
+      </div>
+    </div>
+  );
+}
+

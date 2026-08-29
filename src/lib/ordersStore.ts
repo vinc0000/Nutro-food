@@ -12,6 +12,11 @@ export interface SharedOrderItem {
   qty: number;
 }
 
+export interface PaymentSplitEntry {
+  method: 'cash' | 'card' | 'tap' | 'gift_card' | 'mobile_money' | 'voucher' | 'credit_note';
+  amount: number;
+}
+
 export interface SharedOrder {
   id: string;
   orderNumber: string;
@@ -19,7 +24,8 @@ export interface SharedOrder {
   type: OrderType;
   status: OrderStatus;
   payment: PaymentStatus;
-  paymentMethod?: 'cash' | 'card' | 'tap' | 'gift_card' | 'mobile_money' | null;
+  paymentMethod?: 'cash' | 'card' | 'tap' | 'gift_card' | 'mobile_money' | 'voucher' | 'credit_note' | 'split' | null;
+  paymentSplit?: PaymentSplitEntry[] | null;
   cashierId?: string | null;
   refundAmount: number;
   refundedAt?: string | null;
@@ -43,6 +49,7 @@ interface OrderRow {
   status: OrderStatus;
   payment_status: string;
   payment_method: string | null;
+  payment_split: PaymentSplitEntry[] | null;
   cashier_id: string | null;
   refund_amount: number;
   refunded_at: string | null;
@@ -79,7 +86,8 @@ function rowToShared(row: OrderRow, items: OrderItemRow[]): SharedOrder {
     type: row.order_type,
     status: row.status,
     payment: row.payment_status === 'paid' ? 'paid' : 'unpaid',
-    paymentMethod: (['cash', 'card', 'tap', 'gift_card', 'mobile_money'] as const).includes(row.payment_method as any) ? (row.payment_method as SharedOrder['paymentMethod']) : null,
+    paymentMethod: (['cash', 'card', 'tap', 'gift_card', 'mobile_money', 'voucher', 'credit_note', 'split'] as const).includes(row.payment_method as any) ? (row.payment_method as SharedOrder['paymentMethod']) : null,
+    paymentSplit: row.payment_split ?? null,
     cashierId: row.cashier_id,
     refundAmount: Number(row.refund_amount ?? 0),
     refundedAt: row.refunded_at,
@@ -179,6 +187,7 @@ export function useSharedOrders(branchId: string | null) {
       status: order.status,
       payment_status: order.payment,
       payment_method: order.paymentMethod ?? null,
+      payment_split: order.paymentSplit ?? null,
       cashier_id: order.cashierId ?? null,
       subtotal: order.subtotal,
       tax_amount: order.tax,
