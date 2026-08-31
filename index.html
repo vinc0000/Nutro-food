@@ -1,20 +1,60 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nutro — Restaurant Technology Platform by LiAfrik</title>
-    <meta name="description" content="Nutro by LiAfrik: Interactive tablet menus, smart nutrition engine, cloud POS, and kitchen display system for restaurants." />
+
+    <title>Nutro — La plateforme technologique tout-en-un pour restaurants | LiAfrik</title>
+    <meta name="description" content="Nutro unifie menu interactif sur tablette, caisse cloud (POS), kitchen display system et analytics multi-branches pour votre restaurant. Essai gratuit de 14 jours, sans carte bancaire." />
+    <link rel="canonical" href="https://nutro.app/" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Nutro" />
+    <meta property="og:url" content="https://nutro.app/" />
+    <meta property="og:title" content="Nutro — La plateforme technologique tout-en-un pour restaurants" />
+    <meta property="og:description" content="Menu interactif sur tablette, caisse cloud, kitchen display et analytics multi-branches en une seule plateforme. Essai gratuit de 14 jours." />
+    <meta property="og:locale" content="fr_FR" />
+    <!-- Square logo used as a fallback share image; swap for a real 1200x630 branded
+         image under /public if you want a proper landscape link-preview crop. -->
+    <meta property="og:image" content="https://nutro.app/logo.png" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Nutro — La plateforme technologique tout-en-un pour restaurants" />
+    <meta name="twitter:description" content="Menu interactif sur tablette, caisse cloud, kitchen display et analytics multi-branches en une seule plateforme. Essai gratuit de 14 jours." />
+    <meta name="twitter:image" content="https://nutro.app/logo.png" />
+
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#10B981" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <!-- Square logo used as a fallback share image; swap for a real 1200x630 branded
-         image under /public if you want a proper landscape link-preview crop. -->
-    <meta property="og:image" content="/logo.png">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:image" content="/logo.png">
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Nutro",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "url": "https://nutro.app/",
+      "description": "Plateforme technologique tout-en-un pour restaurants : menu interactif sur tablette, caisse cloud (POS), kitchen display system et analytics multi-branches.",
+      "offers": {
+        "@type": "AggregateOffer",
+        "priceCurrency": "USD",
+        "lowPrice": "29",
+        "highPrice": "189",
+        "offerCount": "3"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "LiAfrik",
+        "url": "https://nutro.app/"
+      }
+    }
+    </script>
 </head>
   <body>
     <div id="root"></div>

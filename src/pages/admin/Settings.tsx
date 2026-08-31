@@ -49,6 +49,8 @@ export default function AdminSettings() {
   const [googleReviews, setGoogleReviews] = useState('');
   const [stampUrl, setStampUrl] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
+  const [uploadingAsset, setUploadingAsset] = useState<'stamp' | 'logo' | null>(null);
+  const [assetUploadError, setAssetUploadError] = useState<string | null>(null);
 
   // Notifications state
   const [notifNewOrder, setNotifNewOrder] = useState(() => JSON.parse(localStorage.getItem('nutro:settings:notifNewOrder') ?? 'true'));
@@ -121,6 +123,30 @@ export default function AdminSettings() {
     } as never).eq('id', orgContext.branch_id);
     if (error) { showSaved(`Could not save: ${error.message}`); return; }
     showSaved('Social and branding options saved successfully');
+  };
+
+  // Real file upload to Supabase Storage (restaurant-assets bucket) — replaces what
+  // used to be a prompt() asking the admin to paste an image URL despite the button
+  // being labeled "Upload Stamp"/"Upload Logo". Same pattern already proven in
+  // Menu.tsx's own image upload.
+  const handleAssetUpload = async (file: File, kind: 'stamp' | 'logo') => {
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { setAssetUploadError('Image too large. Maximum size: 2 MB.'); return; }
+    setUploadingAsset(kind);
+    setAssetUploadError(null);
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
+      const fileName = `${kind}-${orgContext?.branch_id ?? 'branch'}-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('restaurant-assets').upload(fileName, file, { contentType: file.type });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from('restaurant-assets').getPublicUrl(fileName);
+      if (!pub?.publicUrl) throw new Error('No public URL returned by storage');
+      if (kind === 'stamp') setStampUrl(pub.publicUrl); else setLogoUrl(pub.publicUrl);
+    } catch (err) {
+      setAssetUploadError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploadingAsset(null);
+    }
   };
 
   const toggleNotif = (key: string, currentVal: boolean, setter: (v: boolean) => void) => {
@@ -318,10 +344,12 @@ export default function AdminSettings() {
                 <div className="w-24 h-24 rounded-xl flex items-center justify-center overflow-hidden" style={{ background: theme.bg, border: `2px dashed ${theme.border}` }}>
                   {stampUrl ? <img src={stampUrl} alt="Stamp" className="w-full h-full object-cover" /> : <Stamp size={28} style={{ color: theme.textMuted }} />}
                 </div>
-                <button onClick={() => {
-                  const url = prompt('Enter Stamp Image URL:', stampUrl);
-                  if (url !== null) setStampUrl(url);
-                }} className="px-4 py-2.5 rounded-xl text-sm font-bold" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>Upload Stamp</button>
+                <label className="px-4 py-2.5 rounded-xl text-sm font-bold cursor-pointer flex items-center gap-2" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>
+                  {uploadingAsset === 'stamp' && <Loader2 size={14} className="animate-spin" />}
+                  {uploadingAsset === 'stamp' ? 'Uploading...' : 'Upload Stamp'}
+                  <input type="file" accept="image/*" className="hidden" disabled={uploadingAsset !== null}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) void handleAssetUpload(f, 'stamp'); e.target.value = ''; }} />
+                </label>
               </div>
             </div>
             <div className="pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>
@@ -331,12 +359,15 @@ export default function AdminSettings() {
                 <div className="w-24 h-24 rounded-xl flex items-center justify-center overflow-hidden" style={{ background: theme.bg, border: `2px dashed ${theme.border}` }}>
                   {logoUrl ? <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" /> : <Building2 size={28} style={{ color: theme.textMuted }} />}
                 </div>
-                <button onClick={() => {
-                  const url = prompt('Enter Logo Image URL:', logoUrl);
-                  if (url !== null) setLogoUrl(url);
-                }} className="px-4 py-2.5 rounded-xl text-sm font-bold" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>Upload Logo</button>
+                <label className="px-4 py-2.5 rounded-xl text-sm font-bold cursor-pointer flex items-center gap-2" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>
+                  {uploadingAsset === 'logo' && <Loader2 size={14} className="animate-spin" />}
+                  {uploadingAsset === 'logo' ? 'Uploading...' : 'Upload Logo'}
+                  <input type="file" accept="image/*" className="hidden" disabled={uploadingAsset !== null}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) void handleAssetUpload(f, 'logo'); e.target.value = ''; }} />
+                </label>
               </div>
             </div>
+            {assetUploadError && <p className="text-xs" style={{ color: '#ef4444' }}>{assetUploadError}</p>}
             <button onClick={() => void saveSocial()} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: theme.primary }}>Save Social & Branding</button>
           </div>
         )}

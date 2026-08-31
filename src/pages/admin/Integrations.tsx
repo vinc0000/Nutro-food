@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plug, Check, X, Loader2, ExternalLink, Trash2, Users, BookOpen, Webhook } from 'lucide-react';
+import { Plug, Check, X, Loader2, ExternalLink, Trash2, Webhook } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useOrgContext } from '@/hooks/useOrgContext';
 import { supabase } from '@/lib/supabase';
@@ -20,6 +20,16 @@ function WhatsAppLogo({ size = 18 }: { size?: number | string; style?: React.CSS
   );
 }
 
+// The user's own uploaded logos for Atlas CRM and LiBooks (their two LiAfrik
+// products) — wrapped as components so they slot into PROVIDERS' icon field the
+// same way the WhatsApp SVG mark and lucide-react icons do below.
+function AtlasCrmLogo({ size = 18 }: { size?: number | string; style?: React.CSSProperties }) {
+  return <img src="/integrations/atlas-crm.png" alt="Atlas CRM" width={size} height={size} style={{ objectFit: 'contain' }} />;
+}
+function LiBooksLogo({ size = 18 }: { size?: number | string; style?: React.CSSProperties }) {
+  return <img src="/integrations/libooks.png" alt="LiBooks" width={size} height={size} style={{ objectFit: 'contain' }} />;
+}
+
 interface IntegrationRow {
   id: string;
   provider: Provider;
@@ -33,12 +43,12 @@ const PROVIDERS: Array<{
   extraFields?: Array<{ key: string; label: string; placeholder: string }>;
 }> = [
   {
-    key: 'atlas_crm', name: 'Atlas CRM', icon: Users, color: '#0176d3',
+    key: 'atlas_crm', name: 'Atlas CRM', icon: AtlasCrmLogo, color: '#0176d3',
     description: 'AI-powered CRM by LiAfrik — sync your customer base for marketing and loyalty campaigns.',
     url: 'https://atlas.liafrik.com', keyLabel: 'Atlas API Key', keyPlaceholder: 'atlas_live_...', live: false,
   },
   {
-    key: 'libooks', name: 'LiBooks', icon: BookOpen, color: '#0F2A3D',
+    key: 'libooks', name: 'LiBooks', icon: LiBooksLogo, color: '#0F2A3D',
     description: 'International accounting with OHADA expertise — export sales for bookkeeping, invoicing, and treasury.',
     url: 'https://libooks.liafrik.com', keyLabel: 'LiBooks API Key', keyPlaceholder: 'lib_live_...', live: false,
   },

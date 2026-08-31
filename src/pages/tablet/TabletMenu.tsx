@@ -14,7 +14,6 @@ import { useSharedMenu } from '@/lib/menuStore';
 import { useSharedOrders, SharedOrder } from '@/lib/ordersStore';
 import { useOrgContext } from '@/hooks/useOrgContext';
 
-const CURRENCIES = ['USD', 'EUR', 'AED', 'XAF', 'NGN', 'GBP'];
 const CURRENCY_RATES: Record<string, number> = { USD: 1, EUR: 0.92, AED: 3.67, XAF: 600, NGN: 1500, GBP: 0.79 };
 const CURRENCY_SYMBOLS: Record<string, string> = { USD: '$', EUR: '\u20AC', AED: '\u062F.\u0625', XAF: 'FCFA', NGN: '\u20A6', GBP: '\u00A3' };
 
@@ -223,10 +222,9 @@ export default function TabletMenu() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <select value={currency} onChange={e => setCurrency(e.target.value)} className="px-2 py-1 rounded-lg text-xs font-bold outline-none"
-              style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>
-              {CURRENCIES.map(c => <option key={c}>{c}</option>)}
-            </select>
+            <span className="px-2 py-1 rounded-lg text-xs font-bold" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} title="Currency is set by the restaurant">
+              {currency}
+            </span>
             <button onClick={() => setShowSocial(true)} className="px-2 py-1.5 rounded-lg text-xs font-bold" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>{t('tablet.social')}</button>
             <button onClick={() => setShowCart(true)} className="relative flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold"
               style={{ background: theme.primary, color: '#fff' }}>

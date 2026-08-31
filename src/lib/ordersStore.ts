@@ -10,6 +10,7 @@ export interface SharedOrderItem {
   name: string;
   price: number;
   qty: number;
+  imageUrl?: string | null;
 }
 
 export interface PaymentSplitEntry {
@@ -78,7 +79,7 @@ function genId() {
     : `id-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function rowToShared(row: OrderRow, items: OrderItemRow[]): SharedOrder {
+function rowToShared(row: OrderRow, items: OrderItemRow[], imagesByMenuItemId?: Record<string, string | null>): SharedOrder {
   return {
     id: row.id,
     orderNumber: row.order_number,
@@ -92,7 +93,13 @@ function rowToShared(row: OrderRow, items: OrderItemRow[]): SharedOrder {
     refundAmount: Number(row.refund_amount ?? 0),
     refundedAt: row.refunded_at,
     refundReason: row.refund_reason,
-    items: items.map((it) => ({ id: it.menu_item_id ?? it.id, name: it.name, price: Number(it.unit_price), qty: it.quantity })),
+    items: items.map((it) => ({
+      id: it.menu_item_id ?? it.id,
+      name: it.name,
+      price: Number(it.unit_price),
+      qty: it.quantity,
+      imageUrl: it.menu_item_id ? imagesByMenuItemId?.[it.menu_item_id] ?? null : null,
+    })),
     subtotal: Number(row.subtotal),
     tax: Number(row.tax_amount),
     total: Number(row.total_amount),
@@ -128,10 +135,27 @@ export function useSharedOrders(branchId: string | null) {
     if (ordersError) { setError(ordersError.message); setLoading(false); return; }
 
     const rows = (orderRows ?? []) as OrderRow[];
-    const withItems = await Promise.all(rows.map(async (row) => {
+    const withItemRows = await Promise.all(rows.map(async (row) => {
       const { data: itemRows } = await supabase.from('order_items').select('*').eq('order_id', row.id);
-      return rowToShared(row, (itemRows ?? []) as OrderItemRow[]);
+      return { row, itemRows: (itemRows ?? []) as OrderItemRow[] };
     }));
+
+    // One batched lookup for every menu item image referenced across all of this
+    // branch's orders, instead of a per-order-item request — this is what lets the
+    // POS's tablet-order review panel show a real product photo (not just the name)
+    // before a cashier accepts or rejects an order, without an N+1 query per order.
+    const menuItemIds = Array.from(new Set(
+      withItemRows.flatMap(({ itemRows }) => itemRows.map((it) => it.menu_item_id).filter((id): id is string => Boolean(id)))
+    ));
+    let imagesByMenuItemId: Record<string, string | null> = {};
+    if (menuItemIds.length > 0) {
+      const { data: menuItemRows } = await supabase.from('menu_items').select('id, image_url').in('id', menuItemIds);
+      imagesByMenuItemId = Object.fromEntries(
+        ((menuItemRows ?? []) as Array<{ id: string; image_url: string | null }>).map((m) => [m.id, m.image_url])
+      );
+    }
+
+    const withItems = withItemRows.map(({ row, itemRows }) => rowToShared(row, itemRows, imagesByMenuItemId));
 
     setOrders(withItems);
     setError(null);

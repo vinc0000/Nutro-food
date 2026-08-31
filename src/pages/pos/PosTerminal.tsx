@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Monitor, Search, Plus, Minus, X, CreditCard, Banknote, Smartphone, Gift,
   Clock, Printer, ArrowLeft, Check, Hash, Edit2, FileText, Lock,
-  Tablet, Volume2, VolumeX, Split
+  Tablet, Volume2, VolumeX, Split, UtensilsCrossed
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,7 +19,7 @@ import { usePosLock } from '@/components/guards/PosPinGate';
 
 interface CartItem { id: string; name: string; price: number; qty: number; taxRate: number; }
 interface TabletOrder {
-  id: string; tableNum: string; items: { name: string; qty: number; price: number }[];
+  id: string; tableNum: string; items: { name: string; qty: number; price: number; imageUrl?: string | null }[];
   total: number; status: 'pending' | 'accepted' | 'rejected'; time: string;
 }
 
@@ -176,13 +176,22 @@ export default function PosTerminal() {
   const [showTabletOrders, setShowTabletOrders] = useState(false);
   const { orders, updateOrder, addOrder } = useSharedOrders(orgContext?.branch_id ?? null);
 
-  // Dynamically map shared orders to TabletOrder structure
+  // Dynamically map shared orders to TabletOrder structure. Falls back to matching
+  // the item by name against the live menu when the order's own stored image is
+  // missing (e.g. an older order placed before this field existed, or a menu_item_id
+  // that's since been deleted) — a cashier should never have to guess what a tablet
+  // order item is from the name alone if a photo can be found at all.
   const tabletOrders: TabletOrder[] = orders
     .filter(o => o.source === 'tablet')
     .map(o => ({
       id: o.id,
       tableNum: o.tableLabel.replace('Table ', ''),
-      items: o.items.map(it => ({ name: it.name, qty: it.qty, price: it.price })),
+      items: o.items.map(it => ({
+        name: it.name,
+        qty: it.qty,
+        price: it.price,
+        imageUrl: it.imageUrl ?? menuItems.find(m => m.name.toLowerCase() === it.name.toLowerCase())?.image ?? null,
+      })),
       total: o.total,
       status: o.status === 'pending' ? 'pending' : (o.status === 'cancelled' ? 'rejected' : 'accepted'),
       time: 'Just now',
@@ -342,7 +351,21 @@ export default function PosTerminal() {
     setIsPaid(true);
     setOrderCount(c => c + 1);
     setSessionSales(s => s + total);
-    setTimeout(() => { setShowPayment(false); setPaidSuccess(false); }, 2000);
+    // Print immediately on every sale — the receipt used to only appear if the cashier
+    // remembered to click "Receipt" then "Print" afterwards, two extra steps that were
+    // easy to skip under real service pressure and left a customer without a paper
+    // trail. The receipt view opens and triggers window.print() automatically right
+    // after the payment-success confirmation closes, no manual step required.
+    // (window.print() still opens the browser's own print dialog/preview — that's a
+    // platform limitation, not a choice here; on a real POS this is typically hidden
+    // by kiosk-mode print settings on the till itself, which route straight to the
+    // receipt printer with no dialog shown.)
+    setTimeout(() => {
+      setShowPayment(false);
+      setPaidSuccess(false);
+      setShowReceipt(true);
+      setTimeout(() => window.print(), 300);
+    }, 1200);
   };
 
   const acceptTabletOrder = (id: string) => {
@@ -834,10 +857,18 @@ export default function PosTerminal() {
                       <span className="text-sm font-bold" style={{ color: theme.text }}>Table {order.tableNum}</span>
                       <span className="text-xs" style={{ color: theme.textMuted }}>{order.time}</span>
                     </div>
-                    <div className="space-y-1 mb-3">
+                    <div className="space-y-2 mb-3">
                       {order.items.map((it, i) => (
-                        <div key={i} className="flex justify-between text-xs" style={{ color: theme.textMuted }}>
-                          <span>{it.qty}x {it.name}</span><span>{currencySymbol}{(it.price * it.qty).toFixed(2)}</span>
+                        <div key={i} className="flex items-center gap-2 text-xs" style={{ color: theme.textMuted }}>
+                          {it.imageUrl ? (
+                            <img src={it.imageUrl} alt={it.name} className="w-9 h-9 rounded-lg object-cover flex-shrink-0" style={{ border: `1px solid ${theme.border}` }} />
+                          ) : (
+                            <div className="w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
+                              <UtensilsCrossed size={14} style={{ color: theme.textMuted, opacity: 0.5 }} />
+                            </div>
+                          )}
+                          <span className="flex-1">{it.qty}x {it.name}</span>
+                          <span>{currencySymbol}{(it.price * it.qty).toFixed(2)}</span>
                         </div>
                       ))}
                     </div>

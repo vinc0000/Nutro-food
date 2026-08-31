@@ -44,10 +44,11 @@ export default function AdminStaff() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [showAdd, setShowAdd] = useState(false);
-  const [addEmail, setAddEmail] = useState('');
+  const [addName, setAddName] = useState('');
   const [addRole, setAddRole] = useState('cashier');
   const [addCustomModules, setAddCustomModules] = useState<ModuleKey[]>([]);
   const [addPin, setAddPin] = useState('');
+  const [addPinConfirm, setAddPinConfirm] = useState('');
   const [addBusy, setAddBusy] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [newStaffCode, setNewStaffCode] = useState<string | null>(null);
@@ -101,33 +102,19 @@ export default function AdminStaff() {
 
   useEffect(() => { loadStaff(); }, [loadStaff]);
 
-  // Adds an EXISTING Nutro account to this org. We don't fabricate a "staff invitation
-  // email" here for the same reason as the Super Admin panel: sending real invite
-  // emails needs a server-side function with the service role key, which this project
-  // doesn't have yet. The person must already have a Nutro account.
+  // Creates a brand-new staff account directly — the manager types a name, sets a POS
+  // PIN, and the system generates the staff code. No prior Nutro signup is needed: the
+  // create-staff-account edge function provisions a headless auth account behind the
+  // scenes (the staff member never sees or uses an email/password — they only ever
+  // identify themselves by staff_code and their PIN at the POS).
   const addStaffMember = async () => {
-    if (!addEmail || !addEmail.includes('@') || !orgId) { setAddError('Enter a valid email'); return; }
+    if (!addName.trim() || addName.trim().length < 2) { setAddError("Enter the staff member's name"); return; }
+    if (!orgId) return;
+    if (!addPin || addPin.length < 4 || addPin.length > 8) { setAddError('Set a POS PIN (4 to 8 digits) for this staff member'); return; }
+    if (addPin !== addPinConfirm) { setAddError('PIN confirmation does not match'); return; }
+
     setAddBusy(true);
     setAddError(null);
-
-    const { data: existingProfile, error: lookupError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('email', addEmail.trim().toLowerCase())
-      .maybeSingle<{ id: string }>();
-
-    if (lookupError) { setAddError(lookupError.message); setAddBusy(false); return; }
-    if (!existingProfile) {
-      setAddError('No Nutro account exists with this email yet. Ask them to sign up first.');
-      setAddBusy(false);
-      return;
-    }
-
-    if (staff.some(s => s.userId === existingProfile.id)) {
-      setAddError('This person is already on your team.');
-      setAddBusy(false);
-      return;
-    }
 
     const permissionsByRole: Record<string, Record<string, string[]>> = {
       branch_manager: Object.fromEntries(ROLE_MODULE_ACCESS.branch_manager.map(m => [m, ['read', 'write']])),
@@ -143,35 +130,33 @@ export default function AdminStaff() {
       return;
     }
 
-    if (addPin && (addPin.length < 4 || addPin.length > 8)) {
-      setAddError('POS PIN must be 4 to 8 digits');
-      setAddBusy(false);
-      return;
-    }
-
-    // add_staff_member creates the membership AND generates its staff_code server-side
-    // (STF-##### — see generate_staff_code), and, if a POS PIN was entered here, sets
-    // it in the same call so the person can log into the POS immediately instead of
-    // needing a separate "Reset PIN" step afterwards.
-    const { data: result, error: insertError } = await supabase.rpc('add_staff_member', {
-      p_org_id: orgId,
-      p_user_id: existingProfile.id,
-      p_role_name: addRole,
-      p_permissions: permissionsByRole[addRole] ?? {},
-      p_pos_pin: addPin || null,
+    const { data: session } = await supabase.auth.getSession();
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-staff-account`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session?.session?.access_token ?? ''}`,
+      },
+      body: JSON.stringify({
+        full_name: addName.trim(),
+        role_name: addRole,
+        permissions: permissionsByRole[addRole] ?? {},
+        pos_pin: addPin,
+      }),
     });
-
+    const result = await response.json().catch(() => ({}));
     setAddBusy(false);
-    if (insertError || !result) { setAddError(insertError?.message ?? 'Could not add staff member — check permissions'); return; }
 
-    const staffCode = (result as { staff_code?: string }).staff_code ?? null;
+    if (!response.ok) { setAddError(result?.error ?? 'Could not add staff member'); return; }
+
     setShowAdd(false);
-    setAddEmail('');
+    setAddName('');
     setAddRole('cashier');
     setAddCustomModules([]);
     setAddPin('');
-    setNewStaffCode(staffCode);
-    showToast(staffCode ? `Staff added — code ${staffCode}` : 'Staff member added');
+    setAddPinConfirm('');
+    setNewStaffCode(result?.staff_code ?? null);
+    showToast(result?.staff_code ? `Staff added — code ${result.staff_code}` : 'Staff member added');
     loadStaff();
   };
 
@@ -320,11 +305,11 @@ export default function AdminStaff() {
                 <h2 className="text-lg font-extrabold" style={{ color: theme.text }}>Add Staff Member</h2>
                 <button onClick={() => setShowAdd(false)} style={{ color: theme.textMuted }}><X size={18} /></button>
               </div>
-              <p className="text-xs mb-4" style={{ color: theme.textMuted }}>The account must already exist — enter the email of an existing Nutro user.</p>
+              <p className="text-xs mb-4" style={{ color: theme.textMuted }}>No prior Nutro account needed — just name them, pick a role, and set their POS PIN. A staff code is generated automatically for tracking their sales.</p>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Email</label>
-                  <input value={addEmail} onChange={e => setAddEmail(e.target.value)} placeholder="john@restaurant.com"
+                  <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Full Name</label>
+                  <input value={addName} onChange={e => setAddName(e.target.value)} placeholder="e.g. John Kamau"
                     className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
                 </div>
                 <div>
@@ -350,10 +335,14 @@ export default function AdminStaff() {
                   </div>
                 )}
                 <div>
-                  <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>POS PIN (optional)</label>
-                  <input value={addPin} onChange={e => setAddPin(e.target.value.replace(/\D/g, '').slice(0, 8))} placeholder="4–8 digits, for POS login"
+                  <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>POS PIN</label>
+                  <input value={addPin} onChange={e => setAddPin(e.target.value.replace(/\D/g, '').slice(0, 8))} placeholder="4–8 digits"
                     className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
-                  <p className="text-[10px] mt-1" style={{ color: theme.textMuted }}>Leave blank to set it later from the team list. A unique staff code is generated automatically for POS sales tracking.</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Confirm PIN</label>
+                  <input value={addPinConfirm} onChange={e => setAddPinConfirm(e.target.value.replace(/\D/g, '').slice(0, 8))} placeholder="Re-enter the PIN"
+                    className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
                 </div>
                 {addError && <p className="text-xs" style={{ color: '#ef4444' }}>{addError}</p>}
               </div>

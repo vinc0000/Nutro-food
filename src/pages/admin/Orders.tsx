@@ -20,6 +20,7 @@ export default function AdminOrders() {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [viewOrder, setViewOrder] = useState<SharedOrder | null>(null);
+  const [receiptOrder, setReceiptOrder] = useState<SharedOrder | null>(null);
   const [refundTarget, setRefundTarget] = useState<SharedOrder | null>(null);
   const [refundAmount, setRefundAmount] = useState('');
   const [refundReason, setRefundReason] = useState('');
@@ -131,6 +132,9 @@ export default function AdminOrders() {
                 <td>
                   <div className="flex items-center gap-1">
                     <button onClick={() => setViewOrder(o)} title="View details" className="p-1.5 rounded-lg hover:opacity-70" style={{ color: theme.textMuted }}><Eye size={13} /></button>
+                    {o.payment === 'paid' && (
+                      <button onClick={() => setReceiptOrder(o)} title="View / reprint receipt" className="p-1.5 rounded-lg hover:opacity-70" style={{ color: theme.textMuted }}><Printer size={13} /></button>
+                    )}
                     {o.status !== 'paid' && o.status !== 'refunded' && (
                       <button onClick={() => markAsPaid(o.id)} title="Mark as paid" className="p-1.5 rounded-lg hover:opacity-70" style={{ color: '#22c55e' }}><Check size={13} /></button>
                     )}
@@ -201,10 +205,12 @@ export default function AdminOrders() {
                     <RotateCcw size={14} /> Refund
                   </button>
                 )}
-                <button onClick={() => window.print()}
-                  className="flex-1 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>
-                  <Printer size={14} /> Print
-                </button>
+                {viewOrder.payment === 'paid' && (
+                  <button onClick={() => { setReceiptOrder(viewOrder); setViewOrder(null); }}
+                    className="flex-1 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>
+                    <Printer size={14} /> View Receipt
+                  </button>
+                )}
                 <button onClick={() => setViewOrder(null)}
                   className="px-4 py-2.5 rounded-xl font-bold text-sm" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Close</button>
               </div>
@@ -250,6 +256,72 @@ export default function AdminOrders() {
                   {refundBusy && <Loader2 size={14} className="animate-spin" />} Confirm Refund
                 </button>
                 <button onClick={() => setRefundTarget(null)} className="px-4 py-2.5 rounded-xl font-bold text-sm" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Cancel</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Real receipt view / reprint — reads straight from the historical order record
+          (items, subtotal, tax, total, payment method, timestamp), so this is an actual
+          reconstruction of what the customer received, not a screenshot of the admin
+          page. Reuses the same print-isolation CSS trick as the POS's own receipt so
+          printing this only outputs the 80mm receipt, never the surrounding admin UI —
+          the previous "Print" button here had no such isolation and would have printed
+          the whole order-history page. */}
+      <AnimatePresence>
+        {receiptOrder && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.8)' }} onClick={() => setReceiptOrder(null)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="w-80 rounded-2xl p-6 print-receipt-container" style={{ background: '#fff', color: '#000' }} onClick={e => e.stopPropagation()}>
+              <style dangerouslySetInnerHTML={{ __html: `
+                @media print {
+                  body * { visibility: hidden !important; }
+                  .print-receipt-container, .print-receipt-container * { visibility: visible !important; }
+                  .print-receipt-container {
+                    position: absolute !important; left: 0 !important; top: 0 !important;
+                    width: 80mm !important; margin: 0 !important; padding: 10px !important;
+                    border: none !important; box-shadow: none !important;
+                  }
+                }
+              `}} />
+              <div className="text-center mb-4">
+                <div className="text-lg font-extrabold">{orgContext?.org_name ?? 'Receipt'}</div>
+                <div className="text-xs text-gray-500">Powered by Nutro</div>
+                <div className="text-[10px] text-gray-500 font-bold mt-1">REPRINT</div>
+              </div>
+              <div className="border-t border-b border-dashed border-gray-300 py-3 mb-3 text-xs">
+                <div className="flex justify-between mb-1"><span>{receiptOrder.tableLabel}</span><span>Order: {receiptOrder.orderNumber}</span></div>
+                <div className="flex justify-between"><span>Date: {new Date(receiptOrder.createdAt).toLocaleString()}</span></div>
+                {receiptOrder.paymentMethod && (
+                  <div className="flex justify-between mt-1"><span>Payment: {receiptOrder.paymentMethod.replace('_', ' ').toUpperCase()}</span></div>
+                )}
+              </div>
+              <div className="space-y-1 mb-3 text-xs">
+                {receiptOrder.items.map((item, i) => (
+                  <div key={i} className="flex justify-between">
+                    <span>{item.qty}x {item.name}</span>
+                    <span>${(item.price * item.qty).toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t border-dashed border-gray-300 pt-3 text-xs space-y-1">
+                <div className="flex justify-between"><span>Subtotal</span><span>${receiptOrder.subtotal.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>Tax</span><span>${receiptOrder.tax.toFixed(2)}</span></div>
+                <div className="flex justify-between font-bold text-sm"><span>TOTAL</span><span>${receiptOrder.total.toFixed(2)}</span></div>
+                {receiptOrder.refundAmount > 0 && (
+                  <div className="flex justify-between text-red-600"><span>Refunded{receiptOrder.refundReason ? ` (${receiptOrder.refundReason})` : ''}</span><span>-${receiptOrder.refundAmount.toFixed(2)}</span></div>
+                )}
+              </div>
+              <div className="text-center mt-4 text-[10px] text-gray-500">
+                <p>Thank you for dining with us!</p>
+              </div>
+              <div className="flex gap-2 mt-4 print:hidden">
+                <button onClick={() => window.print()} className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-1.5" style={{ background: theme.primary }}>
+                  <Printer size={14} /> Reprint
+                </button>
+                <button onClick={() => setReceiptOrder(null)} className="px-4 py-2.5 rounded-xl font-bold text-sm" style={{ background: '#f5f5f5', color: '#666' }}>Close</button>
               </div>
             </motion.div>
           </motion.div>
