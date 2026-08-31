@@ -55,10 +55,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const s = session as Session | null;
       setSession(s);
       setUser(s?.user ?? null);
+      // Defensive second layer alongside signOut()'s own cleanup: if a tab was
+      // closed without signing out and a different person later signs in on the
+      // same device, a leftover pending-payment reference from the previous
+      // account should never carry over to theirs.
+      if (event === 'SIGNED_IN') {
+        localStorage.removeItem('nutro:pending-tx-ref');
+        localStorage.removeItem('nutro:pending-psp');
+      }
       if (s?.user) {
         (async () => {
           await fetchProfile(s.user.id);
@@ -112,7 +120,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null, needsEmailConfirmation: !data.session };
   };
 
-  const signOut = async () => { await supabase.auth.signOut(); };
+  const signOut = async () => {
+    // A pending PayUnit/Flutterwave/etc. tx_ref is tied to whichever org initiated
+    // it, but localStorage is shared by the whole browser, not scoped per Supabase
+    // session — without this, the next person to log in on the same device (a
+    // shared staff computer, or just switching test accounts) would see a stale
+    // "Verify payment after completion" button and could submit someone else's
+    // transaction reference against their own, different organization.
+    localStorage.removeItem('nutro:pending-tx-ref');
+    localStorage.removeItem('nutro:pending-psp');
+    await supabase.auth.signOut();
+  };
   const refreshProfile = async () => { if (user) await fetchProfile(user.id); };
 
   const isSuperAdmin = profile?.system_role === 'super_admin';

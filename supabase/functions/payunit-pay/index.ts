@@ -20,6 +20,47 @@ interface OrgContext {
   org_name: string;
   billing_email: string | null;
   currency: string | null;
+  country: string | null;
+}
+
+// PayUnit is an African mobile money aggregator (MTN Mobile Money, Orange Money, YUP,
+// Express Union) — their payment rails are denominated in real local currencies, not
+// USD, and their own API docs (developer.payunit.net) show currency:"XAF" +
+// payment_country:"CM" in every example. Sending currency:"USD" with no
+// payment_country (what this used to do) leaves PayUnit with no channel to match,
+// which is exactly why their hosted checkout showed "No options" for payment method.
+// branches.country already stores a real ISO 3166-1 alpha-2 code (matches this
+// mapping's keys and PayUnit's own payment_country format directly, no conversion
+// needed there). This covers the CFA franc zone plus a few other markets PayUnit is
+// documented to serve; anything outside it falls back to Cameroon/XAF — PayUnit's own
+// home market and the currency used in their own docs' example — rather than USD,
+// which we now know produces no payment options at all.
+const PAYUNIT_COUNTRY_CURRENCY: Record<string, string> = {
+  CM: "XAF", TD: "XAF", CF: "XAF", CG: "XAF", GQ: "XAF", GA: "XAF",
+  SN: "XOF", CI: "XOF", ML: "XOF", BF: "XOF", NE: "XOF", GW: "XOF", TG: "XOF", BJ: "XOF",
+  NG: "NGN", GH: "GHS", KE: "KES",
+};
+const PAYUNIT_DEFAULT_COUNTRY = "CM";
+
+function resolvePayunitLocale(orgCountry: string | null): { currency: string; paymentCountry: string } {
+  const code = (orgCountry ?? "").toUpperCase();
+  const currency = PAYUNIT_COUNTRY_CURRENCY[code];
+  if (currency) return { currency, paymentCountry: code };
+  return { currency: PAYUNIT_COUNTRY_CURRENCY[PAYUNIT_DEFAULT_COUNTRY], paymentCountry: PAYUNIT_DEFAULT_COUNTRY };
+}
+
+// Real, fixed conversion from Nutro's canonical USD plan prices into the target local
+// currency. Not a live FX feed (no network access to one here) — same-order-of-
+// magnitude approximate rates so the amount PayUnit actually charges is a real local
+// price rather than a raw USD number relabeled with a local currency code (which
+// would be wildly wrong — 1890 XAF is not the same value as 1890 USD).
+const USD_TO_LOCAL_RATE: Record<string, number> = {
+  XAF: 610, XOF: 610, NGN: 1550, GHS: 15, KES: 129,
+};
+
+function convertUsdToLocal(usdAmount: number, currency: string): number {
+  const rate = USD_TO_LOCAL_RATE[currency] ?? 1;
+  return Math.round(usdAmount * rate);
 }
 
 async function getOrgContext(supabase: ReturnType<typeof createClient>): Promise<OrgContext | null> {
@@ -161,12 +202,9 @@ Deno.serve(async (req: Request) => {
         });
       }
       const period = billing_period === "annual" ? "annual" : "monthly";
-      const amount = prices[period];
-      // Nutro's own subscription fee is always billed in USD, regardless of what
-      // currency the tenant's branch uses for their own customers' orders (that's a
-      // separate concern — branches.currency). PLAN_PRICES above are USD figures;
-      // silently sending them as e.g. XAF or AED would charge a wildly wrong amount.
-      const currency = "USD";
+      const usdAmount = prices[period];
+      const { currency, paymentCountry } = resolvePayunitLocale(orgData.country);
+      const amount = convertUsdToLocal(usdAmount, currency);
       const txRef = `PU-${orgId.slice(0, 8)}-${Date.now()}`;
       const appOrigin = req.headers.get("origin") || Deno.env.get("APP_BASE_URL") || "https://nutro.app";
 
@@ -183,6 +221,7 @@ Deno.serve(async (req: Request) => {
           success_url: `${appOrigin}/app/admin/settings?billing=success`,
           notify_url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/payunit-pay`,
           currency,
+          payment_country: paymentCountry,
           mode: "payment",
           transaction_id: txRef,
           total_amount: amount,
