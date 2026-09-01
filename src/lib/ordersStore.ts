@@ -61,8 +61,12 @@ interface OrderRow {
   subtotal: number;
   tax_amount: number;
   total_amount: number;
+  discount_amount: number;
+  discount_reason: string | null;
+  discount_approved_by: string | null;
   source: 'pos' | 'tablet';
   notes: string | null;
+  customer_phone: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -106,8 +110,12 @@ function rowToShared(row: OrderRow, items: OrderItemRow[], imagesByMenuItemId?: 
     subtotal: Number(row.subtotal),
     tax: Number(row.tax_amount),
     total: Number(row.total_amount),
+    discountAmount: Number(row.discount_amount ?? 0),
+    discountReason: row.discount_reason,
+    discountApprovedBy: row.discount_approved_by,
     source: row.source,
     note: row.notes ?? undefined,
+    customerPhone: row.customer_phone,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

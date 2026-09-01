@@ -89,6 +89,13 @@ const PARTNER_LOGOS = [
   { name: 'Carnivore Nairobi', file: 'carnivore-nairobi.jpg' },
   { name: 'Café La Paris Pâtisserie', file: 'cafe-la-paris.jpg' },
   { name: 'Café de Paris', file: 'cafe-de-paris.jpg' },
+  { name: 'Golden Tulip Al Barsha Hotel', file: 'golden-tulip-albarsha.jpeg' },
+  { name: 'Millennium Al Barsha', file: 'millennium-albarsha.webp' },
+  { name: 'Malam Payroll Plus', file: 'malam-payroll-plus.png' },
+  { name: 'Tambo Real Hotel & Suites', file: 'tambo-real.jpg' },
+  { name: 'Carlton Hotel Singapore', file: 'carlton-singapore.webp' },
+  { name: 'Maritim Antonine Hotel & Spa Malta', file: 'maritim-antonine-malta.jpg' },
+  { name: 'Radisson Hotels & Resorts', file: 'radisson-hotels-resorts.png' },
 ];
 
 const FEATURES = [

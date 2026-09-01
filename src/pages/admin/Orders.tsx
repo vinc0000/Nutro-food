@@ -309,6 +309,9 @@ export default function AdminOrders() {
               <div className="border-t border-dashed border-gray-300 pt-3 text-xs space-y-1">
                 <div className="flex justify-between"><span>Subtotal</span><span>${receiptOrder.subtotal.toFixed(2)}</span></div>
                 <div className="flex justify-between"><span>Tax</span><span>${receiptOrder.tax.toFixed(2)}</span></div>
+                {(receiptOrder.discountAmount ?? 0) > 0 && (
+                  <div className="flex justify-between" style={{ color: '#22c55e' }}><span>Discount{receiptOrder.discountReason ? ` (${receiptOrder.discountReason})` : ''}</span><span>-${(receiptOrder.discountAmount ?? 0).toFixed(2)}</span></div>
+                )}
                 <div className="flex justify-between font-bold text-sm"><span>TOTAL</span><span>${receiptOrder.total.toFixed(2)}</span></div>
                 {receiptOrder.refundAmount > 0 && (
                   <div className="flex justify-between text-red-600"><span>Refunded{receiptOrder.refundReason ? ` (${receiptOrder.refundReason})` : ''}</span><span>-${receiptOrder.refundAmount.toFixed(2)}</span></div>
