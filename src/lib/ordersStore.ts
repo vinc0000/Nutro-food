@@ -38,6 +38,9 @@ export interface SharedOrder {
   source: 'pos' | 'tablet';
   note?: string;
   customerPhone?: string | null;
+  discountAmount?: number;
+  discountReason?: string | null;
+  discountApprovedBy?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -215,7 +218,9 @@ export function useSharedOrders(branchId: string | null) {
       cashier_id: order.cashierId ?? null,
       subtotal: order.subtotal,
       tax_amount: order.tax,
-      discount_amount: 0,
+      discount_amount: order.discountAmount ?? 0,
+      discount_reason: order.discountReason ?? null,
+      discount_approved_by: order.discountApprovedBy ?? null,
       total_amount: order.total,
       source: order.source,
       notes: order.note ?? null,

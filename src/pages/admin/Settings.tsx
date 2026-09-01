@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Building2, Globe, Bell, CreditCard, Palette, Stamp, Share2, MapPin, Check, Lock, KeyRound, Eye, EyeOff, AlertTriangle, LifeBuoy, Loader2 } from 'lucide-react';
+import { Building2, Globe, Bell, CreditCard, Palette, Stamp, Share2, MapPin, Check, Lock, KeyRound, Eye, EyeOff, AlertTriangle, LifeBuoy, Loader2, Gift } from 'lucide-react';
 import { usePlanInfo } from '@/hooks/useOrgContext';
 import { useTheme, THEMES, ThemeName } from '@/contexts/ThemeContext';
 import { COUNTRIES, CURRENCIES, LANGUAGES } from '@/lib/countries';
@@ -162,6 +162,7 @@ export default function AdminSettings() {
     { id: 'localization', label: 'Localization', icon: Globe },
     { id: 'social', label: 'Social & Stamp', icon: Share2 },
     { id: 'pos', label: 'POS & Security', icon: Lock },
+    { id: 'loyalty', label: 'Loyalty Program', icon: Gift },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'billing', label: 'Billing', icon: CreditCard },
     { id: 'support', label: 'Support', icon: LifeBuoy },
@@ -373,6 +374,7 @@ export default function AdminSettings() {
         )}
 
         {activeTab === 'pos' && <PosSecurityTab theme={theme} showSaved={showSaved} />}
+        {activeTab === 'loyalty' && <LoyaltyTab theme={theme} showSaved={showSaved} />}
 
         {activeTab === 'billing' && <BillingTab theme={theme} showSaved={showSaved} />}
         {activeTab === 'support' && <SupportTab theme={theme} showSaved={showSaved} />}
@@ -446,6 +448,126 @@ export default function AdminSettings() {
 //     </div>
 //   );
 // }
+
+function LoyaltyTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['theme']; showSaved: (msg: string) => void }) {
+  const { orgContext } = useOrgContext();
+  const [enabled, setEnabled] = useState(false);
+  const [pointsPerUnit, setPointsPerUnit] = useState(1);
+  const [rewardThreshold, setRewardThreshold] = useState(100);
+  const [rewardDescription, setRewardDescription] = useState('Free item');
+  const [rewardValue, setRewardValue] = useState(0);
+  const [discountPriority, setDiscountPriority] = useState<'discount' | 'loyalty' | 'both'>('both');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!orgContext?.org_id) { setLoading(false); return; }
+    (async () => {
+      const { data } = await supabase.from('loyalty_settings').select('*').eq('org_id', orgContext.org_id).maybeSingle<{
+        enabled: boolean; points_per_currency_unit: number; reward_threshold: number; reward_description: string;
+        reward_value: number; discount_priority: 'discount' | 'loyalty' | 'both';
+      }>();
+      if (data) {
+        setEnabled(data.enabled);
+        setPointsPerUnit(data.points_per_currency_unit);
+        setRewardThreshold(data.reward_threshold);
+        setRewardDescription(data.reward_description);
+        setRewardValue(data.reward_value);
+        setDiscountPriority(data.discount_priority);
+      }
+      setLoading(false);
+    })();
+  }, [orgContext?.org_id]);
+
+  const save = async () => {
+    if (!orgContext?.org_id) return;
+    setSaving(true);
+    const { error } = await supabase.from('loyalty_settings').upsert({
+      org_id: orgContext.org_id,
+      enabled,
+      points_per_currency_unit: pointsPerUnit,
+      reward_threshold: rewardThreshold,
+      reward_description: rewardDescription,
+      reward_value: rewardValue,
+      discount_priority: discountPriority,
+      updated_at: new Date().toISOString(),
+    } as never, { onConflict: 'org_id' } as never);
+    setSaving(false);
+    if (!error) showSaved('Loyalty program settings saved');
+  };
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin" size={24} style={{ color: theme.primary }} /></div>;
+
+  return (
+    <div className="space-y-5">
+      <h2 className="font-extrabold" style={{ color: theme.text }}>Loyalty Program & Discounts</h2>
+      <p className="text-sm" style={{ color: theme.textMuted }}>
+        Customers earn points automatically on every paid order that has a phone number attached (collected at checkout on the POS or tablet). No separate signup — the phone number is the loyalty account.
+      </p>
+
+      <label className="flex items-center gap-3 p-4 rounded-2xl cursor-pointer" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
+        <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} style={{ accentColor: theme.primary }} className="w-5 h-5" />
+        <div>
+          <p className="font-bold text-sm" style={{ color: theme.text }}>Enable loyalty program</p>
+          <p className="text-xs" style={{ color: theme.textMuted }}>When off, no points are earned or shown, anywhere.</p>
+        </div>
+      </label>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Points earned per $1 spent</label>
+          <input type="number" min={0.1} step={0.1} value={pointsPerUnit} onChange={e => setPointsPerUnit(Math.max(0.1, parseFloat(e.target.value) || 0.1))}
+            className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+        </div>
+        <div>
+          <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Points needed for reward</label>
+          <input type="number" min={1} value={rewardThreshold} onChange={e => setRewardThreshold(Math.max(1, parseInt(e.target.value, 10) || 1))}
+            className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Reward description</label>
+          <input value={rewardDescription} onChange={e => setRewardDescription(e.target.value)} placeholder="e.g. Free coffee"
+            className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+        </div>
+        <div>
+          <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Reward value ($ discount)</label>
+          <input type="number" min={0} step={0.5} value={rewardValue} onChange={e => setRewardValue(Math.max(0, parseFloat(e.target.value) || 0))}
+            className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+        </div>
+      </div>
+
+      <div className="p-4 rounded-xl text-xs" style={{ background: theme.bg, border: `1px solid ${theme.border}`, color: theme.textMuted }}>
+        Example: at {pointsPerUnit} point{pointsPerUnit === 1 ? '' : 's'}/$1, a customer needs to spend ${(rewardThreshold / pointsPerUnit).toFixed(2)} total to unlock "{rewardDescription || 'the reward'}" — a ${rewardValue.toFixed(2)} discount applied at the POS.
+      </div>
+
+      <div className="pt-2" style={{ borderTop: `1px solid ${theme.border}` }}>
+        <h3 className="font-bold text-sm mb-1 mt-4" style={{ color: theme.text }}>Price reduction options at the POS</h3>
+        <p className="text-xs mb-3" style={{ color: theme.textMuted }}>Choose what a cashier can offer a customer: a manager-approved manual discount, loyalty point redemption, or both.</p>
+        <div className="space-y-2">
+          {([
+            { key: 'both', label: 'Both', desc: 'Manual discount (manager approval required) and loyalty redemption are both available.' },
+            { key: 'discount', label: 'Manual discount only', desc: 'Cashiers can apply a discount with manager PIN approval. No loyalty points.' },
+            { key: 'loyalty', label: 'Loyalty points only', desc: 'Only point redemption is available — no manual discounts.' },
+          ] as const).map(opt => (
+            <label key={opt.key} className="flex items-start gap-3 p-3 rounded-xl cursor-pointer" style={{ background: discountPriority === opt.key ? theme.primary + '10' : theme.bg, border: `1px solid ${discountPriority === opt.key ? theme.primary : theme.border}` }}>
+              <input type="radio" name="discount_priority" checked={discountPriority === opt.key} onChange={() => setDiscountPriority(opt.key)} style={{ accentColor: theme.primary }} className="mt-0.5" />
+              <div>
+                <p className="font-bold text-xs" style={{ color: theme.text }}>{opt.label}</p>
+                <p className="text-[11px]" style={{ color: theme.textMuted }}>{opt.desc}</p>
+              </div>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <button onClick={() => void save()} disabled={saving} className="px-5 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50" style={{ background: theme.primary }}>
+        {saving ? 'Saving...' : 'Save Loyalty Settings'}
+      </button>
+    </div>
+  );
+}
 
 function PosSecurityTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['theme']; showSaved: (msg: string) => void }) {
   const { orgContext } = useOrgContext();

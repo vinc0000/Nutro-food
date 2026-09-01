@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Monitor, Search, Plus, Minus, X, CreditCard, Banknote, Smartphone, Gift,
   Clock, Printer, ArrowLeft, Check, Hash, Edit2, FileText, Lock,
-  Tablet, Volume2, VolumeX, Split, UtensilsCrossed
+  Tablet, Volume2, VolumeX, Split, UtensilsCrossed, UserCheck, Loader2
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -100,7 +100,73 @@ export default function PosTerminal() {
   const { t } = useLocale();
   const navigate = useNavigate();
   const { plan } = usePlanInfo();
+  const [activeStaff, setActiveStaff] = useState<{ userId: string; fullName: string; roleName: string; locked: boolean; staffCode: string } | null>(null);
+  const [showStaffSwitch, setShowStaffSwitch] = useState(false);
+  const [switchStaffCode, setSwitchStaffCode] = useState('');
+  const [switchPin, setSwitchPin] = useState('');
+  const [switchError, setSwitchError] = useState<string | null>(null);
+  const [switchBusy, setSwitchBusy] = useState(false);
+  const [showUnlockPrompt, setShowUnlockPrompt] = useState(false);
+  const [unlockPin, setUnlockPin] = useState('');
+  const [unlockError, setUnlockError] = useState<string | null>(null);
+  const [showZReportPinGate, setShowZReportPinGate] = useState(false);
+  const [zReportPinInput, setZReportPinInput] = useState('');
+  const [zReportPinError, setZReportPinError] = useState<string | null>(null);
+
+  // Falls back to the browser session's own logged-in profile when no staff has
+  // identified themselves by code+PIN yet — this is what keeps a single
+  // owner/manager operating the POS alone working exactly as before, with no
+  // behavior change, while a shared till with multiple staff can additionally
+  // identify who's actually ringing up each sale.
+  const effectiveCashierId = activeStaff?.userId ?? profile?.id ?? null;
+  const effectiveCashierName = activeStaff?.fullName ?? profile?.full_name ?? 'Staff';
+  const isPosLocked = activeStaff?.locked === true;
+
+  const identifyStaff = async () => {
+    if (!switchStaffCode.trim() || !switchPin) { setSwitchError('Enter your staff code and PIN'); return; }
+    setSwitchBusy(true);
+    setSwitchError(null);
+    const normalizedCode = switchStaffCode.trim().toUpperCase();
+    const { data, error } = await supabase.rpc('identify_staff_by_pin', {
+      p_staff_code: normalizedCode,
+      p_pin: switchPin,
+    });
+    setSwitchBusy(false);
+    const result = data as { success: boolean; error?: string; user_id?: string; full_name?: string; role_name?: string; locked?: boolean } | null;
+    if (error || !result?.success) { setSwitchError(result?.error ?? error?.message ?? 'Could not identify staff'); return; }
+    setActiveStaff({ userId: result.user_id!, fullName: result.full_name!, roleName: result.role_name!, locked: result.locked!, staffCode: normalizedCode });
+    setShowStaffSwitch(false);
+    setSwitchStaffCode('');
+    setSwitchPin('');
+  };
+
+  const lockOwnAccount = async () => {
+    if (!activeStaff) return;
+    await supabase.rpc('set_staff_lock', { p_staff_code: activeStaff.staffCode, p_pin: '', p_lock: true });
+    setActiveStaff(prev => prev ? { ...prev, locked: true } : prev);
+  };
+
+  const unlockOwnAccount = async () => {
+    if (!activeStaff || !unlockPin) { setUnlockError('Enter your PIN'); return; }
+    setUnlockError(null);
+    const { data, error } = await supabase.rpc('set_staff_lock', {
+      p_staff_code: activeStaff.staffCode, p_pin: unlockPin, p_lock: false,
+    });
+    const result = data as { success: boolean; error?: string; locked?: boolean } | null;
+    if (error || !result?.success) { setUnlockError(result?.error ?? error?.message ?? 'Incorrect PIN'); return; }
+    setActiveStaff(prev => prev ? { ...prev, locked: false } : prev);
+    setShowUnlockPrompt(false);
+    setUnlockPin('');
+  };
+
   const { orgContext, loading: orgLoading } = useOrgContext();
+
+  useEffect(() => {
+    if (!orgContext?.org_id) return;
+    supabase.from('loyalty_settings').select('discount_priority').eq('org_id', orgContext.org_id).maybeSingle<{ discount_priority: 'discount' | 'loyalty' | 'both' }>()
+      .then(({ data }) => { if (data) setDiscountPriority(data.discount_priority); });
+  }, [orgContext?.org_id]);
+
   const lockPos = usePosLock();
   const { menuItems } = useSharedMenu(orgContext?.branch_id ?? null);
   const PLAN_TABLE_LIMIT = plan === 'starter' ? 10 : (plan === 'premium' ? 30 : 999);
@@ -154,6 +220,23 @@ export default function PosTerminal() {
     { method: 'card', amount: 0 },
   ]);
   const [customerPhone, setCustomerPhone] = useState('');
+  const [appliedDiscount, setAppliedDiscount] = useState(0);
+  const [discountReason, setDiscountReason] = useState<string | null>(null);
+  const [discountApprovedBy, setDiscountApprovedBy] = useState<string | null>(null);
+  const [showDiscountPanel, setShowDiscountPanel] = useState(false);
+  const [manualDiscountInput, setManualDiscountInput] = useState('');
+  const [manualDiscountReasonInput, setManualDiscountReasonInput] = useState('');
+  const [pendingManualDiscount, setPendingManualDiscount] = useState<{ amount: number; reason: string } | null>(null);
+  const [loyaltyInfo, setLoyaltyInfo] = useState<{ enabled: boolean; points_balance?: number; reward_threshold?: number; reward_description?: string; reward_value?: number; discount_priority?: 'discount' | 'loyalty' | 'both' } | null>(null);
+  const [loyaltyLookupBusy, setLoyaltyLookupBusy] = useState(false);
+  const [loyaltyRedeeming, setLoyaltyRedeeming] = useState(false);
+  const [discountError, setDiscountError] = useState<string | null>(null);
+  const [discountPriority, setDiscountPriority] = useState<'discount' | 'loyalty' | 'both'>('both');
+  const [showManagerApproval, setShowManagerApproval] = useState(false);
+  const [managerApprovalCode, setManagerApprovalCode] = useState('');
+  const [managerApprovalPin, setManagerApprovalPin] = useState('');
+  const [managerApprovalError, setManagerApprovalError] = useState<string | null>(null);
+  const [managerApprovalBusy, setManagerApprovalBusy] = useState(false);
   const [paidSuccess, setPaidSuccess] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
   const [sessionStart] = useState(new Date());
@@ -172,7 +255,7 @@ export default function PosTerminal() {
   const [zReportMode, setZReportMode] = useState<'x' | 'z'>('z');
   const [zReportPrinted, setZReportPrinted] = useState(0);
   const [showManagerPin, setShowManagerPin] = useState(false);
-  const [pendingAction, setPendingAction] = useState<null | 'void'>(null);
+  const [pendingAction, setPendingAction] = useState<null | 'void' | 'discount'>(null);
   const [showTabletOrders, setShowTabletOrders] = useState(false);
   const { orders, updateOrder, addOrder } = useSharedOrders(orgContext?.branch_id ?? null);
 
@@ -205,12 +288,86 @@ export default function PosTerminal() {
   // silently ignoring that and applying UAE's rate to every branch regardless of its
   // actual country, and to every item regardless of what the admin set for it.
   const tax = cart.reduce((s, i) => s + i.price * i.qty * (i.taxRate / 100), 0);
-  const total = subtotal + tax;
+  const total = Math.max(0, subtotal + tax - appliedDiscount);
   const cashGivenAmount = cashGiven ? parseFloat(cashGiven) : NaN;
   const isCashAmountValid = !Number.isNaN(cashGivenAmount) && cashGivenAmount >= total;
   const splitTotal = splitEntries.reduce((sum, e) => sum + (Number.isFinite(e.amount) ? e.amount : 0), 0);
   const isSplitAmountValid = splitEntries.filter(e => e.amount > 0).length >= 2 && Math.abs(splitTotal - total) < 0.01;
   const change = isCashAmountValid ? cashGivenAmount - total : 0;
+
+  // Real customer lookup by phone — the value already collected for WhatsApp
+  // confirmations doubles as the loyalty account key here (get_loyalty_balance is
+  // org-scoped server-side via auth.uid(), same pattern as everywhere else, so this
+  // can never leak another org's loyalty data).
+  const lookupLoyalty = async () => {
+    if (!customerPhone.trim()) { setLoyaltyInfo(null); return; }
+    setLoyaltyLookupBusy(true);
+    const { data } = await supabase.rpc('get_loyalty_balance', { p_customer_phone: customerPhone.trim() });
+    setLoyaltyLookupBusy(false);
+    setLoyaltyInfo(data as typeof loyaltyInfo);
+  };
+
+  const redeemLoyaltyPoints = async () => {
+    if (!customerPhone.trim() || !loyaltyInfo?.enabled) return;
+    setLoyaltyRedeeming(true);
+    setDiscountError(null);
+    const { data, error } = await supabase.rpc('redeem_loyalty_reward', { p_customer_phone: customerPhone.trim() });
+    setLoyaltyRedeeming(false);
+    const result = data as { success: boolean; error?: string; points_balance?: number } | null;
+    if (error || !result?.success) { setDiscountError(result?.error ?? error?.message ?? 'Could not redeem reward'); return; }
+    setAppliedDiscount(prev => prev + (loyaltyInfo.reward_value ?? 0));
+    setDiscountReason(loyaltyInfo.reward_description ?? 'Loyalty reward');
+    setDiscountApprovedBy(null); // loyalty redemption doesn't need manager approval, unlike a manual discount
+    setLoyaltyInfo(prev => prev ? { ...prev, points_balance: result.points_balance } : prev);
+    setShowDiscountPanel(false);
+  };
+
+  // A manual discount needs a real manager to prove it's them (staff_code + PIN,
+  // same identification mechanism as the staff-lock system above) — not just the
+  // shared branch PIN, so discount_approved_by can record an actual accountable
+  // identity rather than "someone who knew a shared code".
+  const requestManualDiscount = () => {
+    const amount = parseFloat(manualDiscountInput);
+    if (!amount || amount <= 0 || amount > subtotal + tax) { setDiscountError('Enter a valid discount amount'); return; }
+    if (!manualDiscountReasonInput.trim()) { setDiscountError('Enter a reason for this discount'); return; }
+    setPendingManualDiscount({ amount, reason: manualDiscountReasonInput.trim() });
+    setManagerApprovalCode('');
+    setManagerApprovalPin('');
+    setManagerApprovalError(null);
+    setShowManagerApproval(true);
+  };
+
+  const confirmManagerApproval = async () => {
+    if (!pendingManualDiscount) return;
+    if (!managerApprovalCode.trim() || !managerApprovalPin) { setManagerApprovalError('Enter the manager\'s staff code and PIN'); return; }
+    setManagerApprovalBusy(true);
+    setManagerApprovalError(null);
+    const { data, error } = await supabase.rpc('identify_staff_by_pin', {
+      p_staff_code: managerApprovalCode.trim().toUpperCase(), p_pin: managerApprovalPin,
+    });
+    setManagerApprovalBusy(false);
+    const result = data as { success: boolean; error?: string; user_id?: string; role_name?: string } | null;
+    if (error || !result?.success) { setManagerApprovalError(result?.error ?? error?.message ?? 'Could not verify manager'); return; }
+    if (!['owner', 'org_owner', 'branch_manager'].includes(result.role_name ?? '')) {
+      setManagerApprovalError('This staff code does not have manager-level access');
+      return;
+    }
+    setAppliedDiscount(prev => prev + pendingManualDiscount.amount);
+    setDiscountReason(pendingManualDiscount.reason);
+    setDiscountApprovedBy(result.user_id!);
+    setPendingManualDiscount(null);
+    setShowManagerApproval(false);
+    setManualDiscountInput('');
+    setManualDiscountReasonInput('');
+    setShowDiscountPanel(false);
+  };
+
+  const clearDiscount = () => {
+    setAppliedDiscount(0);
+    setDiscountReason(null);
+    setDiscountApprovedBy(null);
+  };
+
   const pendingTabletOrders = tabletOrders.filter(o => o.status === 'pending');
   const [posSoundOn, setPosSoundOn] = useState(true);
   const knownPendingTabletIds = useRef<Set<string> | null>(null);
@@ -274,6 +431,35 @@ export default function PosTerminal() {
     setZReportPrinted(stored ? parseInt(stored, 10) || 0 : 0);
   }, [zReportStorageKey]);
 
+  // Z-Report closes the day's books — treated as a "complicated" action requiring
+  // step-up PIN re-entry, same principle as Microsoft Dynamics 365's re-auth prompts
+  // for sensitive actions. If a staff member has identified themselves via PIN this
+  // shift, the print button opens a PIN re-entry gate instead of printing directly;
+  // if nobody has (single-owner/manager session, unchanged from before), it prints
+  // immediately as it always did.
+  const requestZReportPrint = () => {
+    if (zReportPrinted >= zReportPrintLimit) return;
+    if (activeStaff) {
+      setZReportPinInput('');
+      setZReportPinError(null);
+      setShowZReportPinGate(true);
+      return;
+    }
+    printZReport();
+  };
+
+  const confirmZReportPrint = async () => {
+    if (!activeStaff || !zReportPinInput) { setZReportPinError('Enter your PIN'); return; }
+    const { data, error } = await supabase.rpc('identify_staff_by_pin', {
+      p_staff_code: activeStaff.staffCode, p_pin: zReportPinInput,
+    });
+    const result = data as { success: boolean; error?: string } | null;
+    if (error || !result?.success) { setZReportPinError(result?.error ?? error?.message ?? 'Incorrect PIN'); return; }
+    setShowZReportPinGate(false);
+    setZReportPinInput('');
+    printZReport();
+  };
+
   const printZReport = () => {
     if (zReportPrinted >= zReportPrintLimit) return;
     const next = zReportPrinted + 1;
@@ -296,6 +482,7 @@ export default function PosTerminal() {
   };
 
   const processPayment = async () => {
+    if (isPosLocked) return;
     const effectivePaymentMethod: PayMethod | 'split' = isSplitPayment ? 'split' : payMethod;
     const effectivePaymentSplit: PaymentSplitEntry[] | null = isSplitPayment ? splitEntries.filter(e => e.amount > 0) : null;
 
@@ -308,7 +495,7 @@ export default function PosTerminal() {
         payment: 'paid',
         paymentMethod: effectivePaymentMethod,
         paymentSplit: effectivePaymentSplit,
-        cashierId: profile?.id ?? null,
+        cashierId: effectiveCashierId,
         status: 'preparing',
         updatedAt: new Date().toISOString()
       }));
@@ -324,7 +511,7 @@ export default function PosTerminal() {
         payment: 'paid',
         paymentMethod: effectivePaymentMethod,
         paymentSplit: effectivePaymentSplit,
-        cashierId: profile?.id ?? null,
+        cashierId: effectiveCashierId,
         refundAmount: 0,
         items: cart.map(c => ({
           id: c.id,
@@ -337,6 +524,9 @@ export default function PosTerminal() {
         total,
         source: 'pos',
         customerPhone: customerPhone.trim() || null,
+        discountAmount: appliedDiscount,
+        discountReason: discountReason,
+        discountApprovedBy: discountApprovedBy,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -345,6 +535,10 @@ export default function PosTerminal() {
     }
 
     setCustomerPhone('');
+    setAppliedDiscount(0);
+    setDiscountReason(null);
+    setDiscountApprovedBy(null);
+    setLoyaltyInfo(null);
     setIsSplitPayment(false);
     setSplitEntries([{ method: 'cash', amount: 0 }, { method: 'card', amount: 0 }]);
     setPaidSuccess(true);
@@ -419,6 +613,14 @@ export default function PosTerminal() {
             <button onClick={() => setPosSoundOn(p => !p)} title={posSoundOn ? 'Mute new-order sound' : 'Unmute new-order sound'}
               className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-full" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>
               {posSoundOn ? <Volume2 size={12} /> : <VolumeX size={12} />}
+            </button>
+            <button
+              onClick={() => activeStaff ? (isPosLocked ? setShowUnlockPrompt(true) : lockOwnAccount()) : setShowStaffSwitch(true)}
+              title={activeStaff ? (isPosLocked ? 'Locked — tap to unlock with your PIN' : 'Tap to lock your account') : 'Identify yourself with your staff code + PIN'}
+              className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-full"
+              style={{ background: isPosLocked ? '#ef444420' : theme.bg, color: isPosLocked ? '#ef4444' : theme.textMuted, border: `1px solid ${isPosLocked ? '#ef444450' : theme.border}` }}>
+              {isPosLocked ? <Lock size={12} /> : <UserCheck size={12} />}
+              {effectiveCashierName}{activeStaff && (isPosLocked ? ' · Locked' : '')}
             </button>
             <button onClick={() => { setZReportMode('x'); setShowZReport(true); }} className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-full" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>
               <FileText size={12} /> X-Report
@@ -640,10 +842,39 @@ export default function PosTerminal() {
                   )}
                   <div className="mb-4">
                     <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>Customer phone (optional — for WhatsApp confirmation)</label>
-                    <input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="+234 XXX XXX XXXX"
-                      className="w-full px-4 py-2.5 rounded-xl text-sm outline-none"
-                      style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+                    <div className="flex gap-2">
+                      <input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="+234 XXX XXX XXXX"
+                        className="flex-1 px-4 py-2.5 rounded-xl text-sm outline-none"
+                        style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+                      {discountPriority !== 'discount' && (
+                        <button onClick={() => void lookupLoyalty()} disabled={loyaltyLookupBusy || !customerPhone.trim()}
+                          className="px-3 py-2.5 rounded-xl text-xs font-bold disabled:opacity-40" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>
+                          {loyaltyLookupBusy ? <Loader2 size={14} className="animate-spin" /> : 'Check Points'}
+                        </button>
+                      )}
+                    </div>
+                    {loyaltyInfo?.enabled && (
+                      <p className="text-[11px] mt-1.5" style={{ color: theme.textMuted }}>
+                        {loyaltyInfo.points_balance} points · needs {loyaltyInfo.reward_threshold} for "{loyaltyInfo.reward_description}"
+                      </p>
+                    )}
                   </div>
+
+                  {appliedDiscount > 0 ? (
+                    <div className="mb-4 p-3 rounded-xl flex items-center justify-between" style={{ background: '#22c55e10', border: '1px solid #22c55e30' }}>
+                      <div>
+                        <p className="text-xs font-bold" style={{ color: '#22c55e' }}>-{currencySymbol}{appliedDiscount.toFixed(2)} applied</p>
+                        <p className="text-[10px]" style={{ color: theme.textMuted }}>{discountReason}{discountApprovedBy ? ' · manager approved' : ''}</p>
+                      </div>
+                      <button onClick={clearDiscount} className="text-xs font-bold" style={{ color: '#ef4444' }}>Remove</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => { setShowDiscountPanel(true); setDiscountError(null); }}
+                      className="w-full mb-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2"
+                      style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>
+                      <Gift size={14} /> Apply Discount / Reward
+                    </button>
+                  )}
                   {payMethod === 'mobile_money' && !isSplitPayment && (
                     <div className="mb-4 p-3.5 rounded-xl border space-y-2" style={{ background: '#f5a62310', borderColor: '#f5a62330' }}>
                       <div className="text-xs font-bold" style={{ color: '#f5a623' }}>Mobile Money</div>
@@ -696,7 +927,7 @@ export default function PosTerminal() {
                     </div>
                   )}
                   <button onClick={() => void processPayment()}
-                    disabled={isSplitPayment ? !isSplitAmountValid : (payMethod === 'cash' && !isCashAmountValid)}
+                    disabled={isPosLocked || (isSplitPayment ? !isSplitAmountValid : (payMethod === 'cash' && !isCashAmountValid))}
                     className="w-full py-3 rounded-xl font-bold text-sm text-white disabled:opacity-50"
                     style={{ background: payMethod === 'mobile_money' && !isSplitPayment ? '#f5a623' : theme.primary }}>
                     {isSplitPayment
@@ -817,7 +1048,7 @@ export default function PosTerminal() {
                   <p className="text-xs" style={{ color: theme.textMuted }}>Prints today: {zReportPrinted}/{zReportPrintLimit}. Set by your admin in Settings &gt; POS &amp; Security to control thermal-roll usage.</p>
                 </div>
               )}
-              <button onClick={() => zReportMode === 'z' ? printZReport() : window.print()}
+              <button onClick={() => zReportMode === 'z' ? requestZReportPrint() : window.print()}
                 disabled={zReportMode === 'z' && zReportPrinted >= zReportPrintLimit}
                 className="w-full mt-4 py-3 rounded-xl font-bold text-sm text-white disabled:opacity-40 flex items-center justify-center gap-2"
                 style={{ background: theme.primary }}>
@@ -908,6 +1139,159 @@ export default function PosTerminal() {
               if (pendingAction === 'void') startNewOrder();
               setPendingAction(null);
             }} />
+        )}
+
+        {/* Staff identification — enter your own staff_code + PIN, distinct from the
+            branch PIN that unlocked this terminal, so a shared till can attribute
+            sales/lock state to the actual person operating it right now. */}
+        {showStaffSwitch && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.8)' }} onClick={() => setShowStaffSwitch(false)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="w-80 rounded-2xl p-6" style={{ background: theme.surface, border: `1px solid ${theme.border}` }} onClick={e => e.stopPropagation()}>
+              <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2" style={{ color: theme.text }}><UserCheck size={18} /> Who's on the till?</h2>
+              <p className="text-xs mb-4" style={{ color: theme.textMuted }}>Enter your staff code and PIN to identify yourself for this shift.</p>
+              <div className="space-y-3">
+                <input value={switchStaffCode} onChange={e => setSwitchStaffCode(e.target.value)} placeholder="Staff code (e.g. STF-00123)"
+                  className="w-full px-4 py-2.5 rounded-xl text-sm outline-none font-mono" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+                <input value={switchPin} onChange={e => setSwitchPin(e.target.value.replace(/\D/g, '').slice(0, 8))} type="password" placeholder="PIN"
+                  className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+                {switchError && <p className="text-xs" style={{ color: '#ef4444' }}>{switchError}</p>}
+              </div>
+              <div className="flex gap-2 mt-5">
+                <button onClick={() => void identifyStaff()} disabled={switchBusy}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-50 flex items-center justify-center gap-2" style={{ background: theme.primary }}>
+                  {switchBusy && <Loader2 size={14} className="animate-spin" />} Identify
+                </button>
+                <button onClick={() => setShowStaffSwitch(false)} className="px-4 py-2.5 rounded-xl font-bold text-sm" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Cancel</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Unlock — locking your own account needs no PIN (a quick "step away"
+            action), but unlocking re-proves it's really you. */}
+        {showUnlockPrompt && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.8)' }} onClick={() => setShowUnlockPrompt(false)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="w-72 rounded-2xl p-6 text-center" style={{ background: theme.surface, border: `1px solid ${theme.border}` }} onClick={e => e.stopPropagation()}>
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ background: '#ef444420' }}>
+                <Lock size={22} style={{ color: '#ef4444' }} />
+              </div>
+              <h2 className="text-lg font-extrabold mb-1" style={{ color: theme.text }}>Account Locked</h2>
+              <p className="text-xs mb-4" style={{ color: theme.textMuted }}>Enter your PIN to unlock {activeStaff?.fullName}'s account.</p>
+              <input value={unlockPin} onChange={e => setUnlockPin(e.target.value.replace(/\D/g, '').slice(0, 8))} type="password" placeholder="PIN" autoFocus
+                className="w-full px-4 py-2.5 rounded-xl text-sm outline-none text-center mb-3" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+              {unlockError && <p className="text-xs mb-3" style={{ color: '#ef4444' }}>{unlockError}</p>}
+              <div className="flex gap-2">
+                <button onClick={() => void unlockOwnAccount()} className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: theme.primary }}>Unlock</button>
+                <button onClick={() => setShowUnlockPrompt(false)} className="px-4 py-2.5 rounded-xl font-bold text-sm" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Cancel</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Discount / Reward panel — offers manual discount, loyalty redemption, or
+            both depending on the org's configured discount_priority (Settings >
+            Loyalty Program). */}
+        {showDiscountPanel && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.8)' }} onClick={() => setShowDiscountPanel(false)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="w-80 rounded-2xl p-6" style={{ background: theme.surface, border: `1px solid ${theme.border}` }} onClick={e => e.stopPropagation()}>
+              <h2 className="text-lg font-extrabold mb-4 flex items-center gap-2" style={{ color: theme.text }}><Gift size={18} /> Discount / Reward</h2>
+
+              {(discountPriority === 'loyalty' || discountPriority === 'both') && (
+                <div className="mb-5 p-3.5 rounded-xl" style={{ background: theme.bg, border: `1px solid ${theme.border}` }}>
+                  <p className="text-xs font-bold mb-1" style={{ color: theme.text }}>Loyalty Reward</p>
+                  {!customerPhone.trim() ? (
+                    <p className="text-[11px]" style={{ color: theme.textMuted }}>Enter the customer's phone number first.</p>
+                  ) : !loyaltyInfo ? (
+                    <button onClick={() => void lookupLoyalty()} disabled={loyaltyLookupBusy} className="text-xs font-bold" style={{ color: theme.primary }}>Check balance</button>
+                  ) : !loyaltyInfo.enabled ? (
+                    <p className="text-[11px]" style={{ color: theme.textMuted }}>Loyalty program is not enabled.</p>
+                  ) : (loyaltyInfo.points_balance ?? 0) >= (loyaltyInfo.reward_threshold ?? Infinity) ? (
+                    <button onClick={() => void redeemLoyaltyPoints()} disabled={loyaltyRedeeming}
+                      className="w-full py-2 rounded-lg text-xs font-bold text-white flex items-center justify-center gap-2" style={{ background: theme.primary }}>
+                      {loyaltyRedeeming && <Loader2 size={12} className="animate-spin" />} Redeem "{loyaltyInfo.reward_description}" (-{currencySymbol}{(loyaltyInfo.reward_value ?? 0).toFixed(2)})
+                    </button>
+                  ) : (
+                    <p className="text-[11px]" style={{ color: theme.textMuted }}>{loyaltyInfo.points_balance} / {loyaltyInfo.reward_threshold} points — not enough yet.</p>
+                  )}
+                </div>
+              )}
+
+              {(discountPriority === 'discount' || discountPriority === 'both') && (
+                <div>
+                  <p className="text-xs font-bold mb-2" style={{ color: theme.text }}>Manual Discount (manager approval required)</p>
+                  <input type="number" min={0} step={0.5} value={manualDiscountInput} onChange={e => setManualDiscountInput(e.target.value)} placeholder={`Amount in ${currencySymbol}`}
+                    className="w-full px-4 py-2.5 rounded-xl text-sm outline-none mb-2" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+                  <input value={manualDiscountReasonInput} onChange={e => setManualDiscountReasonInput(e.target.value)} placeholder="Reason (e.g. complaint, VIP)"
+                    className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+                  <button onClick={requestManualDiscount} className="w-full mt-2 py-2 rounded-lg text-xs font-bold text-white" style={{ background: theme.primary }}>Request Manager Approval</button>
+                </div>
+              )}
+
+              {discountError && <p className="text-xs mt-3" style={{ color: '#ef4444' }}>{discountError}</p>}
+              <button onClick={() => setShowDiscountPanel(false)} className="w-full mt-4 py-2 rounded-lg text-xs font-bold" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Close</button>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Manager approval — the approving manager proves it's specifically them via
+            their own staff_code + PIN (same identify_staff_by_pin mechanism as the
+            staff-lock system), not just a shared branch PIN, so discount_approved_by
+            records a real, specific identity for accountability. */}
+        {showManagerApproval && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.8)' }} onClick={() => setShowManagerApproval(false)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="w-80 rounded-2xl p-6" style={{ background: theme.surface, border: `1px solid ${theme.border}` }} onClick={e => e.stopPropagation()}>
+              <h2 className="text-lg font-extrabold mb-1 flex items-center gap-2" style={{ color: theme.text }}><Lock size={18} /> Manager Approval</h2>
+              <p className="text-xs mb-4" style={{ color: theme.textMuted }}>
+                A manager must enter their own staff code + PIN to approve a {currencySymbol}{pendingManualDiscount?.amount.toFixed(2)} discount ({pendingManualDiscount?.reason}).
+              </p>
+              <div className="space-y-3">
+                <input value={managerApprovalCode} onChange={e => setManagerApprovalCode(e.target.value)} placeholder="Manager staff code"
+                  className="w-full px-4 py-2.5 rounded-xl text-sm outline-none font-mono" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+                <input value={managerApprovalPin} onChange={e => setManagerApprovalPin(e.target.value.replace(/\D/g, '').slice(0, 8))} type="password" placeholder="PIN"
+                  className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+                {managerApprovalError && <p className="text-xs" style={{ color: '#ef4444' }}>{managerApprovalError}</p>}
+              </div>
+              <div className="flex gap-2 mt-5">
+                <button onClick={() => void confirmManagerApproval()} disabled={managerApprovalBusy}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white disabled:opacity-50 flex items-center justify-center gap-2" style={{ background: theme.primary }}>
+                  {managerApprovalBusy && <Loader2 size={14} className="animate-spin" />} Approve
+                </button>
+                <button onClick={() => { setShowManagerApproval(false); setPendingManualDiscount(null); }} className="px-4 py-2.5 rounded-xl font-bold text-sm" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Cancel</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Step-up re-auth before closing the day's books — same "prove it's you
+            again for a sensitive action" principle as Microsoft Dynamics 365's own
+            re-auth prompts, scoped here to the Z-Report (day close). */}
+        {showZReportPinGate && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.8)' }} onClick={() => setShowZReportPinGate(false)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="w-72 rounded-2xl p-6 text-center" style={{ background: theme.surface, border: `1px solid ${theme.border}` }} onClick={e => e.stopPropagation()}>
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ background: '#f59e0b20' }}>
+                <FileText size={22} style={{ color: '#f59e0b' }} />
+              </div>
+              <h2 className="text-lg font-extrabold mb-1" style={{ color: theme.text }}>Confirm It's You</h2>
+              <p className="text-xs mb-4" style={{ color: theme.textMuted }}>Closing the day's books needs your PIN, {activeStaff?.fullName}.</p>
+              <input value={zReportPinInput} onChange={e => setZReportPinInput(e.target.value.replace(/\D/g, '').slice(0, 8))} type="password" placeholder="PIN" autoFocus
+                className="w-full px-4 py-2.5 rounded-xl text-sm outline-none text-center mb-3" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
+              {zReportPinError && <p className="text-xs mb-3" style={{ color: '#ef4444' }}>{zReportPinError}</p>}
+              <div className="flex gap-2">
+                <button onClick={() => void confirmZReportPrint()} className="flex-1 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: theme.primary }}>Confirm & Print</button>
+                <button onClick={() => setShowZReportPinGate(false)} className="px-4 py-2.5 rounded-xl font-bold text-sm" style={{ background: theme.bg, color: theme.textMuted, border: `1px solid ${theme.border}` }}>Cancel</button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

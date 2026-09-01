@@ -63,6 +63,34 @@ const SLIDES = [
   },
 ];
 
+// Real partner restaurants using Nutro, shown in the landing page's trust banner.
+// Add new partners here as they come on board — the marquee below duplicates this
+// list automatically for a seamless scroll, so no other change is needed. Kept as
+// square-ish source images normalized to a fixed height box (object-contain) so
+// wildly different logo aspect ratios (wordmarks vs. circular badges vs. Arabic
+// script) all render at a visually consistent size in the strip.
+const PARTNER_LOGOS = [
+  { name: 'Tent Jumeirah Restaurant', file: 'tent-jumeirah.png' },
+  { name: 'Al Masa', file: 'al-masa.jpg' },
+  { name: 'GoBurrito', file: 'goburrito.jpg' },
+  { name: 'Beach Burrito Company', file: 'beach-burrito.png' },
+  { name: "Sharky's Fish Shack & Co", file: 'sharkys-fish.jpg' },
+  { name: 'Fergburger', file: 'fergburger.png' },
+  { name: "Harry's Cafe de Wheels", file: 'harrys-cafe.png' },
+  { name: 'Casalaura', file: 'casalaura.png' },
+  { name: "L'Antica Pizzeria Da Michele", file: 'da-michele-antica.png' },
+  { name: 'Da Michele Ristorante Pizzeria', file: 'da-michele-ristorante.png' },
+  { name: 'Bouillon Chartier', file: 'bouillon-chartier.png' },
+  { name: 'Ichiran', file: 'ichiran.jpg' },
+  { name: 'Mocotó Bar e Restaurante', file: 'mocoto.jpg' },
+  { name: "Mama Dangote's Canteen", file: 'mama-dangotes.jpg' },
+  { name: 'Din Tai Fung', file: 'din-tai-fung.webp' },
+  { name: 'La Puerta Falsa', file: 'la-puerta-falsa.png' },
+  { name: 'Carnivore Nairobi', file: 'carnivore-nairobi.jpg' },
+  { name: 'Café La Paris Pâtisserie', file: 'cafe-la-paris.jpg' },
+  { name: 'Café de Paris', file: 'cafe-de-paris.jpg' },
+];
+
 const FEATURES = [
   { icon: Tablet, title: 'Menu interactif sur tablette', desc: 'Menus client élégants avec filtrage allergènes en temps réel, suivi des macros et personnalisations diet qui élèvent l\'expérience dining.' },
   { icon: Monitor, title: 'Terminal POS cloud', desc: 'Point de vente complet avec gestion des tables, paiements fractionnés, multi-moyens de paiement et reporting de shift en temps réel.' },
@@ -466,13 +494,27 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CLIENT LOGOS */}
-      <section className="py-16 px-6">
-        <div className="max-w-5xl mx-auto text-center">
-          <p className="text-sm font-semibold uppercase tracking-wider mb-8" style={{ color: theme.textMuted }}>Approuvé par les leaders de la restauration</p>
-          <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12">
-            {['Babu Town', 'Galore', 'Madinath', 'Fine Dining', 'Capital Catering', 'Al Abeer'].map(name => (
-              <div key={name} className="text-lg font-bold opacity-50 hover:opacity-80 transition-opacity" style={{ color: theme.text }}>{name}</div>
+      {/* PARTNER LOGOS — real restaurants using Nutro, infinite scroll marquee */}
+      <section className="py-12 overflow-hidden" style={{ background: theme.surface, borderTop: `1px solid ${theme.border}`, borderBottom: `1px solid ${theme.border}` }}>
+        <p className="text-center text-xs font-bold tracking-widest uppercase mb-8" style={{ color: theme.textMuted }}>
+          Approuvé par les leaders de la restauration
+        </p>
+        <style dangerouslySetInnerHTML={{ __html: `
+          @keyframes nutro-partner-scroll {
+            from { transform: translateX(0); }
+            to { transform: translateX(-50%); }
+          }
+          .nutro-partner-track {
+            animation: nutro-partner-scroll 45s linear infinite;
+          }
+          .nutro-partner-track:hover { animation-play-state: paused; }
+        `}} />
+        <div className="relative w-full">
+          <div className="flex items-center gap-12 nutro-partner-track" style={{ width: 'max-content' }}>
+            {[...PARTNER_LOGOS, ...PARTNER_LOGOS].map((partner, i) => (
+              <div key={`${partner.file}-${i}`} className="flex items-center justify-center flex-shrink-0" style={{ height: 56, width: 140 }} title={partner.name}>
+                <img src={`/partners/${partner.file}`} alt={partner.name} className="max-h-full max-w-full object-contain" style={{ filter: 'grayscale(15%)', opacity: 0.9 }} loading="lazy" />
+              </div>
             ))}
           </div>
         </div>
