@@ -255,7 +255,7 @@ export default function PosTerminal() {
   const [zReportMode, setZReportMode] = useState<'x' | 'z'>('z');
   const [zReportPrinted, setZReportPrinted] = useState(0);
   const [showManagerPin, setShowManagerPin] = useState(false);
-  const [pendingAction, setPendingAction] = useState<null | 'void' | 'discount'>(null);
+  const [pendingAction, setPendingAction] = useState<null | 'void'>(null);
   const [showTabletOrders, setShowTabletOrders] = useState(false);
   const { orders, updateOrder, addOrder } = useSharedOrders(orgContext?.branch_id ?? null);
 
@@ -579,6 +579,16 @@ export default function PosTerminal() {
 
   const startNewOrder = () => {
     setCart([]); setSelectedTable(null); setIsPaid(false); setCardDetail(''); setCashGiven('');
+    // A discount/loyalty redemption applied to a voided order must never silently
+    // carry over to the next customer's order — same for split-payment state and
+    // the phone number, which belonged to whoever's order just got cancelled.
+    setAppliedDiscount(0);
+    setDiscountReason(null);
+    setDiscountApprovedBy(null);
+    setLoyaltyInfo(null);
+    setCustomerPhone('');
+    setIsSplitPayment(false);
+    setSplitEntries([{ method: 'cash', amount: 0 }, { method: 'card', amount: 0 }]);
   };
 
   return (
