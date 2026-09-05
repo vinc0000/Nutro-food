@@ -734,7 +734,7 @@ export default function LandingPage() {
               </div>
             </div>
             {[
-              { title: 'Plateforme', links: ['Fonctionnalités', 'Tarifs', 'Centre d\'aide', 'Changelog'] },
+              { title: 'Plateforme', links: ['Fonctionnalités', 'Tarifs', 'Témoignages', 'Centre d\'aide'] },
               { title: 'Modules', links: ['Menu tablette', 'POS cloud', 'Kitchen display', 'Analytics'] },
               { title: 'Légal', links: ['Conditions générales', 'Confidentialité', 'Cookies', 'Remboursement', 'Mentions légales', 'GDPR / INCO'] },
             ].map(col => (
@@ -750,13 +750,29 @@ export default function LandingPage() {
                       'Remboursement': 'refund',
                       'Mentions légales': 'mentions',
                     };
+                    // Was `<a href="#">` for every non-legal link — every "Plateforme" and
+                    // "Modules" entry was a dead link on a page that otherwise works. These
+                    // all have a real destination already: in-page anchors that exist further
+                    // up this same file, or the real /help route (App.tsx). "Changelog" had no
+                    // real page anywhere in the app, so it's swapped for "Témoignages", which
+                    // does exist and wasn't linked from the footer at all.
+                    const hrefMap: Record<string, string> = {
+                      'Fonctionnalités': '#features',
+                      'Tarifs': '#pricing',
+                      'Témoignages': '#testimonials',
+                      "Centre d'aide": '/help',
+                      'Menu tablette': '#features',
+                      'POS cloud': '#features',
+                      'Kitchen display': '#features',
+                      'Analytics': '#features',
+                    };
                     const legalType = legalMap[link];
                     return (
                       <li key={link}>
                         {legalType ? (
                           <button onClick={() => setLegalModal(legalType)} className="text-sm hover:opacity-80 transition-opacity text-left" style={{ color: theme.textMuted }}>{link}</button>
                         ) : (
-                          <a href="#" className="text-sm hover:opacity-80 transition-opacity" style={{ color: theme.textMuted }}>{link}</a>
+                          <a href={hrefMap[link] ?? '#'} className="text-sm hover:opacity-80 transition-opacity" style={{ color: theme.textMuted }}>{link}</a>
                         )}
                       </li>
                     );
