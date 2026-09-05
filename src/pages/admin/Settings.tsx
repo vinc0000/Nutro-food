@@ -5,6 +5,7 @@ import { usePlanInfo } from '@/hooks/useOrgContext';
 import { useTheme, THEMES, ThemeName } from '@/contexts/ThemeContext';
 import { COUNTRIES, CURRENCIES, LANGUAGES } from '@/lib/countries';
 import { supabase } from '@/lib/supabase';
+import { openPaddleCheckout } from '@/lib/paddle';
 import { useOrgContext } from '@/hooks/useOrgContext';
 
 export default function AdminSettings() {
@@ -773,8 +774,8 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [latestTxRef, setLatestTxRef] = useState<string | null>(() => localStorage.getItem('nutro:pending-tx-ref'));
-  const [activePsp, setActivePsp] = useState<'flutterwave' | 'payunit' | 'stripe' | 'paystack' | null>(() => (localStorage.getItem('nutro:pending-psp') as 'flutterwave' | 'payunit' | 'stripe' | 'paystack' | null));
-  const [availablePsps, setAvailablePsps] = useState<Array<'flutterwave' | 'payunit' | 'stripe' | 'paystack'>>([]);
+  const [activePsp, setActivePsp] = useState<'flutterwave' | 'payunit' | 'stripe' | 'paystack' | 'paddle' | null>(() => (localStorage.getItem('nutro:pending-psp') as 'flutterwave' | 'payunit' | 'stripe' | 'paystack' | 'paddle' | null));
+  const [availablePsps, setAvailablePsps] = useState<Array<'flutterwave' | 'payunit' | 'stripe' | 'paystack' | 'paddle'>>([]);
   const [pspChecking, setPspChecking] = useState(true);
   const [pspPickerFor, setPspPickerFor] = useState<string | null>(null);
 
@@ -784,7 +785,7 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
     { name: 'enterprise', label: 'Enterprise', price: 189, color: theme.primary, features: 'Unlimited everything, API access' },
   ];
 
-  const callPsp = async (psp: 'flutterwave' | 'payunit' | 'stripe' | 'paystack', payload: Record<string, unknown>) => {
+  const callPsp = async (psp: 'flutterwave' | 'payunit' | 'stripe' | 'paystack' | 'paddle', payload: Record<string, unknown>) => {
     const { data: session } = await supabase.auth.getSession();
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${psp}-pay`, {
       method: 'POST',
@@ -797,30 +798,32 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
     return response.json();
   };
 
-  // PayUnit, Flutterwave, Stripe and Paystack are all supported. If exactly one has
-  // real API credentials configured in Supabase secrets, it's used automatically. If
-  // more than one is configured, the tenant is asked which to pay with (a popup) at
-  // Subscribe time instead of the app silently picking one on their behalf — money is
-  // moving, so which processor to trust should be their choice. If none are
-  // configured, subscribing is disabled with an explanatory message rather than
-  // faking a successful payment.
+  // PayUnit, Flutterwave, Stripe, Paystack and Paddle are all supported. If exactly
+  // one has real API credentials configured in Supabase secrets, it's used
+  // automatically. If more than one is configured, the tenant is asked which to pay
+  // with (a popup) at Subscribe time instead of the app silently picking one on
+  // their behalf — money is moving, so which processor to trust should be their
+  // choice. If none are configured, subscribing is disabled with an explanatory
+  // message rather than faking a successful payment.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setPspChecking(true);
       try {
-        const [payunitStatus, flutterwaveStatus, stripeStatus, paystackStatus] = await Promise.all([
+        const [payunitStatus, flutterwaveStatus, stripeStatus, paystackStatus, paddleStatus] = await Promise.all([
           callPsp('payunit', { action: 'status' }).catch(() => ({ configured: false })),
           callPsp('flutterwave', { action: 'status' }).catch(() => ({ configured: false })),
           callPsp('stripe', { action: 'status' }).catch(() => ({ configured: false })),
           callPsp('paystack', { action: 'status' }).catch(() => ({ configured: false })),
+          callPsp('paddle', { action: 'status' }).catch(() => ({ configured: false })),
         ]);
         if (cancelled) return;
-        const configured: Array<'flutterwave' | 'payunit' | 'stripe' | 'paystack'> = [];
+        const configured: Array<'flutterwave' | 'payunit' | 'stripe' | 'paystack' | 'paddle'> = [];
         if (payunitStatus?.configured) configured.push('payunit');
         if (flutterwaveStatus?.configured) configured.push('flutterwave');
         if (stripeStatus?.configured) configured.push('stripe');
         if (paystackStatus?.configured) configured.push('paystack');
+        if (paddleStatus?.configured) configured.push('paddle');
         setAvailablePsps(configured);
         setActivePsp(configured.length === 1 ? configured[0] : null);
       } finally {
@@ -830,11 +833,11 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
     return () => { cancelled = true; };
   }, []);
 
-  const handleSubscribe = async (planName: string, pspOverride?: 'flutterwave' | 'payunit' | 'stripe' | 'paystack') => {
+  const handleSubscribe = async (planName: string, pspOverride?: 'flutterwave' | 'payunit' | 'stripe' | 'paystack' | 'paddle') => {
     const psp = pspOverride ?? activePsp;
     if (!psp) {
       if (availablePsps.length > 1) { setPspPickerFor(planName); return; }
-      setError('Payments are not configured yet. Add Flutterwave, PayUnit, Stripe or Paystack API credentials to Supabase secrets to enable subscriptions.');
+      setError('Payments are not configured yet. Add Flutterwave, PayUnit, Stripe, Paystack or Paddle API credentials to Supabase secrets to enable subscriptions.');
       return;
     }
     setError(null);
@@ -847,6 +850,18 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
         tenant_org_id: orgContext?.org_id,
       });
       if (result.error) { setError(result.error); return; }
+
+      if (psp === 'paddle') {
+        // Paddle has no hosted redirect URL — its checkout is an in-page
+        // overlay opened with the transaction id Paddle.js needs.
+        if (!result.transaction_id) { setError('Could not start checkout — please try again.'); return; }
+        localStorage.setItem('nutro:pending-tx-ref', result.transaction_id);
+        localStorage.setItem('nutro:pending-psp', psp);
+        setLatestTxRef(result.transaction_id);
+        await openPaddleCheckout(result.transaction_id, () => void handleVerifyPayment());
+        return;
+      }
+
       if (!result.payment_link || !result.tx_ref) { setError('Could not start checkout — please try again.'); return; }
 
       localStorage.setItem('nutro:pending-tx-ref', result.tx_ref);
@@ -973,7 +988,7 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
       {!pspChecking && availablePsps.length === 0 && (
         <div className="p-3 rounded-xl" style={{ background: '#f59e0b10', border: '1px solid #f59e0b30' }}>
           <span className="text-sm font-semibold" style={{ color: '#f59e0b' }}>
-            No payment provider is configured yet. Add Flutterwave (FLW_SECRET_KEY), PayUnit (PAYUNIT_API_USER / PAYUNIT_API_PASSWORD / PAYUNIT_APP_TOKEN), Stripe (STRIPE_SECRET_KEY) or Paystack (PAYSTACK_SECRET_KEY) as Supabase Edge Function secrets to accept real subscriptions.
+            No payment provider is configured yet. Add Flutterwave (FLW_SECRET_KEY), PayUnit (PAYUNIT_API_USER / PAYUNIT_API_PASSWORD / PAYUNIT_APP_TOKEN), Stripe (STRIPE_SECRET_KEY), Paystack (PAYSTACK_SECRET_KEY) or Paddle (PADDLE_API_KEY) as Supabase Edge Function secrets to accept real subscriptions.
           </span>
         </div>
       )}
@@ -1004,6 +1019,7 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
                 : activePsp === 'flutterwave' ? 'Payment via Flutterwave'
                 : activePsp === 'stripe' ? 'Payment via Stripe'
                 : activePsp === 'paystack' ? 'Payment via Paystack'
+                : activePsp === 'paddle' ? 'Payment via Paddle'
                 : 'Payments'}
             </p>
             <p className="text-xs" style={{ color: theme.textMuted }}>
@@ -1015,6 +1031,8 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
                 ? "We use Stripe to securely process payments. Supports cards and popular wallets worldwide."
                 : activePsp === 'paystack'
                 ? "We use Paystack to securely process payments. Supports cards, bank transfers, and mobile money across Africa."
+                : activePsp === 'paddle'
+                ? "We use Paddle to securely process payments as our Merchant of Record. Supports cards and popular wallets worldwide, with tax handled automatically."
                 : availablePsps.length > 1
                 ? "Multiple payment providers are available — you'll be asked to pick one when you subscribe."
                 : ""}
@@ -1034,12 +1052,13 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
                 <button key={psp} onClick={() => { const plan = pspPickerFor; setPspPickerFor(null); void handleSubscribe(plan, psp); }}
                   className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold text-left"
                   style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>
-                  {psp === 'payunit' ? 'PayUnit' : psp === 'flutterwave' ? 'Flutterwave' : psp === 'stripe' ? 'Stripe' : 'Paystack'}
+                  {psp === 'payunit' ? 'PayUnit' : psp === 'flutterwave' ? 'Flutterwave' : psp === 'stripe' ? 'Stripe' : psp === 'paystack' ? 'Paystack' : 'Paddle'}
                   <span className="text-xs font-normal" style={{ color: theme.textMuted }}>
                     {psp === 'payunit' ? 'Mobile money, cards, bank transfer'
                       : psp === 'flutterwave' ? 'Cards, mobile money, USSD'
                       : psp === 'stripe' ? 'Cards, wallets'
-                      : 'Cards, bank transfer, mobile money'}
+                      : psp === 'paystack' ? 'Cards, bank transfer, mobile money'
+                      : 'Cards, wallets — Merchant of Record'}
                   </span>
                 </button>
               ))}

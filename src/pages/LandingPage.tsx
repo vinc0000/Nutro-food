@@ -766,37 +766,30 @@ export default function LandingPage() {
             ))}
           </div>
 
-          {/* Instagram feed teaser */}
-          <div className="mb-10 pt-8 pb-2" style={{ borderTop: `1px solid ${theme.border}` }}>
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: theme.text }}>
-                <Instagram size={16} /> Suivez-nous sur Instagram
-              </h4>
-              <a
-                href="https://www.instagram.com/liafrik_tech?igsi=eXBjdTc5NG42Zml4&utm_source=qr"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs font-semibold hover:opacity-80 flex items-center gap-1"
-                style={{ color: theme.primary }}
-              >
-                @liafrik_tech <ExternalLink size={11} />
-              </a>
-            </div>
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <a
-                  key={i}
-                  href="https://www.instagram.com/liafrik_tech?igsi=eXBjdTc5NG42Zml4&utm_source=qr"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="aspect-square rounded-lg flex items-center justify-center transition-opacity hover:opacity-80"
-                  style={{ background: theme.surface, border: `1px solid ${theme.border}` }}
-                  aria-label="Voir sur Instagram"
-                >
-                  <Instagram size={18} style={{ color: theme.textMuted }} />
-                </a>
-              ))}
-            </div>
+          {/* Instagram CTA banner — style requested by the client (badge pill + headline +
+              white follow button on a brand-color gradient), no live feed since pulling
+              real photos would need Instagram Graph API credentials we don't have. */}
+          <div className="mb-10 rounded-2xl overflow-hidden text-center px-6 py-12"
+            style={{ background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.bg} 140%)` }}>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white mb-5"
+              style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)' }}>
+              <Instagram size={13} /> ON INSTAGRAM
+            </span>
+            <h3 className="text-2xl sm:text-3xl font-extrabold text-white mb-2 max-w-lg mx-auto">
+              Suivez nos actus produit et les coulisses
+            </h3>
+            <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.85)' }}>
+              Nouveautés, restaurants à l'honneur, et ce qu'on prépare ensuite.
+            </p>
+            <a
+              href="https://www.instagram.com/liafrik_tech?igsi=eXBjdTc5NG42Zml4&utm_source=qr"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition-opacity hover:opacity-90"
+              style={{ background: '#fff', color: theme.bg }}
+            >
+              <Instagram size={15} /> Suivre @liafrik_tech
+            </a>
           </div>
 
           <div className="pt-6 flex flex-col sm:flex-row justify-between items-center gap-4" style={{ borderTop: `1px solid ${theme.border}` }}>
