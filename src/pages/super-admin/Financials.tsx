@@ -71,10 +71,13 @@ export default function SuperAdminFinancials() {
       const subRows = (subs ?? []) as Array<{ org_id: string; plan: string; amount: number; psp: string; status: string; created_at: string; paid_at: string | null }>;
       const orgIds = Array.from(new Set(subRows.map(r => r.org_id)));
       const namesById = new Map<string, string>();
-      await Promise.all(orgIds.map(async (id) => {
-        const { data } = await supabase.from('organizations').select('*').eq('id', id).maybeSingle<{ name: string }>();
-        namesById.set(id, data?.name ?? id);
-      }));
+      // Batched .in() instead of one query per distinct org_id in the ledger — the
+      // financial ledger can have thousands of rows across many tenants, so this
+      // avoided a real N+1 slowdown on every page load.
+      if (orgIds.length > 0) {
+        const { data: orgNames } = await supabase.from('organizations').select('*').in('id', orgIds);
+        for (const o of (orgNames ?? []) as Array<{ id: string; name: string }>) namesById.set(o.id, o.name);
+      }
 
       setLedger(subRows.map(r => ({
         date: (r.paid_at ?? r.created_at).slice(0, 10),

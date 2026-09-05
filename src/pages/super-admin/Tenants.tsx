@@ -45,24 +45,31 @@ export default function SuperAdminTenants() {
     const branchCountByOrg = new Map<string, number>();
     for (const b of branchRows) branchCountByOrg.set(b.org_id, (branchCountByOrg.get(b.org_id) ?? 0) + 1);
 
-    const withOwners = await Promise.all(orgRows.map(async (o) => {
-      let ownerName = '—';
-      if (o.owner_id) {
-        const { data: ownerProfile } = await supabase.from('profiles').select('*').eq('id', o.owner_id).maybeSingle<{ full_name: string | null; email: string | null }>();
-        ownerName = ownerProfile?.full_name ?? ownerProfile?.email ?? '—';
+    // Was previously one profiles query PER tenant (N+1) — fine with a handful of
+    // tenants in testing, but it means the super admin dashboard's load time grows
+    // linearly with the number of tenants on the platform, and hits Supabase's
+    // request-rate limits well before that. A single batched `.in()` query gets the
+    // same data in one round trip regardless of how many tenants exist.
+    const ownerIds = orgRows.map(o => o.owner_id).filter((id): id is string => Boolean(id));
+    const ownerNameById = new Map<string, string>();
+    if (ownerIds.length > 0) {
+      const { data: ownerProfiles } = await supabase.from('profiles').select('*').in('id', ownerIds);
+      for (const p of (ownerProfiles ?? []) as Array<{ id: string; full_name: string | null; email: string | null }>) {
+        ownerNameById.set(p.id, p.full_name ?? p.email ?? '—');
       }
-      return {
-        id: o.id,
-        name: o.name,
-        plan: o.plan,
-        status: o.plan_status,
-        branches: branchCountByOrg.get(o.id) ?? 0,
-        mrr: o.plan_status === 'active' ? (PLAN_MRR[o.plan] ?? 0) : 0,
-        owner: ownerName,
-        joined: o.created_at,
-        trialEndsAt: o.trial_ends_at,
-        subscriptionEndsAt: o.subscription_ends_at,
-      };
+    }
+
+    const withOwners = orgRows.map((o) => ({
+      id: o.id,
+      name: o.name,
+      plan: o.plan,
+      status: o.plan_status,
+      branches: branchCountByOrg.get(o.id) ?? 0,
+      mrr: o.plan_status === 'active' ? (PLAN_MRR[o.plan] ?? 0) : 0,
+      owner: (o.owner_id && ownerNameById.get(o.owner_id)) || '—',
+      joined: o.created_at,
+      trialEndsAt: o.trial_ends_at,
+      subscriptionEndsAt: o.subscription_ends_at,
     }));
 
     setTenants(withOwners);

@@ -37,10 +37,10 @@ export default function SuperAdminNotifications() {
 
       const orgIds = Array.from(new Set([...subs.map(s => s.org_id), ...tickets.map(t => t.org_id)]));
       const namesById = new Map<string, string>();
-      await Promise.all(orgIds.map(async (id) => {
-        const { data } = await supabase.from('organizations').select('*').eq('id', id).maybeSingle<{ name: string }>();
-        namesById.set(id, data?.name ?? 'A tenant');
-      }));
+      if (orgIds.length > 0) {
+        const { data: orgNames } = await supabase.from('organizations').select('*').in('id', orgIds);
+        for (const o of (orgNames ?? []) as Array<{ id: string; name: string }>) namesById.set(o.id, o.name);
+      }
 
       const items: NotificationRow[] = [
         ...orgs.map((o, i) => ({ id: `org-${i}`, kind: 'tenant' as const, title: 'New tenant registered', desc: `${o.name} joined the platform`, time: o.created_at })),
