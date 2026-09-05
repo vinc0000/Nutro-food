@@ -54,8 +54,14 @@ export const ROLE_MODULE_ACCESS: Record<string, ModuleKey[]> = {
   accountant: ['dashboard', 'reports'],
 };
 
+// Starter deliberately has no 'pos' — the pricing page (LandingPage.tsx PLANS)
+// explicitly lists "Terminal POS cloud" as not included on Starter and only
+// added from Premium ("Terminal POS complet"). It used to be listed here
+// anyway with nothing actually enforcing the marketing promise (PosTerminal.tsx
+// had no PlanGate at all), silently giving every Starter tenant the paid
+// feature for free — see the PlanGate now wrapping PosTerminal.tsx's export.
 const PLAN_FEATURES: Record<string, string[]> = {
-  starter: ['pos', 'menu', 'orders', 'basic_reports', 'tables', 'kds', 'staff'],
+  starter: ['menu', 'orders', 'basic_reports', 'tables', 'kds', 'staff'],
   premium: ['pos', 'menu', 'orders', 'basic_reports', 'advanced_reports', 'tables', 'kds', 'staff', 'inventory', 'crm', 'multi_branch', 'integrations'],
   enterprise: ['pos', 'menu', 'orders', 'basic_reports', 'advanced_reports', 'tables', 'kds', 'staff', 'inventory', 'crm', 'multi_branch', 'white_label', 'api_access', 'advanced_analytics', 'integrations'],
 };

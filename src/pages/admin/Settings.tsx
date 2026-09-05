@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Building2, Globe, Bell, CreditCard, Palette, Stamp, Share2, MapPin, Check, Lock, KeyRound, Eye, EyeOff, AlertTriangle, LifeBuoy, Loader2, Gift } from 'lucide-react';
+import { Building2, Globe, Bell, CreditCard, Palette, Stamp, Share2, MapPin, Check, X, Lock, KeyRound, Eye, EyeOff, AlertTriangle, LifeBuoy, Loader2, Gift } from 'lucide-react';
 import { usePlanInfo } from '@/hooks/useOrgContext';
 import { useTheme, THEMES, ThemeName } from '@/contexts/ThemeContext';
 import { COUNTRIES, CURRENCIES, LANGUAGES } from '@/lib/countries';
@@ -789,10 +789,28 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
   const [pspChecking, setPspChecking] = useState(true);
   const [pspPickerFor, setPspPickerFor] = useState<string | null>(null);
 
+  // Mirrors PLAN_FEATURES in useOrgContext.ts (the list actually enforced by
+  // PlanGate) — not just cosmetic like the old one-line summary here. A tenant
+  // deciding whether to upgrade sees this at the exact moment they're about to
+  // pay, so it needs to match what they'll actually get, not drift from it.
   const PLANS = [
-    { name: 'starter', label: 'Starter', price: 29, color: '#94a3b8', features: '10 tables, 3 staff, basic reports' },
-    { name: 'premium', label: 'Premium', price: 69, color: '#10B981', features: '30 tables, 10 staff, advanced reports' },
-    { name: 'enterprise', label: 'Enterprise', price: 189, color: theme.primary, features: 'Unlimited everything, API access' },
+    { name: 'starter', label: 'Starter', price: 29, color: '#94a3b8', features: [
+      { text: 'Menu & orders', included: true }, { text: 'KDS & thermal receipts', included: true },
+      { text: 'Basic reports', included: true }, { text: 'Up to 3 staff accounts', included: true },
+      { text: 'Full POS terminal', included: false }, { text: 'Inventory tracking', included: false },
+      { text: 'Multi-branch', included: false }, { text: 'Integrations', included: false },
+    ] },
+    { name: 'premium', label: 'Premium', price: 69, color: '#10B981', features: [
+      { text: 'Everything in Starter', included: true }, { text: 'Full POS terminal', included: true },
+      { text: 'Advanced reports', included: true }, { text: 'Inventory tracking', included: true },
+      { text: 'Multi-branch', included: true }, { text: 'Integrations (CRM, etc.)', included: true },
+      { text: 'White-label & API access', included: false },
+    ] },
+    { name: 'enterprise', label: 'Enterprise', price: 189, color: theme.primary, features: [
+      { text: 'Everything in Premium', included: true }, { text: 'White-label branding', included: true },
+      { text: 'API access', included: true }, { text: 'Advanced analytics', included: true },
+      { text: 'Unlimited staff & branches', included: true },
+    ] },
   ];
 
   const callPsp = async (psp: 'flutterwave' | 'payunit' | 'stripe' | 'paystack' | 'paddle', payload: Record<string, unknown>) => {
@@ -981,8 +999,17 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
               {convertedPrice !== null && (
                 <div className="text-xs font-semibold" style={{ color: theme.textMuted }}>≈ {tenantCurrency!.symbol}{convertedPrice.toLocaleString()} — billed in USD</div>
               )}
-              <div className="text-xs mt-1" style={{ color: theme.textMuted }}>{p.features}</div>
-              <div className="text-[10px] mt-1 font-semibold" style={{ color: theme.primary }}>KDS & Thermal included</div>
+              <div className="text-xs mt-1 space-y-1">
+                {p.features.map(f => (
+                  <div key={f.text} className="flex items-center gap-1.5">
+                    {f.included
+                      ? <Check size={11} style={{ color: theme.primary, flexShrink: 0 }} />
+                      : <X size={11} style={{ color: theme.textMuted, flexShrink: 0, opacity: 0.5 }} />}
+                    <span style={{ color: f.included ? theme.text : theme.textMuted, opacity: f.included ? 1 : 0.6 }}>{f.text}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="text-[10px] mt-2 font-semibold" style={{ color: theme.primary }}>14-day free trial included</div>
               <button
                 onClick={() => void handleSubscribe(p.name)}
                 disabled={paying || isCurrent || pspChecking || (!activePsp && availablePsps.length === 0) || !orgContext?.org_id}

@@ -16,6 +16,7 @@ import { playNotificationSound } from '@/lib/notificationSound';
 import { CURRENCIES } from '@/lib/countries';
 import { supabase } from '@/lib/supabase';
 import { usePosLock } from '@/components/guards/PosPinGate';
+import PlanGate from '@/components/ui/PlanGate';
 
 interface CartItem { id: string; name: string; price: number; qty: number; taxRate: number; }
 interface TabletOrder {
@@ -94,7 +95,10 @@ function ManagerPinModal({ onClose, onApprove, theme, branchId }: { onClose: () 
   );
 }
 
-export default function PosTerminal() {
+// Split out so the plan gate below (PosTerminal) never mounts this component's
+// hooks at all when the tenant's plan doesn't include POS — matches the same
+// pattern already used by Inventory.tsx/Integrations.tsx.
+function PosTerminalContent() {
   const { theme } = useTheme();
   const { profile } = useAuth();
   const { t } = useLocale();
@@ -1358,6 +1362,22 @@ function SplitPaymentForm({ theme, total, currencySymbol, entries, setEntries }:
         <span>{currencySymbol}{Math.abs(remaining).toFixed(2)}</span>
       </div>
     </div>
+  );
+}
+
+// Pricing (LandingPage.tsx) explicitly promises "Terminal POS cloud" only from
+// Premium up — Starter's own feature list marks it not included. Nothing was
+// actually enforcing that: this page had no PlanGate at all, so a Starter
+// tenant with a 'pos'-permitted staff role got the full POS terminal for free,
+// identical to Premium/Enterprise. That's not a cosmetic gap — it removes the
+// actual reason to pay more for Premium. The sidebar link still shows for
+// Starter tenants (role-based nav, unchanged) since we want it seen, not
+// hidden — clicking it now lands here instead of silently working.
+export default function PosTerminal() {
+  return (
+    <PlanGate feature="pos" title="POS Terminal" description="The full cloud POS terminal is available on Premium and Enterprise plans. Upgrade to unlock in-person order taking and payments.">
+      <PosTerminalContent />
+    </PlanGate>
   );
 }
 
