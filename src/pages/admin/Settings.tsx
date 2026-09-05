@@ -132,11 +132,21 @@ export default function AdminSettings() {
   // Menu.tsx's own image upload.
   const handleAssetUpload = async (file: File, kind: 'stamp' | 'logo') => {
     if (!file) return;
+    // SVG deliberately excluded even though logos are often vector graphics —
+    // see the identical fix + explanation in Menu.tsx's handleImageUpload:
+    // an SVG can embed a <script>, and this bucket serves public URLs anyone
+    // can open directly, so allowing SVG here would be a stored-XSS vector.
+    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setAssetUploadError('Unsupported file type. Please upload a JPEG, PNG, WEBP or GIF image.');
+      return;
+    }
     if (file.size > 2 * 1024 * 1024) { setAssetUploadError('Image too large. Maximum size: 2 MB.'); return; }
     setUploadingAsset(kind);
     setAssetUploadError(null);
     try {
-      const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
+      const extByType: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
+      const ext = extByType[file.type];
       const fileName = `${kind}-${orgContext?.branch_id ?? 'branch'}-${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from('restaurant-assets').upload(fileName, file, { contentType: file.type });
       if (upErr) throw upErr;

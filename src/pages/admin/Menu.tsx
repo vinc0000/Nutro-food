@@ -119,6 +119,17 @@ export default function AdminMenu() {
 
   const handleImageUpload = async (file: File) => {
     if (!file) return;
+    // Only the file's declared MIME type was checked before (for the upload's
+    // contentType header) — the extension was trusted from the filename, and
+    // nothing rejected a non-image file. SVG is deliberately excluded even
+    // though it's a valid image type: an SVG can carry an embedded <script>,
+    // and this bucket is public — anyone opening the file's direct URL in a
+    // new tab would execute it, a real stored-XSS path for a "menu image".
+    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setUploadMessage('Unsupported file type. Please upload a JPEG, PNG, WEBP or GIF image.');
+      return;
+    }
     if (file.size > 2 * 1024 * 1024) {
       setUploadMessage('Image too large. Maximum size: 2 MB.');
       return;
@@ -127,7 +138,8 @@ export default function AdminMenu() {
     setUploading(true);
     setUploadMessage(null);
     try {
-      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const extByType: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
+      const ext = extByType[file.type];
       const fileName = `menu-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
       const { error: upErr } = await supabase.storage.from('menu-images').upload(fileName, file, { contentType: file.type });
       if (upErr) throw upErr;
