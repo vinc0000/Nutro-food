@@ -5,7 +5,8 @@ import {
   ChefHat, Monitor, Tablet, BarChart3, Shield, Globe, Zap,
   Check, X, ArrowRight, Menu as MenuIcon, ChevronDown, Sparkles, Mail, X as XIcon,
   Star, Award, Headphones, Cloud, Scale, Brain,
-  Phone, MessageCircle, ArrowUp
+  Phone, MessageCircle, ArrowUp,
+  Facebook, Instagram, Linkedin, Youtube, ExternalLink
 } from 'lucide-react';
 import { useTheme, THEMES, ThemeName } from '@/contexts/ThemeContext';
 import { useLocale, type SupportedCurrency } from '@/contexts/LocaleContext';
@@ -156,18 +157,25 @@ const PLANS = [
     ] },
 ];
 
-function LegalModal({ type, onClose, theme }: { type: 'privacy' | 'terms' | 'gdpr'; onClose: () => void; theme: ReturnType<typeof useTheme>['theme'] }) {
-  const titles = { privacy: 'Politique de confidentialité', terms: 'Conditions d\'utilisation', gdpr: 'Conformité GDPR / INCO' };
+function LegalModal({ type, onClose, theme }: { type: 'privacy' | 'terms' | 'gdpr' | 'cookies' | 'refund' | 'mentions'; onClose: () => void; theme: ReturnType<typeof useTheme>['theme'] }) {
+  const titles = {
+    privacy: 'Politique de confidentialité',
+    terms: 'Conditions générales d\'utilisation',
+    gdpr: 'Conformité GDPR / INCO',
+    cookies: 'Politique de cookies',
+    refund: 'Politique de remboursement',
+    mentions: 'Mentions légales',
+  };
   const contents: Record<string, string[]> = {
     privacy: [
       'Nutro par LiAfrik Dubai & Afrique (« nous ») respecte votre vie privée. Nous collectons uniquement les données nécessaires au fonctionnement de la plateforme : profil restaurant, comptes staff, données menu et historique commandes.',
       'Nous ne vendons ni ne partageons vos données avec des tiers. Toutes les données sont chiffrées en transit et au repos selon les standards de l\'industrie.',
       'Vous pouvez demander l\'export ou la suppression de vos données à tout moment en contactant cs@liafrik.com.',
-      'Les données de paiement sont traitées par nos partenaires de paiement et ne sont jamais stockées sur nos serveurs.',
+      'Les données de paiement sont traitées par nos partenaires de paiement (Paddle, en qualité de Merchant of Record) et ne sont jamais stockées sur nos serveurs.',
     ],
     terms: [
       'En utilisant Nutro, vous acceptez d\'utiliser la plateforme pour des opérations de restaurant licites uniquement.',
-      'Les abonnements sont facturés mensuellement. Vous pouvez annuler à tout moment ; l\'accès continue jusqu\'à la fin de la période de facturation.',
+      'Les abonnements sont facturés mensuellement ou annuellement selon le plan choisi. Vous pouvez annuler à tout moment ; l\'accès continue jusqu\'à la fin de la période de facturation en cours.',
       'Les essais gratuits durent 14 jours. Aucune carte de crédit n\'est requise pour démarrer un essai.',
       'LiAfrik se réserve le droit de suspendre les comptes en cas d\'abus, fraude ou non-paiement.',
       'Pour les conditions complètes, contactez support@liafrik.com.',
@@ -177,6 +185,26 @@ function LegalModal({ type, onClose, theme }: { type: 'privacy' | 'terms' | 'gdp
       'Les personnes concernées ont le droit d\'accès, de rectification, d\'effacement, de restriction, de portabilité et d\'opposition au traitement de leurs données personnelles.',
       'Nous ne transférons pas de données en dehors de l\'UE/EEE sans garanties appropriées (Clauses Contractuelles Types).',
       'Pour les demandes DPO : cs@liafrik.com. Pour les demandes de personnes concernées : support@liafrik.com.',
+    ],
+    cookies: [
+      'Nutro utilise des cookies strictement nécessaires au fonctionnement du site (session, authentification, préférences de langue et de devise).',
+      'Des cookies de mesure d\'audience peuvent être utilisés pour améliorer la plateforme ; ils sont anonymisés dès que possible.',
+      'Vous pouvez configurer votre navigateur pour refuser les cookies non essentiels, ce qui peut limiter certaines fonctionnalités du site.',
+      'Aucun cookie publicitaire tiers n\'est déposé sans votre consentement explicite.',
+    ],
+    refund: [
+      'Les essais gratuits de 14 jours ne donnent lieu à aucun prélèvement et peuvent être annulés à tout moment sans frais.',
+      'Les abonnements payants peuvent être remboursés intégralement dans les 14 jours suivant le premier paiement, sur simple demande à support@liafrik.com, conformément au droit de rétractation applicable.',
+      'Passé ce délai, les paiements déjà effectués pour la période en cours ne sont pas remboursables, mais l\'abonnement reste actif jusqu\'à la fin de la période payée.',
+      'Les remboursements sont traités via notre partenaire de paiement (Paddle) sous 5 à 10 jours ouvrés.',
+      'En cas d\'erreur de facturation ou de double prélèvement, contactez-nous immédiatement à support@liafrik.com pour un remboursement prioritaire.',
+    ],
+    mentions: [
+      'Nutro est une plateforme technologique édité et opérée par LiAfrik Dubai & Afrique.',
+      'Contact éditeur : cs@liafrik.com · Support : support@liafrik.com.',
+      'Hébergement et infrastructure : fournisseurs cloud internationaux avec chiffrement des données en transit et au repos.',
+      'Paiements traités par Paddle.com (Paddle acting as Merchant of Record) pour l\'ensemble des transactions internationales.',
+      'Pour toute question relative à la propriété intellectuelle ou au contenu du site, contactez cs@liafrik.com.',
     ],
   };
 
@@ -208,7 +236,7 @@ export default function LandingPage() {
   const { language, currency, setLanguage, setCurrency, t, formatCurrency } = useLocale();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [legalModal, setLegalModal] = useState<'privacy' | 'terms' | 'gdpr' | null>(null);
+  const [legalModal, setLegalModal] = useState<'privacy' | 'terms' | 'gdpr' | 'cookies' | 'refund' | 'mentions' | null>(null);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -663,9 +691,12 @@ export default function LandingPage() {
                 <span className="text-lg font-bold" style={{ color: theme.text }}>NUTRO</span>
               </div>
               <p className="text-sm leading-relaxed mb-4" style={{ color: theme.textMuted }}>
-                Plateforme technologique restaurant entreprise. Propulsé par LiAfrik Dubai & Afrique.
+                Plateforme technologique restaurant entreprise. Propulsé par{' '}
+                <a href="https://liafrik.com" target="_blank" rel="noopener noreferrer" className="font-semibold hover:opacity-80 inline-flex items-center gap-1" style={{ color: theme.text }}>
+                  LiAfrik Dubai & Afrique <ExternalLink size={11} />
+                </a>.
               </p>
-              <div className="space-y-2">
+              <div className="space-y-2 mb-5">
                 <a href="mailto:cs@liafrik.com" className="flex items-center gap-2 text-sm hover:opacity-80" style={{ color: theme.textMuted }}>
                   <Mail size={13} /> cs@liafrik.com
                 </a>
@@ -673,18 +704,51 @@ export default function LandingPage() {
                   <Mail size={13} /> support@liafrik.com
                 </a>
               </div>
+              <div className="flex items-center gap-3">
+                {[
+                  { label: 'TikTok', href: 'https://www.tiktok.com/@liyahgroup?_r=1&_t=ZS-9981XGgaxrE', icon: 'tiktok' as const },
+                  { label: 'Facebook', href: 'https://www.facebook.com/share/1LMAGqsy3n/?mibextid=wwXIfr', icon: Facebook },
+                  { label: 'Instagram', href: 'https://www.instagram.com/liafrik_tech?igsi=eXBjdTc5NG42Zml4&utm_source=qr', icon: Instagram },
+                  { label: 'LinkedIn', href: 'https://www.linkedin.com/company/liafrik/', icon: Linkedin },
+                  { label: 'YouTube', href: 'https://youtube.com/@liyah-n?si=D-lXwovYubw3sdaf', icon: Youtube },
+                ].map(social => (
+                  <a
+                    key={social.label}
+                    href={social.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={social.label}
+                    title={social.label}
+                    className="w-9 h-9 rounded-lg flex items-center justify-center transition-opacity hover:opacity-80"
+                    style={{ background: theme.surface, border: `1px solid ${theme.border}`, color: theme.textMuted }}
+                  >
+                    {social.icon === 'tiktok' ? (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M16.6 5.82s.51.5 0 0A4.278 4.278 0 0 1 15.54 3h-3.09v12.4a2.592 2.592 0 0 1-2.59 2.5c-1.42 0-2.6-1.16-2.6-2.6 0-1.72 1.66-3.01 3.37-2.48V9.66c-3.45-.46-6.47 2.22-6.47 5.64 0 3.33 2.76 5.7 5.69 5.7 3.14 0 5.69-2.55 5.69-5.7V9.01a7.35 7.35 0 0 0 4.3 1.38V7.3s-1.88.09-3.24-1.48Z" />
+                      </svg>
+                    ) : (
+                      <social.icon size={15} />
+                    )}
+                  </a>
+                ))}
+              </div>
             </div>
             {[
               { title: 'Plateforme', links: ['Fonctionnalités', 'Tarifs', 'Centre d\'aide', 'Changelog'] },
               { title: 'Modules', links: ['Menu tablette', 'POS cloud', 'Kitchen display', 'Analytics'] },
-              { title: 'Légal', links: ['Confidentialité', 'Conditions', 'GDPR / INCO', 'Cookies'] },
+              { title: 'Légal', links: ['Conditions générales', 'Confidentialité', 'Cookies', 'Remboursement', 'Mentions légales', 'GDPR / INCO'] },
             ].map(col => (
               <div key={col.title}>
                 <h4 className="text-sm font-bold mb-4 uppercase tracking-wider" style={{ color: theme.text }}>{col.title}</h4>
                 <ul className="space-y-2">
                   {col.links.map(link => {
-                    const legalMap: Record<string, 'privacy' | 'terms' | 'gdpr'> = {
-                      'Confidentialité': 'privacy', 'Conditions': 'terms', 'GDPR / INCO': 'gdpr',
+                    const legalMap: Record<string, 'privacy' | 'terms' | 'gdpr' | 'cookies' | 'refund' | 'mentions'> = {
+                      'Confidentialité': 'privacy',
+                      'Conditions générales': 'terms',
+                      'GDPR / INCO': 'gdpr',
+                      'Cookies': 'cookies',
+                      'Remboursement': 'refund',
+                      'Mentions légales': 'mentions',
                     };
                     const legalType = legalMap[link];
                     return (
@@ -701,9 +765,44 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
+
+          {/* Instagram feed teaser */}
+          <div className="mb-10 pt-8 pb-2" style={{ borderTop: `1px solid ${theme.border}` }}>
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: theme.text }}>
+                <Instagram size={16} /> Suivez-nous sur Instagram
+              </h4>
+              <a
+                href="https://www.instagram.com/liafrik_tech?igsi=eXBjdTc5NG42Zml4&utm_source=qr"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-semibold hover:opacity-80 flex items-center gap-1"
+                style={{ color: theme.primary }}
+              >
+                @liafrik_tech <ExternalLink size={11} />
+              </a>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <a
+                  key={i}
+                  href="https://www.instagram.com/liafrik_tech?igsi=eXBjdTc5NG42Zml4&utm_source=qr"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="aspect-square rounded-lg flex items-center justify-center transition-opacity hover:opacity-80"
+                  style={{ background: theme.surface, border: `1px solid ${theme.border}` }}
+                  aria-label="Voir sur Instagram"
+                >
+                  <Instagram size={18} style={{ color: theme.textMuted }} />
+                </a>
+              ))}
+            </div>
+          </div>
+
           <div className="pt-6 flex flex-col sm:flex-row justify-between items-center gap-4" style={{ borderTop: `1px solid ${theme.border}` }}>
             <p className="text-xs" style={{ color: theme.textMuted }}>
-              © {new Date().getFullYear()} Nutro. Opéré par LiAfrik Dubai & Afrique. Tous droits réservés.
+              © {new Date().getFullYear()} Nutro. Opéré par{' '}
+              <a href="https://liafrik.com" target="_blank" rel="noopener noreferrer" className="hover:opacity-80 underline">LiAfrik Dubai & Afrique</a>. Tous droits réservés.
             </p>
             <p className="text-xs" style={{ color: theme.textMuted }}>Conçu pour les meilleurs restaurants du monde.</p>
           </div>
