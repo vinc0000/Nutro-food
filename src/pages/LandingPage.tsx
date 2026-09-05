@@ -767,28 +767,32 @@ export default function LandingPage() {
           </div>
 
           {/* Instagram CTA banner — style requested by the client (badge pill + headline +
-              white follow button on a brand-color gradient), no live feed since pulling
-              real photos would need Instagram Graph API credentials we don't have. */}
-          <div className="mb-10 rounded-2xl overflow-hidden text-center px-6 py-12"
-            style={{ background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.bg} 140%)` }}>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white mb-5"
-              style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)' }}>
+              white follow button), stretched full-bleed edge-to-edge like a real banner
+              rather than boxed inside the footer's max-w-7xl column. Gradient uses the
+              platform's own primary/secondary brand colors (from ThemeContext), so it
+              automatically matches whichever of the 3 theme presets is active — never a
+              fixed color independent of the site's actual identity. No live feed since
+              pulling real photos would need Instagram Graph API credentials we don't have. */}
+          <div className="relative left-1/2 right-1/2 -mx-[50vw] w-screen mb-12 overflow-hidden text-center px-6 py-16 sm:py-20"
+            style={{ background: `linear-gradient(120deg, ${theme.primary} 0%, ${theme.secondary} 100%)` }}>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white mb-6"
+              style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.35)' }}>
               <Instagram size={13} /> ON INSTAGRAM
             </span>
-            <h3 className="text-2xl sm:text-3xl font-extrabold text-white mb-2 max-w-lg mx-auto">
+            <h3 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white mb-3 max-w-2xl mx-auto leading-tight">
               Suivez nos actus produit et les coulisses
             </h3>
-            <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.85)' }}>
+            <p className="text-base sm:text-lg mb-8 max-w-xl mx-auto" style={{ color: 'rgba(255,255,255,0.85)' }}>
               Nouveautés, restaurants à l'honneur, et ce qu'on prépare ensuite.
             </p>
             <a
               href="https://www.instagram.com/liafrik_tech?igsi=eXBjdTc5NG42Zml4&utm_source=qr"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition-opacity hover:opacity-90"
-              style={{ background: '#fff', color: theme.bg }}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-sm font-bold transition-all hover:opacity-90 hover:-translate-y-0.5"
+              style={{ background: '#fff', color: theme.bg, boxShadow: '0 8px 30px rgba(0,0,0,0.2)' }}
             >
-              <Instagram size={15} /> Suivre @liafrik_tech
+              <Instagram size={16} /> Suivre @liafrik_tech
             </a>
           </div>
 
