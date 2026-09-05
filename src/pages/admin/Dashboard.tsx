@@ -37,6 +37,7 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [todayRevenue, setTodayRevenue] = useState(0);
   const [todayOrders, setTodayOrders] = useState(0);
+  const [paidOrdersToday, setPaidOrdersToday] = useState(0);
   const [activeTables, setActiveTables] = useState(0);
   const [totalTables, setTotalTables] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -56,7 +57,7 @@ export default function AdminDashboard() {
         // just whichever ones happen to land in the 10-most-recent list above — a
         // branch doing more than 10 orders/day (the common case) would otherwise
         // silently undercount both figures.
-        supabase.from('orders').select('total_amount')
+        supabase.from('orders').select('total_amount, refund_amount, payment_status, status')
           .eq('branch_id', branchId).gte('created_at', today.toISOString()),
         supabase.from('restaurant_tables').select('id, status').eq('branch_id', branchId),
       ]);
@@ -65,8 +66,25 @@ export default function AdminDashboard() {
         setOrders(recentOrdersRes.data as OrderRow[]);
       }
       if (todaysOrdersRes.data) {
-        setTodayOrders(todaysOrdersRes.data.length);
-        setTodayRevenue(todaysOrdersRes.data.reduce((sum, o) => sum + Number(o.total_amount), 0));
+        // Was summing total_amount across every order placed today regardless of
+        // status — unpaid orders still being prepared, and even cancelled orders,
+        // inflated "Today's Revenue" above what was actually collected, and refunds
+        // issued today were never subtracted. This is the same "paid, net of
+        // refunds" definition Orders.tsx already uses for its own revenue total —
+        // the dashboard's headline number should agree with the Orders page, not
+        // show a bigger, wrong figure right above it.
+        //
+        // "Today's Orders" itself stays a volume metric (every order that isn't
+        // cancelled — including ones still being prepared/unpaid), since an owner
+        // asking "how busy were we today" wants real order count, not just the
+        // ones that happen to be paid yet. Only the average-order-value divisor
+        // below needs the paid-only count, so it doesn't get dragged down by
+        // orders that haven't been charged yet.
+        const notCancelled = todaysOrdersRes.data.filter((o) => o.status !== 'cancelled');
+        const paidToday = todaysOrdersRes.data.filter((o) => o.payment_status === 'paid');
+        setTodayOrders(notCancelled.length);
+        setPaidOrdersToday(paidToday.length);
+        setTodayRevenue(paidToday.reduce((sum, o) => sum + (Number(o.total_amount) - Number(o.refund_amount ?? 0)), 0));
       }
 
       if (tablesRes.data) {
@@ -79,7 +97,7 @@ export default function AdminDashboard() {
     fetchData();
   }, [orgContext?.branch_id]);
 
-  const avgOrder = todayOrders > 0 ? todayRevenue / todayOrders : 0;
+  const avgOrder = paidOrdersToday > 0 ? todayRevenue / paidOrdersToday : 0;
 
   return (
     <div className="space-y-6">
