@@ -363,6 +363,17 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     if (!storedCurrency) setCurrencyState(detectedCurrency);
   }, []);
 
+  // The <html lang="..."> attribute was hardcoded to "fr" in index.html and never
+  // updated at runtime, so screen readers and search engines always saw "fr" even
+  // for users on "en" or "ar" — actively wrong for an "international" product.
+  // Keep it in sync with the active language, and set dir="rtl" for Arabic so the
+  // browser's native bidi handling (form fields, native widgets) is correct too.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.documentElement.lang = language;
+    document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+  }, [language]);
+
   const setLanguage = (next: SupportedLanguage) => {
     setLanguageState(next);
     if (typeof window !== 'undefined') window.localStorage.setItem('nutro-language', next);

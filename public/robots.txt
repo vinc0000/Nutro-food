@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Allow: /help
+Disallow: /admin
+Disallow: /super-admin
+Disallow: /pos
+Disallow: /kds
+Disallow: /tablet
+Disallow: /auth/
+
+Sitemap: https://nutro.app/sitemap.xml

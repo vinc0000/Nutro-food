@@ -1,0 +1,23 @@
+# Security headers for the whole site (Netlify _headers syntax).
+# CSP notes:
+# - style-src needs 'unsafe-inline' because the UI is themed with runtime
+#   inline `style={{...}}` attributes (dynamic per-theme colors) throughout
+#   the app — there is no static stylesheet to hash/nonce against. This is a
+#   real, common trade-off for this kind of app, not an oversight: locking
+#   style-src down further would require rewriting all theming to CSS
+#   variables/classes, a much bigger change outside this pass.
+# - script-src has no 'unsafe-inline': the built app ships no inline <script>
+#   (verified against the production build output), so this is fully strict.
+# - connect-src/img-src allow *.supabase.co (REST, Auth, Storage, Realtime
+#   over wss) since the project's Supabase URL is an env var, not fixed here.
+/*
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(self)
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://images.pexels.com https://*.supabase.co; connect-src 'self' https://*.supabase.co wss://*.supabase.co; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+
+# Hashed build assets are immutable — safe to cache aggressively.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
