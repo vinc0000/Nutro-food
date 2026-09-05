@@ -49,6 +49,7 @@ export default defineConfig({
           'animation': ['framer-motion'],
           'supabase': ['@supabase/supabase-js'],
           'icons': ['lucide-react'],
+          'sentry': ['@sentry/react'],
         },
       },
     },

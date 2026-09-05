@@ -22,9 +22,18 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    // No error monitoring (Sentry or similar) is wired into this project yet —
-    // this is the one place that would send it. Logged to console in the
-    // meantime so it's still visible in browser/devtools during support calls.
+    // Dynamically imported instead of a static top-level import — @sentry/react
+    // (with Session Replay) is a genuinely large dependency, and this file is
+    // pulled in eagerly by main.tsx (an error boundary can't be lazy-loaded the
+    // normal route-based way, since it has to already be mounted before any
+    // error happens). A static import here would drag the whole Sentry SDK into
+    // the app's critical first-paint bundle for every single visitor, whether
+    // Sentry is configured or not. By the time a real error happens, it's
+    // already been fetched once by initSentry() at boot, so this is effectively
+    // instant in practice — it just never blocks initial page load.
+    void import('@sentry/react').then((Sentry) => {
+      Sentry.captureException(error, { contexts: { react: { componentStack: info.componentStack } } });
+    });
     console.error('Nutro crashed:', error, info.componentStack);
   }
 
