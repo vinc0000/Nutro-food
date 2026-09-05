@@ -790,7 +790,7 @@ export default function LandingPage() {
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-sm font-bold transition-all hover:opacity-90 hover:-translate-y-0.5"
-              style={{ background: '#fff', color: theme.bg, boxShadow: '0 8px 30px rgba(0,0,0,0.2)' }}
+              style={{ background: '#fff', color: theme.text, boxShadow: '0 8px 30px rgba(0,0,0,0.2)' }}
             >
               <Instagram size={16} /> Suivre @liafrik_tech
             </a>
