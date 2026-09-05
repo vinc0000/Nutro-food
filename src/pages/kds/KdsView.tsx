@@ -53,9 +53,16 @@ export default function KdsView() {
     return () => clearInterval(interval);
   }, []);
 
-  // Map shared orders into KDS tickets dynamically, excluding pending tablet orders (validated at POS first)
+  // Map shared orders into KDS tickets dynamically. Excludes 'pending' (tablet
+  // orders not yet validated at POS) — but 'cancelled' and 'refunded' orders
+  // must be excluded too: neither preparing/ready/served/paid nor pending, they
+  // fell through to the kdsStatus 'new' default below, which put cancelled and
+  // refunded orders in the kitchen's "New" column looking exactly like a fresh
+  // order the kitchen still needs to cook — and since only 'served' tickets get
+  // filtered out of activeTickets, they'd sit there indefinitely as a phantom
+  // active ticket with no way to clear it.
   const tickets: KdsTicket[] = orders
-    .filter(o => o.status !== 'pending')
+    .filter(o => o.status !== 'pending' && o.status !== 'cancelled' && o.status !== 'refunded')
     .map(o => {
     let kdsStatus: KdsTicket['status'] = 'new';
     if (o.status === 'preparing') kdsStatus = 'preparing';

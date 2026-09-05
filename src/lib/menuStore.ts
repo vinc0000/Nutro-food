@@ -234,10 +234,17 @@ export function useSharedMenu(branchId: string | null) {
   }, [menuItems, updateItem]);
 
   const adjustStock = useCallback(async (id: string, delta: number) => {
-    const current = menuItems.find((it) => it.id === id);
-    if (!current) return;
-    await updateItem(id, { stock: Math.max(0, current.stock + delta) });
-  }, [menuItems, updateItem]);
+    // Atomic in the database (see migration 20260905020000) instead of reading
+    // `stock` from local React state and writing back `current + delta` — that
+    // pattern loses updates when two terminals adjust the same item's stock
+    // close together, since both can read the same stale starting value.
+    const { data: newStock, error: rpcError } = await supabase.rpc('adjust_menu_item_stock', {
+      p_item_id: id,
+      p_delta: delta,
+    });
+    if (rpcError) { setError(rpcError.message); return; }
+    setMenuItems((prev) => prev.map((it) => (it.id === id ? { ...it, stock: newStock as number } : it)));
+  }, []);
 
   return { menuItems, loading, error, addItem, updateItem, deleteItem, toggleAvailable, adjustStock, refresh: load };
 }
