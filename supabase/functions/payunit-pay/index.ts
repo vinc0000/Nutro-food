@@ -94,6 +94,59 @@ async function updateSubscriptionStatus(
   return await supabase.from("subscriptions").update(patch).eq("org_id", orgId).eq("flw_tx_ref", txRef).eq("psp", "payunit");
 }
 
+// Re-verifies a transaction directly against PayUnit's own status API (using our
+// own stored credentials — never the webhook payload's claimed status) and
+// activates the tenant's plan only if PayUnit itself confirms SUCCESS. Shared by
+// both the "verify" action (client returns from checkout) and the webhook branch
+// below (PayUnit's own server-to-server notification) so a paying customer isn't
+// solely dependent on their browser making it back to the app: previously, if
+// someone paid via mobile money and closed the tab, lost signal, or the app
+// crashed before the redirect completed, they had genuinely paid but their plan
+// never activated — the webhook arrived and was just acknowledged and discarded.
+// This makes the webhook a real, working safety net instead of a no-op.
+async function verifyAndActivatePayunit(
+  supabase: ReturnType<typeof createClient>,
+  creds: NonNullable<ReturnType<typeof payunitCredentials>>,
+  orgId: string,
+  txRef: string
+): Promise<'successful' | 'pending' | 'not_found'> {
+  const { data: subscriptionRow, error: subLookupError } = await supabase
+    .from("subscriptions")
+    .select("plan, status")
+    .eq("org_id", orgId)
+    .eq("flw_tx_ref", txRef)
+    .eq("psp", "payunit")
+    .maybeSingle();
+  if (subLookupError) throw subLookupError;
+  if (!subscriptionRow) return 'not_found';
+  if (subscriptionRow.status === "successful") return 'successful'; // already activated, nothing to do
+
+  const statusResponse = await fetch(`${PAYUNIT_BASE_URL}/api/gateway/checkout/status/${txRef}`, {
+    headers: { "Content-Type": "application/json", "Authorization": creds.authHeader, "x-api-key": creds.appToken, "mode": creds.mode },
+  });
+  const statusData = await statusResponse.json();
+  const remoteStatus = statusData?.data?.status;
+
+  if (remoteStatus === "SUCCESS") {
+    const updateResult = await updateSubscriptionStatus(supabase, orgId, txRef, {
+      status: "successful",
+      flw_tx_id: String(statusData?.data?.transaction?.id ?? ""),
+      paid_at: new Date().toISOString(),
+    });
+    if (updateResult.error) throw updateResult.error;
+
+    const orgUpdate = await supabase.from("organizations")
+      .update({ plan: subscriptionRow.plan as string, plan_status: "active" }).eq("id", orgId);
+    if (orgUpdate.error) throw orgUpdate.error;
+    return 'successful';
+  }
+
+  if (remoteStatus === "FAILED" || remoteStatus === "CANCELLED") {
+    await updateSubscriptionStatus(supabase, orgId, txRef, { status: "failed" });
+  }
+  return 'pending';
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -129,12 +182,47 @@ Deno.serve(async (req: Request) => {
     }
 
     // PayUnit's notify_url webhook lands here with no `action` field and no Supabase
-    // session (same reasoning as the Flutterwave webhook fix earlier this session).
-    // We deliberately do NOT activate anything from this payload — the "verify" action
-    // below independently re-checks the real status against PayUnit's API before ever
-    // touching plan_status, so trusting this notification isn't necessary for
-    // correctness. Just acknowledge it so PayUnit doesn't retry indefinitely.
+    // session. We do NOT trust the payload's own claimed status (never authenticate
+    // off unsigned webhook content — PayUnit's exact webhook signature scheme isn't
+    // documented publicly, so we can't verify a header here the way Flutterwave's
+    // verif-hash is verified above). Instead: pull tx_ref/org_id out of whatever
+    // shape the payload has (defensively — PayUnit's exact field names aren't
+    // guaranteed), and re-check the REAL status straight from PayUnit's own status
+    // API using our own stored credentials. That call is the actual source of
+    // truth, not this payload, so this is safe even if the webhook itself is
+    // spoofed: activation only happens if PayUnit's own API — reached with our own
+    // credentials — confirms the transaction really is paid.
+    //
+    // This used to just acknowledge and discard every notification, relying
+    // entirely on the client's own "verify" call after the checkout redirect. That
+    // meant a customer who paid via mobile money and then lost signal, closed the
+    // tab, or had the redirect fail before reaching the app would have genuinely
+    // paid PayUnit and never gotten their plan activated — the exact kind of gap
+    // that becomes a real support incident once real customers are paying.
     if (!action && body && typeof body === "object") {
+      try {
+        const payload = body as Record<string, unknown>;
+        const data = (payload.data as Record<string, unknown> | undefined) ?? payload;
+        const meta = (data?.meta as Record<string, unknown> | undefined) ?? (payload.meta as Record<string, unknown> | undefined);
+        const txRef =
+          (data?.transaction_id as string | undefined) ??
+          (data?.reference as string | undefined) ??
+          (data?.tx_ref as string | undefined) ??
+          (payload.transaction_id as string | undefined);
+        const metaOrgId = meta?.org_id as string | undefined;
+
+        if (txRef && metaOrgId) {
+          const creds = payunitCredentials();
+          if (creds) {
+            await verifyAndActivatePayunit(supabase, creds, metaOrgId, txRef);
+          }
+        }
+      } catch {
+        // Never let a malformed/unexpected webhook shape fail loudly — the client's
+        // own "verify" call after redirect is still the primary path and remains
+        // fully functional regardless of what happens here. This is strictly a
+        // best-effort safety net on top of it, not a replacement for it.
+      }
       return new Response(JSON.stringify({ status: "received" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -271,57 +359,22 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      const statusResponse = await fetch(`${PAYUNIT_BASE_URL}/api/gateway/checkout/status/${tx_ref}`, {
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": creds.authHeader,
-          "x-api-key": creds.appToken,
-          "mode": creds.mode,
-        },
-      });
-      const statusData = await statusResponse.json();
-      const remoteStatus = statusData?.data?.status;
-      const isSuccessful = remoteStatus === "SUCCESS";
-
-      if (isSuccessful) {
-        const { data: subscriptionRow, error: subLookupError } = await supabase
-          .from("subscriptions")
-          .select("plan")
-          .eq("org_id", orgId)
-          .eq("flw_tx_ref", tx_ref)
-          .eq("psp", "payunit")
-          .maybeSingle();
-        if (subLookupError) throw subLookupError;
-        if (!subscriptionRow) {
-          return new Response(JSON.stringify({ error: "No matching subscription found for this org" }), {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-
-        const updateResult = await updateSubscriptionStatus(supabase, orgId, tx_ref, {
-          status: "successful",
-          flw_tx_id: String(statusData?.data?.transaction?.id ?? ""),
-          paid_at: new Date().toISOString(),
+      // Shared with the webhook branch above so both paths (client returns from
+      // checkout vs. PayUnit's own server-to-server notification) activate through
+      // the exact same logic — no risk of the two diverging over time.
+      const outcome = await verifyAndActivatePayunit(supabase, creds, orgId, tx_ref);
+      if (outcome === 'not_found') {
+        return new Response(JSON.stringify({ error: "No matching subscription found for this org" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
-        if (updateResult.error) throw updateResult.error;
-
-        const orgUpdate = await supabase.from("organizations").update({
-          plan: subscriptionRow.plan as string,
-          plan_status: "active",
-        }).eq("id", orgId);
-        if (orgUpdate.error) throw orgUpdate.error;
-
+      }
+      if (outcome === 'successful') {
         return new Response(JSON.stringify({ status: "successful" }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-
-      if (remoteStatus === "FAILED" || remoteStatus === "CANCELLED") {
-        await updateSubscriptionStatus(supabase, orgId, tx_ref, { status: "failed" });
-      }
-
       return new Response(JSON.stringify({ status: "pending", message: "Payment not completed yet" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
