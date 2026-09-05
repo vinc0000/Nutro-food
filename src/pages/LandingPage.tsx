@@ -171,7 +171,7 @@ function LegalModal({ type, onClose, theme }: { type: 'privacy' | 'terms' | 'gdp
       'Nutro par LiAfrik Dubai & Afrique (« nous ») respecte votre vie privée. Nous collectons uniquement les données nécessaires au fonctionnement de la plateforme : profil restaurant, comptes staff, données menu et historique commandes.',
       'Nous ne vendons ni ne partageons vos données avec des tiers. Toutes les données sont chiffrées en transit et au repos selon les standards de l\'industrie.',
       'Vous pouvez demander l\'export ou la suppression de vos données à tout moment en contactant cs@liafrik.com.',
-      'Les données de paiement sont traitées par nos partenaires de paiement (Paddle, en qualité de Merchant of Record) et ne sont jamais stockées sur nos serveurs.',
+      'Les données de paiement sont traitées par nos prestataires de paiement (Flutterwave, Stripe, Paystack, PayUnit selon votre région) et ne sont jamais stockées sur nos serveurs.',
     ],
     terms: [
       'En utilisant Nutro, vous acceptez d\'utiliser la plateforme pour des opérations de restaurant licites uniquement.',
@@ -196,14 +196,14 @@ function LegalModal({ type, onClose, theme }: { type: 'privacy' | 'terms' | 'gdp
       'Les essais gratuits de 14 jours ne donnent lieu à aucun prélèvement et peuvent être annulés à tout moment sans frais.',
       'Les abonnements payants peuvent être remboursés intégralement dans les 14 jours suivant le premier paiement, sur simple demande à support@liafrik.com, conformément au droit de rétractation applicable.',
       'Passé ce délai, les paiements déjà effectués pour la période en cours ne sont pas remboursables, mais l\'abonnement reste actif jusqu\'à la fin de la période payée.',
-      'Les remboursements sont traités via notre partenaire de paiement (Paddle) sous 5 à 10 jours ouvrés.',
+      'Les remboursements sont traités via votre prestataire de paiement d\'origine (Flutterwave, Stripe, Paystack ou PayUnit) sous 5 à 10 jours ouvrés.',
       'En cas d\'erreur de facturation ou de double prélèvement, contactez-nous immédiatement à support@liafrik.com pour un remboursement prioritaire.',
     ],
     mentions: [
       'Nutro est une plateforme technologique édité et opérée par LiAfrik Dubai & Afrique.',
       'Contact éditeur : cs@liafrik.com · Support : support@liafrik.com.',
       'Hébergement et infrastructure : fournisseurs cloud internationaux avec chiffrement des données en transit et au repos.',
-      'Paiements traités par Paddle.com (Paddle acting as Merchant of Record) pour l\'ensemble des transactions internationales.',
+      'Paiements traités par nos prestataires de paiement partenaires (Flutterwave, Stripe, Paystack, PayUnit) pour l\'ensemble des transactions internationales.',
       'Pour toute question relative à la propriété intellectuelle ou au contenu du site, contactez cs@liafrik.com.',
     ],
   };
