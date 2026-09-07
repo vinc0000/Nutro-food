@@ -13,56 +13,26 @@ import { useLocale, type SupportedCurrency } from '@/contexts/LocaleContext';
 import { CURRENCIES } from '@/lib/countries';
 import Logo from '@/components/Logo';
 
-const SLIDES = [
-  {
-    image: 'https://images.pexels.com/photos/34723813/pexels-photo-34723813.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
-    title: ['La technologie restaurant', 'réinventée pour', 'les chefs d\'aujourd\'hui'],
-    description: 'Nutro unifie menu interactif sur tablette, caisse cloud, kitchen display et analytics multi-branches en une seule plateforme élégante.',
-    cta: 'Démarrer l\'essai gratuit',
-    ctaLink: '/auth/signup',
-    ctaColor: '#0369A1',
-  },
-  {
-    image: 'https://images.pexels.com/photos/36073021/pexels-photo-36073021.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
-    title: ['Une cuisine connectée', 'et performante', 'au service du goût'],
-    description: 'Kitchen Display System avec timers colorés, alertes allergènes et routage intelligent des tickets pour un service fluide aux heures de pointe.',
-    cta: 'En savoir plus',
-    ctaLink: '#features',
-    ctaColor: '#0EA5E9',
-  },
-  {
-    image: 'https://images.pexels.com/photos/12935087/pexels-photo-12935087.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
-    title: ['Vos menus digitaux', 'à portée de', 'tablette'],
-    description: 'Menus interactifs élégants avec filtrage allergènes en temps réel, suivi des macros et personnalisation diet pour une expérience client premium.',
-    cta: 'Démarrer l\'essai gratuit',
-    ctaLink: '/auth/signup',
-    ctaColor: '#0369A1',
-  },
-  {
-    image: 'https://images.pexels.com/photos/12935080/pexels-photo-12935080.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
-    title: ['Encaissez plus vite,', 'servez mieux,', 'sans limite'],
-    description: 'Terminal POS cloud complet : gestion des tables, paiements fractionnés, multi-moyens de paiement et reporting de shift en temps réel.',
-    cta: 'En savoir plus',
-    ctaLink: '#features',
-    ctaColor: '#10B981',
-  },
-  {
-    image: 'https://images.pexels.com/photos/20150680/pexels-photo-20150680.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
-    title: ['L\'excellence culinaire', 'mérite une technologie', 'à sa hauteur'],
-    description: 'Analytiques multi-branches consolidées, dashboards de revenus en temps réel et benchmarking de performance pour décider avec données.',
-    cta: 'Démarrer l\'essai gratuit',
-    ctaLink: '/auth/signup',
-    ctaColor: '#0369A1',
-  },
-  {
-    image: 'https://images.pexels.com/photos/1327393/pexels-photo-1327393.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
-    title: ['La gastronomie', 'rencontre la', 'précision digitale'],
-    description: 'Chaque assiette mérite d\'être sublimée par une technologie qui comprend l\'art culinaire. Nutro accompagne votre créativité du four à la table.',
-    cta: 'Démarrer l\'essai gratuit',
-    ctaLink: '/auth/signup',
-    ctaColor: '#10B981',
-  },
-];
+// Content built from translation keys (see LocaleContext.tsx `landing.*`) so the
+// marketing page actually respects the language switcher — it previously ignored
+// it entirely and stayed French-only regardless of the selected language.
+function getSlides(t: (key: string, fallback?: string) => string) {
+  return [
+    { image: 'https://images.pexels.com/photos/34723813/pexels-photo-34723813.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
+      title: t('landing.hero1.title').split('|'), description: t('landing.hero1.desc'), cta: t('landing.hero1.cta'), ctaLink: '/auth/signup', ctaColor: '#0369A1' },
+    { image: 'https://images.pexels.com/photos/36073021/pexels-photo-36073021.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
+      title: t('landing.hero2.title').split('|'), description: t('landing.hero2.desc'), cta: t('landing.hero2.cta'), ctaLink: '#features', ctaColor: '#0EA5E9' },
+    { image: 'https://images.pexels.com/photos/12935087/pexels-photo-12935087.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
+      title: t('landing.hero3.title').split('|'), description: t('landing.hero3.desc'), cta: t('landing.hero3.cta'), ctaLink: '/auth/signup', ctaColor: '#0369A1' },
+    { image: 'https://images.pexels.com/photos/12935080/pexels-photo-12935080.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
+      title: t('landing.hero4.title').split('|'), description: t('landing.hero4.desc'), cta: t('landing.hero4.cta'), ctaLink: '#features', ctaColor: '#10B981' },
+    { image: 'https://images.pexels.com/photos/20150680/pexels-photo-20150680.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
+      title: t('landing.hero5.title').split('|'), description: t('landing.hero5.desc'), cta: t('landing.hero5.cta'), ctaLink: '/auth/signup', ctaColor: '#0369A1' },
+    { image: 'https://images.pexels.com/photos/1327393/pexels-photo-1327393.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1080',
+      title: t('landing.hero6.title').split('|'), description: t('landing.hero6.desc'), cta: t('landing.hero6.cta'), ctaLink: '/auth/signup', ctaColor: '#10B981' },
+  ];
+}
+
 
 // Real partner restaurants using Nutro, shown in the landing page's trust banner.
 // Add new partners here as they come on board — the marquee below duplicates this
@@ -99,21 +69,27 @@ const PARTNER_LOGOS = [
   { name: 'Radisson Hotels & Resorts', file: 'radisson-hotels-resorts.png' },
 ];
 
-const FEATURES = [
-  { icon: Tablet, title: 'Menu interactif sur tablette', desc: 'Menus client élégants avec filtrage allergènes en temps réel, suivi des macros et personnalisations diet qui élèvent l\'expérience dining.' },
-  { icon: Monitor, title: 'Terminal POS cloud', desc: 'Point de vente complet avec gestion des tables, paiements fractionnés, multi-moyens de paiement et reporting de shift en temps réel.' },
-  { icon: ChefHat, title: 'Kitchen Display System', desc: 'KDS temps réel avec timers colorés, alertes allergènes et routage priorité pour des cuisines fluides aux heures de pointe.' },
-  { icon: BarChart3, title: 'Analytiques multi-branches', desc: 'Rapports financiers consolidés sur tous les sites avec dashboards revenus temps réel et benchmarking de performance.' },
-  { icon: Shield, title: 'Contrôle d\'accès RBAC', desc: 'Contrôle d\'accès granulaire par rôle — du Super Admin au personnel cuisine avec permissions personnalisées par site.' },
-  { icon: Globe, title: 'Multi-langue & multi-devise', desc: 'Servez vos clients en EN, FR, AR avec changement de devise en direct USD, EUR, AED, XAF, NGN, GBP et plus.' },
-];
+function getFeatures(t: (key: string, fallback?: string) => string) {
+  return [
+    { icon: Tablet, title: t('landing.feat.tablet.title'), desc: t('landing.feat.tablet.desc') },
+    { icon: Monitor, title: t('landing.feat.pos.title'), desc: t('landing.feat.pos.desc') },
+    { icon: ChefHat, title: t('landing.feat.kds.title'), desc: t('landing.feat.kds.desc') },
+    { icon: BarChart3, title: t('landing.feat.analytics.title'), desc: t('landing.feat.analytics.desc') },
+    { icon: Shield, title: t('landing.feat.rbac.title'), desc: t('landing.feat.rbac.desc') },
+    { icon: Globe, title: t('landing.feat.i18n.title'), desc: t('landing.feat.i18n.desc') },
+  ];
+}
 
-const WHY_US = [
-  { icon: Cloud, title: 'Flexibilité cloud', desc: 'Gérez vos opérations partout, sur tout appareil. Vos données se synchronisent en temps réel sur tous les terminaux.' },
-  { icon: Scale, title: 'Scalabilité sans effort', desc: 'Passez d\'un site à une chaîne multi-branches sans changer d\'infrastructure. La plateforme grandit avec vous.' },
-  { icon: Brain, title: 'Insights intelligents', desc: 'Boostez la satisfaction avec analytics temps réel, inventaire prédictif et support décisionnel data-driven.' },
-  { icon: Headphones, title: 'Support dédié', desc: 'Équipe support prioritaire disponible tous fuseaux horaires. Onboarding, formation et assistance continue inclus.' },
-];
+function getWhyUs(t: (key: string, fallback?: string) => string) {
+  return [
+    { icon: Cloud, title: t('landing.why.cloud.title'), desc: t('landing.why.cloud.desc') },
+    { icon: Scale, title: t('landing.why.scale.title'), desc: t('landing.why.scale.desc') },
+    { icon: Brain, title: t('landing.why.insights.title'), desc: t('landing.why.insights.desc') },
+    { icon: Headphones, title: t('landing.why.support.title'), desc: t('landing.why.support.desc') },
+  ];
+}
+
+
 
 const TESTIMONIALS = [
   { quote: 'Nutro a transformé nos opérations multi-branches. Nous avons désormais une visibilité temps réel sur tous nos sites et le menu tablette a élevé l\'expérience client.', author: 'Omar Al Mulla', role: 'Directeur des opérations', company: 'Babu Town Restaurant Group' },
@@ -122,40 +98,44 @@ const TESTIMONIALS = [
   { quote: 'En tant que chaîne en croissance, les analytics multi-branches et le contrôle d\'accès par rôle sont exactement ce dont nous avions besoin. La plateforme scale avec nous.', author: 'Ahmed Z', role: 'Propriétaire', company: 'Galore Restaurants' },
 ];
 
-const STATS = [
-  { value: '158+', label: 'Groupes de restaurants' },
-  { value: '312+', label: 'Sites desservis' },
-  { value: '2.4M+', label: 'Commandes traitées' },
-  { value: '99.9%', label: 'Disponibilité plateforme' },
-];
+function getStats(t: (key: string, fallback?: string) => string) {
+  return [
+    { value: '158+', label: t('landing.stats.groups') },
+    { value: '312+', label: t('landing.stats.sites') },
+    { value: '2.4M+', label: t('landing.stats.orders') },
+    { value: '99.9%', label: t('landing.stats.uptime') },
+  ];
+}
 
-const PLANS = [
-  { name: 'Starter', price: 29, color: '#64748B', description: 'Parfait pour les restaurants single-site qui se lancent dans le digital.',
-    features: [
-      { text: '1 Site', included: true }, { text: 'Jusqu\'à 10 tables', included: true },
-      { text: 'Jusqu\'à 3 comptes staff', included: true }, { text: 'Menu digital interactif', included: true },
-      { text: 'KDS & reçus thermiques', included: true }, { text: 'Allergènes & macros de base', included: true },
-      { text: 'Terminal POS cloud', included: false }, { text: 'Multi-devise', included: false },
-      { text: 'Comptabilité multi-branches', included: false }, { text: 'Rôles personnalisés', included: false },
-    ] },
-  { name: 'Premium', price: 69, color: '#0369A1', popular: true, description: 'Pour les restaurants en croissance qui veulent la suite complète multi-branches.',
-    features: [
-      { text: 'Jusqu\'à 3 sites', included: true }, { text: 'Jusqu\'à 30 tables', included: true },
-      { text: 'Jusqu\'à 10 comptes staff', included: true }, { text: 'Menu digital interactif', included: true },
-      { text: 'Terminal POS complet', included: true }, { text: 'KDS & reçus thermiques', included: true },
-      { text: 'Macros & allergènes avancés', included: true }, { text: 'Multi-devise', included: true },
-      { text: 'Comptabilité multi-branches', included: true }, { text: 'Rôles standards', included: true },
-    ] },
-  { name: 'Enterprise', price: 189, color: '#0369A1', description: 'Échelle illimitée pour chaînes & groupes hôteliers avec besoins avancés.',
-    features: [
-      { text: 'Sites illimités', included: true }, { text: 'Tables illimitées', included: true },
-      { text: 'Comptes staff illimités', included: true }, { text: 'Menu digital interactif', included: true },
-      { text: 'Terminaux POS illimités', included: true }, { text: 'KDS & reçus thermiques', included: true },
-      { text: 'Assistant AI Gemini complet', included: true }, { text: 'Multi-devise', included: true },
-      { text: 'Comptabilité multi-branches centralisée', included: true }, { text: 'Créateur de rôles personnalisé', included: true },
-      { text: 'Support prioritaire (support@liafrik.com)', included: true },
-    ] },
-];
+function getPlans(t: (key: string, fallback?: string) => string) {
+  return [
+    { name: t('landing.plan.starter.name'), price: 29, color: '#64748B', description: t('landing.plan.starter.desc'),
+      features: [
+        { text: t('landing.pf.site1'), included: true }, { text: t('landing.pf.tables10'), included: true },
+        { text: t('landing.pf.staff3'), included: true }, { text: t('landing.pf.digitalMenu'), included: true },
+        { text: t('landing.pf.kdsReceipts'), included: true }, { text: t('landing.pf.basicAllergy'), included: true },
+        { text: t('landing.pf.posTerminal'), included: false }, { text: t('landing.pf.multiCurrency'), included: false },
+        { text: t('landing.pf.multiBranchAccounting'), included: false }, { text: t('landing.pf.customRoles'), included: false },
+      ] },
+    { name: t('landing.plan.premium.name'), price: 69, color: '#0369A1', popular: true, description: t('landing.plan.premium.desc'),
+      features: [
+        { text: t('landing.pf.sites3'), included: true }, { text: t('landing.pf.tables30'), included: true },
+        { text: t('landing.pf.staff10'), included: true }, { text: t('landing.pf.digitalMenu'), included: true },
+        { text: t('landing.pf.fullPos'), included: true }, { text: t('landing.pf.kdsReceipts'), included: true },
+        { text: t('landing.pf.advancedAllergy'), included: true }, { text: t('landing.pf.multiCurrency'), included: true },
+        { text: t('landing.pf.multiBranchAccounting'), included: true }, { text: t('landing.pf.standardRoles'), included: true },
+      ] },
+    { name: t('landing.plan.enterprise.name'), price: 189, color: '#0369A1', description: t('landing.plan.enterprise.desc'),
+      features: [
+        { text: t('landing.pf.unlimitedSites'), included: true }, { text: t('landing.pf.unlimitedTables'), included: true },
+        { text: t('landing.pf.unlimitedStaff'), included: true }, { text: t('landing.pf.digitalMenu'), included: true },
+        { text: t('landing.pf.unlimitedPos'), included: true }, { text: t('landing.pf.kdsReceipts'), included: true },
+        { text: t('landing.pf.geminiAssistant'), included: true }, { text: t('landing.pf.multiCurrency'), included: true },
+        { text: t('landing.pf.centralAccounting'), included: true }, { text: t('landing.pf.customRoleBuilder'), included: true },
+        { text: t('landing.pf.prioritySupport'), included: true },
+      ] },
+  ];
+}
 
 function LegalModal({ type, onClose, theme }: { type: 'privacy' | 'terms' | 'gdpr' | 'cookies' | 'refund' | 'mentions'; onClose: () => void; theme: ReturnType<typeof useTheme>['theme'] }) {
   const titles = {
@@ -234,6 +214,11 @@ function LegalModal({ type, onClose, theme }: { type: 'privacy' | 'terms' | 'gdp
 export default function LandingPage() {
   const { theme, themeName, setTheme } = useTheme();
   const { language, currency, setLanguage, setCurrency, t, formatCurrency } = useLocale();
+  const SLIDES = getSlides(t);
+  const FEATURES = getFeatures(t);
+  const WHY_US = getWhyUs(t);
+  const STATS = getStats(t);
+  const PLANS = getPlans(t);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [legalModal, setLegalModal] = useState<'privacy' | 'terms' | 'gdpr' | 'cookies' | 'refund' | 'mentions' | null>(null);
@@ -241,9 +226,14 @@ export default function LandingPage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showScrollTop, setShowScrollTop] = useState(false);
 
+  // SLIDES.length is always 6 (the array's content is translated per-language, but
+  // never grows/shrinks), so capturing it once here is safe and avoids recreating
+  // this callback — and re-running the interval effect below — on every language
+  // change.
+  const slideCount = SLIDES.length;
   const nextSlide = useCallback(() => {
-    setCurrentSlide(prev => (prev + 1) % SLIDES.length);
-  }, []);
+    setCurrentSlide(prev => (prev + 1) % slideCount);
+  }, [slideCount]);
 
   useEffect(() => {
     const interval = setInterval(nextSlide, 6000);
@@ -496,10 +486,10 @@ export default function LandingPage() {
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 text-sm font-semibold mb-4 px-3 py-1 rounded-full"
               style={{ color: theme.primary, background: theme.primary + '12' }}>
-              <Zap size={14} /> Modules de la plateforme
+              <Zap size={14} /> {t('landing.features.badge')}
             </div>
-            <h2 className="text-4xl md:text-5xl font-bold mb-4" style={{ color: theme.text }}>Tout ce dont votre restaurant a besoin</h2>
-            <p className="text-xl" style={{ color: theme.textMuted }}>Une plateforme. Six modules puissants. Possibilités infinies.</p>
+            <h2 className="text-4xl md:text-5xl font-bold mb-4" style={{ color: theme.text }}>{t('landing.features.title')}</h2>
+            <p className="text-xl" style={{ color: theme.textMuted }}>{t('landing.features.subtitle')}</p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {FEATURES.map((f, i) => (
@@ -561,10 +551,10 @@ export default function LandingPage() {
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 text-sm font-semibold mb-4 px-3 py-1 rounded-full"
               style={{ color: theme.primary, background: theme.primary + '12' }}>
-              <Award size={14} /> Pourquoi choisir Nutro
+              <Award size={14} /> {t('landing.whyus.badge')}
             </div>
-            <h2 className="text-4xl md:text-5xl font-bold mb-4" style={{ color: theme.text }}>Conçu pour les meilleurs restaurants du monde</h2>
-            <p className="text-xl" style={{ color: theme.textMuted }}>Nous apportons innovation et excellence aux entreprises du monde entier.</p>
+            <h2 className="text-4xl md:text-5xl font-bold mb-4" style={{ color: theme.text }}>{t('landing.whyus.title')}</h2>
+            <p className="text-xl" style={{ color: theme.textMuted }}>{t('landing.whyus.subtitle')}</p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {WHY_US.map((item, i) => (
@@ -588,10 +578,10 @@ export default function LandingPage() {
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 text-sm font-semibold mb-4 px-3 py-1 rounded-full"
               style={{ color: theme.primary, background: theme.primary + '12' }}>
-              <Star size={14} /> Témoignages
+              <Star size={14} /> {t('landing.testimonials.badge')}
             </div>
-            <h2 className="text-4xl md:text-5xl font-bold mb-4" style={{ color: theme.text }}>Ce que disent nos clients</h2>
-            <p className="text-xl" style={{ color: theme.textMuted }}>Approuvé par 158+ groupes de restaurants dans le monde</p>
+            <h2 className="text-4xl md:text-5xl font-bold mb-4" style={{ color: theme.text }}>{t('landing.testimonials.title')}</h2>
+            <p className="text-xl" style={{ color: theme.textMuted }}>{t('landing.testimonials.subtitle')}</p>
           </div>
           <AnimatePresence mode="wait">
             <motion.div key={activeTestimonial} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.4 }}
@@ -625,12 +615,12 @@ export default function LandingPage() {
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-2 text-sm font-semibold mb-4 px-3 py-1 rounded-full"
               style={{ color: theme.primary, background: theme.primary + '12' }}>
-              <Sparkles size={14} /> Tarification simple
+              <Sparkles size={14} /> {t('landing.pricing.badge')}
             </div>
-            <h2 className="text-4xl md:text-5xl font-bold mb-4" style={{ color: theme.text }}>Démarrez gratuitement. Scalez sans effort.</h2>
-            <p className="text-xl mb-6" style={{ color: theme.textMuted }}>Tous les plans incluent KDS & reçus thermiques. Essai 14 jours gratuit. Sans carte de crédit.</p>
+            <h2 className="text-4xl md:text-5xl font-bold mb-4" style={{ color: theme.text }}>{t('landing.pricing.title')}</h2>
+            <p className="text-xl mb-6" style={{ color: theme.textMuted }}>{t('landing.pricing.subtitle')}</p>
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold" style={{ background: theme.primary + '15', color: theme.primary, border: `1px solid ${theme.primary}30` }}>
-              <Sparkles size={14} /> Payez 12 mois, on vous en offre 2 — l'abonnement annuel équivaut à 10 mois facturés
+              <Sparkles size={14} /> {t('landing.pricing.annualBadge')}
             </div>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
@@ -639,14 +629,14 @@ export default function LandingPage() {
                 className="rounded-2xl p-8 relative flex flex-col"
                 style={{ background: theme.surface, border: plan.popular ? `2px solid ${theme.primary}` : `1px solid ${theme.border}`, boxShadow: plan.popular ? `0 0 40px ${theme.primary}15` : 'none' }}>
                 {plan.popular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold text-white" style={{ background: theme.primary }}>PLUS POPULAIRE</div>
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold text-white" style={{ background: theme.primary }}>{t('landing.plan.popular').toUpperCase()}</div>
                 )}
                 <div className="mb-6">
                   <h3 className="text-xl font-bold mb-1" style={{ color: plan.color }}>{plan.name}</h3>
                   <p className="text-sm mb-4" style={{ color: theme.textMuted }}>{plan.description}</p>
                   <div className="flex items-end gap-1">
                     <span className="text-5xl font-bold" style={{ color: theme.text }}>{toPrice(plan.price)}</span>
-                    <span className="text-sm mb-2" style={{ color: theme.textMuted }}>/mois</span>
+                    <span className="text-sm mb-2" style={{ color: theme.textMuted }}>{t('landing.plan.perMonth')}</span>
                   </div>
                 </div>
                 <ul className="space-y-3 mb-8 flex-1">
@@ -659,7 +649,7 @@ export default function LandingPage() {
                 </ul>
                 <Link to="/auth/signup" className="block text-center py-3 rounded-xl font-bold text-sm transition-all hover:opacity-90"
                   style={{ background: plan.popular ? theme.primary : 'transparent', color: plan.popular ? '#fff' : theme.primary, border: plan.popular ? 'none' : `2px solid ${theme.primary}` }}>
-                  Démarrer l'essai gratuit
+                  {t('landing.plan.cta')}
                 </Link>
               </motion.div>
             ))}
@@ -670,11 +660,11 @@ export default function LandingPage() {
       {/* CTA */}
       <section className="py-24 px-6" style={{ background: theme.surface, borderTop: `1px solid ${theme.border}` }}>
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-4xl md:text-5xl font-bold mb-6" style={{ color: theme.text }}>Prêt à transformer votre restaurant ?</h2>
-          <p className="text-xl mb-10" style={{ color: theme.textMuted }}>Rejoignez 158+ groupes de restaurants déjà sur Nutro. Sans frais d'installation. Annulez à tout moment.</p>
+          <h2 className="text-4xl md:text-5xl font-bold mb-6" style={{ color: theme.text }}>{t('landing.finalCta.title')}</h2>
+          <p className="text-xl mb-10" style={{ color: theme.textMuted }}>{t('landing.finalCta.subtitle')}</p>
           <Link to="/auth/signup" className="inline-flex items-center gap-3 px-10 py-4 rounded-xl text-lg font-bold transition-all hover:opacity-90 hover:-translate-y-0.5"
             style={{ background: theme.primary, color: '#fff', boxShadow: `0 8px 40px ${theme.primary}30` }}>
-            Commencer gratuitement <ArrowRight size={20} />
+            {t('landing.finalCta.button')} <ArrowRight size={20} />
           </Link>
         </div>
       </section>
@@ -691,7 +681,7 @@ export default function LandingPage() {
                 <span className="text-lg font-bold" style={{ color: theme.text }}>NUTRO</span>
               </div>
               <p className="text-sm leading-relaxed mb-4" style={{ color: theme.textMuted }}>
-                Plateforme technologique restaurant entreprise. Propulsé par{' '}
+                {t('landing.footer.poweredBy')}{' '}
                 <a href="https://liafrik.com" target="_blank" rel="noopener noreferrer" className="font-semibold hover:opacity-80 inline-flex items-center gap-1" style={{ color: theme.text }}>
                   LiAfrik Dubai & Afrique <ExternalLink size={11} />
                 </a>.
@@ -734,49 +724,39 @@ export default function LandingPage() {
               </div>
             </div>
             {[
-              { title: 'Plateforme', links: ['Fonctionnalités', 'Tarifs', 'Témoignages', 'Centre d\'aide'] },
-              { title: 'Modules', links: ['Menu tablette', 'POS cloud', 'Kitchen display', 'Analytics'] },
-              { title: 'Légal', links: ['Conditions générales', 'Confidentialité', 'Cookies', 'Remboursement', 'Mentions légales', 'GDPR / INCO'] },
+              { title: t('landing.footer.platform'), links: [
+                { id: 'features', label: t('landing.footer.features'), href: '#features' },
+                { id: 'pricing', label: t('landing.footer.pricing'), href: '#pricing' },
+                { id: 'testimonials', label: t('landing.footer.testimonials'), href: '#testimonials' },
+                { id: 'help', label: t('landing.footer.help'), href: '/help' },
+              ] },
+              { title: t('landing.footer.modules'), links: [
+                { id: 'tablet', label: t('landing.footer.tabletMenu'), href: '#features' },
+                { id: 'pos', label: t('landing.footer.posCloud'), href: '#features' },
+                { id: 'kds', label: t('landing.footer.kds'), href: '#features' },
+                { id: 'analytics', label: t('landing.footer.analytics'), href: '#features' },
+              ] },
+              { title: t('landing.footer.legal'), links: [
+                { id: 'terms', label: t('landing.footer.terms'), legal: 'terms' as const },
+                { id: 'privacy', label: t('landing.footer.privacy'), legal: 'privacy' as const },
+                { id: 'cookies', label: t('landing.footer.cookies'), legal: 'cookies' as const },
+                { id: 'refund', label: t('landing.footer.refund'), legal: 'refund' as const },
+                { id: 'mentions', label: t('landing.footer.mentions'), legal: 'mentions' as const },
+                { id: 'gdpr', label: t('landing.footer.gdpr'), legal: 'gdpr' as const },
+              ] },
             ].map(col => (
               <div key={col.title}>
                 <h4 className="text-sm font-bold mb-4 uppercase tracking-wider" style={{ color: theme.text }}>{col.title}</h4>
                 <ul className="space-y-2">
-                  {col.links.map(link => {
-                    const legalMap: Record<string, 'privacy' | 'terms' | 'gdpr' | 'cookies' | 'refund' | 'mentions'> = {
-                      'Confidentialité': 'privacy',
-                      'Conditions générales': 'terms',
-                      'GDPR / INCO': 'gdpr',
-                      'Cookies': 'cookies',
-                      'Remboursement': 'refund',
-                      'Mentions légales': 'mentions',
-                    };
-                    // Was `<a href="#">` for every non-legal link — every "Plateforme" and
-                    // "Modules" entry was a dead link on a page that otherwise works. These
-                    // all have a real destination already: in-page anchors that exist further
-                    // up this same file, or the real /help route (App.tsx). "Changelog" had no
-                    // real page anywhere in the app, so it's swapped for "Témoignages", which
-                    // does exist and wasn't linked from the footer at all.
-                    const hrefMap: Record<string, string> = {
-                      'Fonctionnalités': '#features',
-                      'Tarifs': '#pricing',
-                      'Témoignages': '#testimonials',
-                      "Centre d'aide": '/help',
-                      'Menu tablette': '#features',
-                      'POS cloud': '#features',
-                      'Kitchen display': '#features',
-                      'Analytics': '#features',
-                    };
-                    const legalType = legalMap[link];
-                    return (
-                      <li key={link}>
-                        {legalType ? (
-                          <button onClick={() => setLegalModal(legalType)} className="text-sm hover:opacity-80 transition-opacity text-left" style={{ color: theme.textMuted }}>{link}</button>
-                        ) : (
-                          <a href={hrefMap[link] ?? '#'} className="text-sm hover:opacity-80 transition-opacity" style={{ color: theme.textMuted }}>{link}</a>
-                        )}
-                      </li>
-                    );
-                  })}
+                  {col.links.map(link => (
+                    <li key={link.id}>
+                      {'legal' in link ? (
+                        <button onClick={() => setLegalModal(link.legal)} className="text-sm hover:opacity-80 transition-opacity text-left" style={{ color: theme.textMuted }}>{link.label}</button>
+                      ) : (
+                        <a href={link.href} className="text-sm hover:opacity-80 transition-opacity" style={{ color: theme.textMuted }}>{link.label}</a>
+                      )}
+                    </li>
+                  ))}
                 </ul>
               </div>
             ))}
@@ -793,13 +773,13 @@ export default function LandingPage() {
             style={{ background: `linear-gradient(120deg, ${theme.primary} 0%, ${theme.secondary} 100%)` }}>
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white mb-6"
               style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.35)' }}>
-              <Instagram size={13} /> ON INSTAGRAM
+              <Instagram size={13} /> {t('landing.footer.instagramBadge').toUpperCase()}
             </span>
             <h3 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white mb-3 max-w-2xl mx-auto leading-tight">
-              Suivez nos actus produit et les coulisses
+              {t('landing.footer.instagramTitle')}
             </h3>
             <p className="text-base sm:text-lg mb-8 max-w-xl mx-auto" style={{ color: 'rgba(255,255,255,0.85)' }}>
-              Nouveautés, restaurants à l'honneur, et ce qu'on prépare ensuite.
+              {t('landing.footer.instagramDesc')}
             </p>
             <a
               href="https://www.instagram.com/liafrik_tech?igsi=eXBjdTc5NG42Zml4&utm_source=qr"
@@ -808,16 +788,16 @@ export default function LandingPage() {
               className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-sm font-bold transition-all hover:opacity-90 hover:-translate-y-0.5"
               style={{ background: '#fff', color: theme.text, boxShadow: '0 8px 30px rgba(0,0,0,0.2)' }}
             >
-              <Instagram size={16} /> Suivre @liafrik_tech
+              <Instagram size={16} /> {t('landing.footer.instagramFollow')}
             </a>
           </div>
 
           <div className="pt-6 flex flex-col sm:flex-row justify-between items-center gap-4" style={{ borderTop: `1px solid ${theme.border}` }}>
             <p className="text-xs" style={{ color: theme.textMuted }}>
-              © {new Date().getFullYear()} Nutro. Opéré par{' '}
-              <a href="https://liafrik.com" target="_blank" rel="noopener noreferrer" className="hover:opacity-80 underline">LiAfrik Dubai & Afrique</a>. Tous droits réservés.
+              © {new Date().getFullYear()} Nutro. {t('landing.footer.copyright')}{' '}
+              <a href="https://liafrik.com" target="_blank" rel="noopener noreferrer" className="hover:opacity-80 underline">LiAfrik Dubai & Afrique</a>. {t('landing.footer.allRights')}
             </p>
-            <p className="text-xs" style={{ color: theme.textMuted }}>Conçu pour les meilleurs restaurants du monde.</p>
+            <p className="text-xs" style={{ color: theme.textMuted }}>{t('landing.footer.tagline')}</p>
           </div>
         </div>
       </footer>
