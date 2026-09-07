@@ -368,7 +368,7 @@ export default function LandingPage() {
               >
                 <div className="inline-flex items-center gap-2 rounded-full px-4 py-2 mb-8 text-sm font-medium"
                   style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff' }}>
-                  <Sparkles size={14} color="#38BDF8" /> Technologie restaurant entreprise — Essai 14 jours gratuit
+                  <Sparkles size={14} color="#38BDF8" /> {t('landing.hero.badge')}
                 </div>
                 <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight text-white">
                   {SLIDES[currentSlide].title.map((line, i) => (
@@ -489,7 +489,7 @@ export default function LandingPage() {
       {/* PARTNER LOGOS — real restaurants using Nutro, infinite scroll marquee */}
       <section className="py-12 overflow-hidden" style={{ background: theme.surface, borderTop: `1px solid ${theme.border}`, borderBottom: `1px solid ${theme.border}` }}>
         <p className="text-center text-xs font-bold tracking-widest uppercase mb-8" style={{ color: theme.textMuted }}>
-          Approuvé par les leaders de la restauration
+          {t('landing.partners.trustedBy')}
         </p>
         <style dangerouslySetInnerHTML={{ __html: `
           @keyframes nutro-partner-scroll {
