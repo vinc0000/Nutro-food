@@ -5,7 +5,7 @@ import {
   ChefHat, Monitor, Tablet, BarChart3, Shield, Globe, Zap,
   Check, X, ArrowRight, Menu as MenuIcon, ChevronDown, Sparkles, Mail, X as XIcon,
   Star, Award, Headphones, Cloud, Scale, Brain,
-  Phone, MessageCircle, ArrowUp,
+  Phone, MessageCircle, ArrowUp, Clock, Lock,
   Facebook, Instagram, Linkedin, Youtube, ExternalLink
 } from 'lucide-react';
 import { useTheme, THEMES, ThemeName } from '@/contexts/ThemeContext';
@@ -637,7 +637,32 @@ export default function LandingPage() {
       </section>
 
       {/* FOOTER */}
-      <footer className="py-12 px-6" style={{ background: theme.bg, borderTop: `1px solid ${theme.border}` }}>
+      {/* Trust badges strip — sits right above the footer as a confidence bar before
+          the visitor leaves the main content. Uses only existing theme colors (no new
+          palette), same icons already imported elsewhere on this page. */}
+      <div className="py-8 px-6" style={{ background: theme.surface, borderTop: `1px solid ${theme.border}` }}>
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-center gap-x-10 gap-y-4">
+          {[
+            { icon: Lock, label: t('landing.trust.encryption') },
+            { icon: Clock, label: t('landing.trust.trial') },
+            { icon: Shield, label: t('landing.trust.isolation') },
+            { icon: Headphones, label: t('landing.trust.support') },
+          ].map(item => (
+            <div key={item.label} className="flex items-center gap-2 text-sm font-semibold" style={{ color: theme.textMuted }}>
+              <item.icon size={16} style={{ color: theme.primary }} />
+              {item.label}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Footer background gets subtle depth from theme.primary at very low opacity —
+          same color already used everywhere else on the page, not a new one, just used
+          more richly here instead of a single flat fill. */}
+      <footer className="py-12 px-6" style={{
+        background: `radial-gradient(ellipse 80% 50% at 50% 0%, ${theme.primary}0d, transparent), ${theme.bg}`,
+        borderTop: `1px solid ${theme.border}`,
+      }}>
         <div className="max-w-7xl mx-auto">
           <div className="grid md:grid-cols-4 gap-8 mb-10">
             <div>

@@ -271,6 +271,10 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     'landing.footer.instagramTitle': 'Follow our product updates and behind the scenes',
     'landing.footer.instagramDesc': 'New features, restaurant spotlights, and what we\'re building next.',
     'landing.footer.instagramFollow': 'Follow @liafrik_tech',
+    'landing.trust.encryption': 'End-to-end encryption',
+    'landing.trust.trial': '14-day free trial, no card',
+    'landing.trust.support': 'Dedicated support',
+    'landing.trust.isolation': 'Secure multi-tenant isolation',
   },
   fr: {
     'nav.login': 'Connexion',
@@ -524,6 +528,10 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     'landing.footer.instagramTitle': 'Suivez nos actus produit et les coulisses',
     'landing.footer.instagramDesc': 'Nouveautés, restaurants à l\'honneur, et ce qu\'on prépare ensuite.',
     'landing.footer.instagramFollow': 'Suivre @liafrik_tech',
+    'landing.trust.encryption': 'Chiffrement bout-en-bout',
+    'landing.trust.trial': 'Essai 14 jours, sans carte',
+    'landing.trust.support': 'Support dédié',
+    'landing.trust.isolation': 'Isolation multi-tenant sécurisée',
   },
   ar: {
     'nav.login': 'تسجيل الدخول',
@@ -777,6 +785,10 @@ const translations: Record<SupportedLanguage, Record<string, string>> = {
     'landing.footer.instagramTitle': 'تابع تحديثات منتجنا وكواليس العمل',
     'landing.footer.instagramDesc': 'ميزات جديدة، إبراز لمطاعم مميزة، وما نستعد لبنائه لاحقًا.',
     'landing.footer.instagramFollow': 'تابع @liafrik_tech',
+    'landing.trust.encryption': 'تشفير من طرف إلى طرف',
+    'landing.trust.trial': 'تجربة مجانية 14 يومًا، بدون بطاقة',
+    'landing.trust.support': 'دعم مخصص',
+    'landing.trust.isolation': 'عزل آمن متعدد المستأجرين',
   },
 };
 
