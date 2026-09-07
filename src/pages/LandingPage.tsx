@@ -137,55 +137,22 @@ function getPlans(t: (key: string, fallback?: string) => string) {
   ];
 }
 
-function LegalModal({ type, onClose, theme }: { type: 'privacy' | 'terms' | 'gdpr' | 'cookies' | 'refund' | 'mentions'; onClose: () => void; theme: ReturnType<typeof useTheme>['theme'] }) {
+function LegalModal({ type, onClose, theme, t }: { type: 'privacy' | 'terms' | 'gdpr' | 'cookies' | 'refund' | 'mentions'; onClose: () => void; theme: ReturnType<typeof useTheme>['theme']; t: (key: string, fallback?: string) => string }) {
   const titles = {
-    privacy: 'Politique de confidentialité',
-    terms: 'Conditions générales d\'utilisation',
-    gdpr: 'Conformité GDPR / INCO',
-    cookies: 'Politique de cookies',
-    refund: 'Politique de remboursement',
-    mentions: 'Mentions légales',
+    privacy: t('legal.title.privacy'),
+    terms: t('legal.title.terms'),
+    gdpr: t('legal.title.gdpr'),
+    cookies: t('legal.title.cookies'),
+    refund: t('legal.title.refund'),
+    mentions: t('legal.title.mentions'),
   };
   const contents: Record<string, string[]> = {
-    privacy: [
-      'Nutro par LiAfrik Dubai & Afrique (« nous ») respecte votre vie privée. Nous collectons uniquement les données nécessaires au fonctionnement de la plateforme : profil restaurant, comptes staff, données menu et historique commandes.',
-      'Nous ne vendons ni ne partageons vos données avec des tiers. Toutes les données sont chiffrées en transit et au repos selon les standards de l\'industrie.',
-      'Vous pouvez demander l\'export ou la suppression de vos données à tout moment en contactant cs@liafrik.com.',
-      'Les données de paiement sont traitées par nos prestataires de paiement (Flutterwave, Stripe, Paystack, PayUnit selon votre région) et ne sont jamais stockées sur nos serveurs.',
-    ],
-    terms: [
-      'En utilisant Nutro, vous acceptez d\'utiliser la plateforme pour des opérations de restaurant licites uniquement.',
-      'Les abonnements sont facturés mensuellement ou annuellement selon le plan choisi. Vous pouvez annuler à tout moment ; l\'accès continue jusqu\'à la fin de la période de facturation en cours.',
-      'Les essais gratuits durent 14 jours. Aucune carte de crédit n\'est requise pour démarrer un essai.',
-      'LiAfrik se réserve le droit de suspendre les comptes en cas d\'abus, fraude ou non-paiement.',
-      'Pour les conditions complètes, contactez support@liafrik.com.',
-    ],
-    gdpr: [
-      'Nutro est conforme au RGPD. Nous traitons les données personnelles sur la base juridique de l\'exécution du contrat et de l\'intérêt légitime (sécurité, prévention des fraudes).',
-      'Les personnes concernées ont le droit d\'accès, de rectification, d\'effacement, de restriction, de portabilité et d\'opposition au traitement de leurs données personnelles.',
-      'Nous ne transférons pas de données en dehors de l\'UE/EEE sans garanties appropriées (Clauses Contractuelles Types).',
-      'Pour les demandes DPO : cs@liafrik.com. Pour les demandes de personnes concernées : support@liafrik.com.',
-    ],
-    cookies: [
-      'Nutro utilise des cookies strictement nécessaires au fonctionnement du site (session, authentification, préférences de langue et de devise).',
-      'Des cookies de mesure d\'audience peuvent être utilisés pour améliorer la plateforme ; ils sont anonymisés dès que possible.',
-      'Vous pouvez configurer votre navigateur pour refuser les cookies non essentiels, ce qui peut limiter certaines fonctionnalités du site.',
-      'Aucun cookie publicitaire tiers n\'est déposé sans votre consentement explicite.',
-    ],
-    refund: [
-      'Les essais gratuits de 14 jours ne donnent lieu à aucun prélèvement et peuvent être annulés à tout moment sans frais.',
-      'Les abonnements payants peuvent être remboursés intégralement dans les 14 jours suivant le premier paiement, sur simple demande à support@liafrik.com, conformément au droit de rétractation applicable.',
-      'Passé ce délai, les paiements déjà effectués pour la période en cours ne sont pas remboursables, mais l\'abonnement reste actif jusqu\'à la fin de la période payée.',
-      'Les remboursements sont traités via votre prestataire de paiement d\'origine (Flutterwave, Stripe, Paystack ou PayUnit) sous 5 à 10 jours ouvrés.',
-      'En cas d\'erreur de facturation ou de double prélèvement, contactez-nous immédiatement à support@liafrik.com pour un remboursement prioritaire.',
-    ],
-    mentions: [
-      'Nutro est une plateforme technologique édité et opérée par LiAfrik Dubai & Afrique.',
-      'Contact éditeur : cs@liafrik.com · Support : support@liafrik.com.',
-      'Hébergement et infrastructure : fournisseurs cloud internationaux avec chiffrement des données en transit et au repos.',
-      'Paiements traités par nos prestataires de paiement partenaires (Flutterwave, Stripe, Paystack, PayUnit) pour l\'ensemble des transactions internationales.',
-      'Pour toute question relative à la propriété intellectuelle ou au contenu du site, contactez cs@liafrik.com.',
-    ],
+    privacy: [t('legal.privacy.p1'), t('legal.privacy.p2'), t('legal.privacy.p3'), t('legal.privacy.p4')],
+    terms: [t('legal.terms.p1'), t('legal.terms.p2'), t('legal.terms.p3'), t('legal.terms.p4'), t('legal.terms.p5')],
+    gdpr: [t('legal.gdpr.p1'), t('legal.gdpr.p2'), t('legal.gdpr.p3'), t('legal.gdpr.p4')],
+    cookies: [t('legal.cookies.p1'), t('legal.cookies.p2'), t('legal.cookies.p3'), t('legal.cookies.p4')],
+    refund: [t('legal.refund.p1'), t('legal.refund.p2'), t('legal.refund.p3'), t('legal.refund.p4'), t('legal.refund.p5')],
+    mentions: [t('legal.mentions.p1'), t('legal.mentions.p2'), t('legal.mentions.p3'), t('legal.mentions.p4'), t('legal.mentions.p5')],
   };
 
   return (
@@ -204,7 +171,7 @@ function LegalModal({ type, onClose, theme }: { type: 'privacy' | 'terms' | 'gdp
           ))}
         </div>
         <div className="mt-6 pt-4 text-xs" style={{ borderTop: `1px solid ${theme.border}`, color: theme.textMuted }}>
-          Dernière mise à jour : {new Date().getFullYear()} · LiAfrik Dubai & Afrique
+          {t('legal.lastUpdated')} {new Date().getFullYear()} · LiAfrik Dubai & Afrique
         </div>
       </motion.div>
     </motion.div>
@@ -803,7 +770,7 @@ export default function LandingPage() {
       </footer>
 
       <AnimatePresence>
-        {legalModal && <LegalModal type={legalModal} onClose={() => setLegalModal(null)} theme={theme} />}
+        {legalModal && <LegalModal type={legalModal} onClose={() => setLegalModal(null)} theme={theme} t={t} />}
       </AnimatePresence>
     </div>
   );
