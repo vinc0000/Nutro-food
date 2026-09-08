@@ -10,9 +10,9 @@ const corsHeaders = {
 const PAYSTACK_BASE_URL = "https://api.paystack.co";
 
 const PLAN_PRICES: Record<string, { monthly: number; annual: number }> = {
-  starter: { monthly: 29, annual: 290 },
-  premium: { monthly: 69, annual: 690 },
-  enterprise: { monthly: 189, annual: 1890 },
+  starter: { monthly: 29, annual: 278.40 },
+  premium: { monthly: 69, annual: 662.40 },
+  enterprise: { monthly: 189, annual: 1814.40 },
 };
 
 interface OrgContext {

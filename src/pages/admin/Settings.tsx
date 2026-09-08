@@ -968,14 +968,20 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
           <button key={p} onClick={() => setSelectedPeriod(p)}
             className="flex-1 py-2 rounded-lg text-sm font-bold capitalize transition-all"
             style={{ background: selectedPeriod === p ? theme.primary : 'transparent', color: selectedPeriod === p ? '#fff' : theme.textMuted }}>
-            {p} {p === 'annual' && '(Save 2 months)'}
+            {p} {p === 'annual' && '(Save 20%)'}
           </button>
         ))}
       </div>
 
       <div className="grid grid-cols-3 gap-3">
         {PLANS.map(p => {
-          const price = selectedPeriod === 'annual' ? Math.round(p.price * 10) : p.price;
+          // 20% off monthly × 12 (confirmed by the client) — was previously ×10
+          // (≈16.7% off, a different and wrong discount), which both understated the
+          // real discount shown to the customer AND, more importantly, was the exact
+          // amount actually sent to the PSP edge functions to charge on annual
+          // billing. That mismatch is fixed at the source (PLAN_PRICES in each
+          // edge function); this display calculation is kept in sync with it here.
+          const price = selectedPeriod === 'annual' ? Math.round(p.price * 12 * 0.8 * 100) / 100 : p.price;
           const isCurrent = plan === p.name && planStatus === 'active';
           // Billing is always actually charged in USD (see the payunit-pay/
           // flutterwave-pay edge functions) — that's independent of the tenant's

@@ -276,7 +276,12 @@ Deno.serve(async (req: Request) => {
       const insertResult = await supabase.from("subscriptions").insert({
         org_id: orgId,
         plan: normalizedPlan,
-        amount: period === "annual" ? amount * 10 : amount,
+        // Record-keeping only — Paddle's actual charge is fully determined by the
+        // Price ID (priceId above, configured in the Paddle Dashboard), not by this
+        // value. Keep it in sync with whatever the real annual Price objects are set
+        // to there (20% off monthly × 12, confirmed by the client), so our own
+        // reports/dashboard show the real amount rather than a stale guess.
+        amount: period === "annual" ? Math.round(amount * 12 * 0.8 * 100) / 100 : amount,
         currency: "USD",
         flw_tx_ref: transactionId,
         status: "pending",
