@@ -19,9 +19,21 @@ export default function PlanGate({ feature, title, description, children }: Plan
   // Without this loading check, PlanGate showed the "Upgrade Plan" paywall to EVERY
   // tenant, including ones with full legitimate access, for as long as the org
   // context took to load — a real access flash/lockout on every page it wraps
-  // (POS Terminal included), not just a cosmetic delay. Render nothing rather than
-  // a false paywall until we actually know the answer.
-  if (loading) return null;
+  // (POS Terminal included), not just a cosmetic delay. A themed skeleton — not a
+  // blank screen, and not the full-viewport spinner RouteGuards.tsx uses for whole
+  // page transitions — keeps this feeling like part of the product while we wait
+  // to actually know the answer, instead of a jarring blank flash.
+  if (loading) {
+    return (
+      <div className="rounded-2xl p-8 text-center" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 animate-pulse" style={{ background: theme.primary + '15' }}>
+          <div className="animate-spin w-5 h-5 border-2 border-t-transparent rounded-full" style={{ borderColor: theme.primary }} />
+        </div>
+        <div className="h-4 w-40 rounded mx-auto mb-3 animate-pulse" style={{ background: theme.border }} />
+        <div className="h-3 w-64 rounded mx-auto animate-pulse" style={{ background: theme.border }} />
+      </div>
+    );
+  }
 
   if (canAccess(feature) || isTrialActive) {
     return <>{children}</>;
