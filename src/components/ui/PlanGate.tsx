@@ -11,8 +11,17 @@ interface PlanGateProps {
 }
 
 export default function PlanGate({ feature, title, description, children }: PlanGateProps) {
-  const { canAccess, isTrialActive } = usePlanInfo();
+  const { canAccess, isTrialActive, loading } = usePlanInfo();
   const { theme } = useTheme();
+
+  // usePlanInfo() defaults plan/trial data to "not loaded yet" while orgContext is
+  // still being fetched — which computes as isTrialActive=false, canAccess=false.
+  // Without this loading check, PlanGate showed the "Upgrade Plan" paywall to EVERY
+  // tenant, including ones with full legitimate access, for as long as the org
+  // context took to load — a real access flash/lockout on every page it wraps
+  // (POS Terminal included), not just a cosmetic delay. Render nothing rather than
+  // a false paywall until we actually know the answer.
+  if (loading) return null;
 
   if (canAccess(feature) || isTrialActive) {
     return <>{children}</>;
