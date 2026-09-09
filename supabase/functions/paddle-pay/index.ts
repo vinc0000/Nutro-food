@@ -12,7 +12,12 @@ const corsHeaders = {
 // Defaults to sandbox so a half-configured deployment can never accidentally
 // bill a real card before someone deliberately sets PADDLE_ENV=live.
 function paddleApiBase() {
-  return Deno.env.get("PADDLE_ENV") === "live"
+  // Accepts both PADDLE_ENV and PADDLE_ENVIRONMENT — a naming mismatch between what
+  // the code originally expected and what got set as the actual secret caused a real
+  // diagnosis detour, so both names are honored going forward rather than requiring
+  // one exact name.
+  const env = Deno.env.get("PADDLE_ENV") ?? Deno.env.get("PADDLE_ENVIRONMENT");
+  return env === "live"
     ? "https://api.paddle.com"
     : "https://sandbox-api.paddle.com";
 }
@@ -25,7 +30,8 @@ function paddleApiBase() {
 // message instead of silently charging the wrong amount.
 function paddlePriceId(plan: string, period: "monthly" | "annual"): string | null {
   const key = `PADDLE_PRICE_${plan.toUpperCase()}_${period.toUpperCase()}`;
-  return Deno.env.get(key) ?? null;
+  const value = Deno.env.get(key);
+  return value && value.trim().length > 0 ? value.trim() : null;
 }
 
 interface OrgContext {
@@ -41,7 +47,8 @@ async function getOrgContext(supabase: ReturnType<typeof createClient>): Promise
 }
 
 function paddleApiKey() {
-  return Deno.env.get("PADDLE_API_KEY") ?? null;
+  const value = Deno.env.get("PADDLE_API_KEY");
+  return value && value.trim().length > 0 ? value.trim() : null;
 }
 
 async function paddleRequest(path: string, apiKey: string, method: "GET" | "POST", body?: Record<string, unknown>) {
