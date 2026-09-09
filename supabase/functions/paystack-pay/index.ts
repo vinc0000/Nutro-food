@@ -228,7 +228,7 @@ Deno.serve(async (req: Request) => {
       // always billed in USD, independent of the tenant's own branches.currency.
       const currency = "USD";
       const txRef = `PS-${orgId.slice(0, 8)}-${Date.now()}`;
-      const appOrigin = req.headers.get("origin") || Deno.env.get("APP_BASE_URL") || "https://nutro.app";
+      const appOrigin = req.headers.get("origin") || Deno.env.get("APP_BASE_URL") || "https://nutro.liafrik.com";
 
       const initResponse = await fetch(`${PAYSTACK_BASE_URL}/transaction/initialize`, {
         method: "POST",

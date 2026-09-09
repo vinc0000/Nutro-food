@@ -2,20 +2,20 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://nutro.app/</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://nutro.app/" />
-    <xhtml:link rel="alternate" hreflang="fr" href="https://nutro.app/" />
-    <xhtml:link rel="alternate" hreflang="ar" href="https://nutro.app/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://nutro.app/" />
+    <loc>https://nutro.liafrik.com/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://nutro.liafrik.com/" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://nutro.liafrik.com/" />
+    <xhtml:link rel="alternate" hreflang="ar" href="https://nutro.liafrik.com/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://nutro.liafrik.com/" />
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://nutro.app/help</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://nutro.app/help" />
-    <xhtml:link rel="alternate" hreflang="fr" href="https://nutro.app/help" />
-    <xhtml:link rel="alternate" hreflang="ar" href="https://nutro.app/help" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://nutro.app/help" />
+    <loc>https://nutro.liafrik.com/help</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://nutro.liafrik.com/help" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://nutro.liafrik.com/help" />
+    <xhtml:link rel="alternate" hreflang="ar" href="https://nutro.liafrik.com/help" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://nutro.liafrik.com/help" />
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>

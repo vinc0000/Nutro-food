@@ -247,7 +247,7 @@ Deno.serve(async (req: Request) => {
           tx_ref: txRef,
           amount,
           currency,
-          payment_link: `https://demo.nutro.app/billing/${txRef}`,
+          payment_link: `https://demo.nutro.liafrik.com/billing/${txRef}`,
           demo_mode: true,
         }), {
           status: 200,
@@ -273,7 +273,7 @@ Deno.serve(async (req: Request) => {
           customizations: {
             title: "Nutro Subscription",
             description: `${normalizedPlan.charAt(0).toUpperCase() + normalizedPlan.slice(1)} plan - ${period}`,
-            logo: "https://nutro.app/logo.png",
+            logo: "https://nutro.liafrik.com/logo.png",
           },
           meta: {
             org_id: orgId,

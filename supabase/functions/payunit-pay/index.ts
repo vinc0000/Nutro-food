@@ -294,7 +294,7 @@ Deno.serve(async (req: Request) => {
       const { currency, paymentCountry } = resolvePayunitLocale(orgData.country);
       const amount = convertUsdToLocal(usdAmount, currency);
       const txRef = `PU-${orgId.slice(0, 8)}-${Date.now()}`;
-      const appOrigin = req.headers.get("origin") || Deno.env.get("APP_BASE_URL") || "https://nutro.app";
+      const appOrigin = req.headers.get("origin") || Deno.env.get("APP_BASE_URL") || "https://nutro.liafrik.com";
 
       const payunitResponse = await fetch(`${PAYUNIT_BASE_URL}/api/gateway/checkout/initialize`, {
         method: "POST",
@@ -317,7 +317,7 @@ Deno.serve(async (req: Request) => {
             price_description: { unit_amount: amount },
             product_description: {
               name: `Nutro ${normalizedPlan} plan (${period})`,
-              image_url: "https://nutro.app/logo.png",
+              image_url: "https://nutro.liafrik.com/logo.png",
               about_product: `Nutro subscription — ${normalizedPlan} plan, billed ${period}`,
             },
             quantity: 1,

@@ -14,7 +14,7 @@ const corsHeaders = {
 // is ever given; it exists only because Supabase's schema requires *a* password.
 function generateInternalEmail(orgId: string): string {
   const suffix = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
-  return `staff-${orgId.slice(0, 8)}-${suffix}@staff.internal.nutro.app`;
+  return `staff-${orgId.slice(0, 8)}-${suffix}@staff.internal.nutro.liafrik.com`;
 }
 
 function generateInternalPassword(): string {

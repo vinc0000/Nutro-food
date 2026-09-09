@@ -14,7 +14,7 @@ function createDemoStore() {
     users: [
       {
         id: 'demo-admin',
-        email: 'demo@nutro.app',
+        email: 'demo@nutro.liafrik.com',
         password: 'demo1234',
         full_name: 'Demo Admin',
         role: 'admin',
@@ -23,7 +23,7 @@ function createDemoStore() {
     profiles: [
       {
         id: 'demo-admin',
-        email: 'demo@nutro.app',
+        email: 'demo@nutro.liafrik.com',
         full_name: 'Demo Admin',
         avatar_url: null,
         system_role: 'super_admin',
@@ -43,7 +43,7 @@ function createDemoStore() {
         plan: 'premium',
         plan_status: 'active',
         trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-        billing_email: 'demo@nutro.app',
+        billing_email: 'demo@nutro.liafrik.com',
         referral_code: 'NUTRO7' as string | null,
         created_at: now,
       },
@@ -746,7 +746,7 @@ function createMockSupabaseClient() {
           plan: String(params?.p_plan ?? 'premium'),
           plan_status: 'trial',
           trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-          billing_email: String(params?.p_billing_email ?? 'demo@nutro.app'),
+          billing_email: String(params?.p_billing_email ?? 'demo@nutro.liafrik.com'),
           referral_code: 'NUTRO7',
           created_at: new Date().toISOString(),
         });

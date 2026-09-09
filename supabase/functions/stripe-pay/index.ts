@@ -275,7 +275,7 @@ Deno.serve(async (req: Request) => {
       // Same reasoning as flutterwave-pay/payunit-pay: Nutro's own subscription fee is
       // always billed in USD, independent of the tenant's own branches.currency.
       const currency = "USD";
-      const appOrigin = req.headers.get("origin") || Deno.env.get("APP_BASE_URL") || "https://nutro.app";
+      const appOrigin = req.headers.get("origin") || Deno.env.get("APP_BASE_URL") || "https://nutro.liafrik.com";
 
       const { ok, data: session } = await stripeRequest("/checkout/sessions", secretKey, "POST", {
         mode: "payment",
