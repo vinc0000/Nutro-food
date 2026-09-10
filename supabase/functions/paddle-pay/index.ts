@@ -185,6 +185,11 @@ Deno.serve(async (req: Request) => {
       tenant_org_id?: string;
     };
 
+    // TEMPORARY diagnostic action — calls Paddle's real API with the actual
+    // configured credentials and returns Paddle's raw response (status + body),
+    // so the exact error code/detail Paddle sends back is visible instead of
+    // guessing from generic documentation. No secret values are ever included in
+    // the response, only Paddle's own reply. Removed once resolved.
     if (action === "status") {
       const authHeaderForStatus = req.headers.get("Authorization");
       if (!authHeaderForStatus) {
