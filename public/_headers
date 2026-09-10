@@ -13,21 +13,28 @@
 # - connect-src also allows *.sentry.io and *.ingest.us/de.sentry.io for error
 #   reporting — harmless if VITE_SENTRY_DSN is unset (initSentry() never runs,
 #   so nothing ever actually calls out to these hosts).
-# - Paddle.js overlay checkout needs three things allowed, all under *.paddle.com:
-#   script-src (loading cdn.paddle.com/paddle/v2/paddle.js itself), frame-src
-#   (the actual payment-form iframe Paddle.js opens, e.g. buy.paddle.com /
-#   sandbox-buy.paddle.com), and connect-src (Paddle.js's own API calls for
-#   price previews, localization, etc. against api.paddle.com /
-#   sandbox-api.paddle.com). Wildcarding *.paddle.com instead of listing each
+# - Paddle.js overlay checkout needs several things allowed, all under
+#   *.paddle.com: script-src (loading cdn.paddle.com/paddle/v2/paddle.js
+#   itself), style-src (the checkout's own CSS, e.g.
+#   sandbox-cdn.paddle.com/paddle/v2/assets/css/paddle.css — missed on the
+#   first pass, which silently broke the checkout's layout), frame-src (the
+#   actual payment-form iframe, e.g. buy.paddle.com / sandbox-buy.paddle.com),
+#   img-src, and connect-src (Paddle.js's own API calls for price previews,
+#   localization, etc.). Wildcarding *.paddle.com instead of listing each
 #   subdomain individually, since Paddle uses several and the exact set isn't
-#   publicly documented as a fixed list.
+#   publicly documented as a fixed list. static.cloudflareinsights.com is an
+#   analytics beacon Paddle.js itself injects onto the parent page — harmless
+#   to allow, blocking it doesn't break checkout but does spam the console.
+# - worker-src allows blob: in addition to 'self' — Sentry's Session Replay
+#   integration creates its encoding worker from a blob: URL, which 'self'
+#   alone does not cover in Chrome's CSP worker-src matching.
 /*
   Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(self)
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://*.paddle.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://images.pexels.com https://*.supabase.co https://*.paddle.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io https://*.paddle.com; frame-src https://*.paddle.com; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://*.paddle.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.paddle.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://images.pexels.com https://*.supabase.co https://*.paddle.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io https://*.paddle.com; frame-src https://*.paddle.com; worker-src 'self' blob:; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
 
 # Hashed build assets are immutable — safe to cache aggressively.
 /assets/*
