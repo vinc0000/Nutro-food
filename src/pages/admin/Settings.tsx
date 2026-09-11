@@ -853,7 +853,23 @@ function BillingTab({ theme, showSaved }: { theme: ReturnType<typeof useTheme>['
         if (paystackStatus?.configured) configured.push('paystack');
         if (paddleStatus?.configured) configured.push('paddle');
         setAvailablePsps(configured);
-        setActivePsp(configured.length === 1 ? configured[0] : null);
+        // Was unconditionally overwriting activePsp based on "exactly one PSP
+        // configured" — harmless while only one PSP ever was configured, but once
+        // a second one (Paddle) got added, this started wiping out the PSP that a
+        // pending transaction actually used (restored from localStorage on mount)
+        // with null, right when the tenant is redirected back from checkout. That
+        // silently broke the auto-verify-after-redirect effect below (it requires
+        // activePsp to be truthy), leaving real completed payments stuck on
+        // "pending" in the database forever — nothing was ever wrong with the
+        // payment itself, verify() just never got called. A transaction actually
+        // in flight now takes priority over the "which PSP to default to for a
+        // brand-new subscription" heuristic.
+        const pendingPsp = localStorage.getItem('nutro:pending-psp') as typeof configured[number] | null;
+        if (pendingPsp && configured.includes(pendingPsp)) {
+          setActivePsp(pendingPsp);
+        } else {
+          setActivePsp(configured.length === 1 ? configured[0] : null);
+        }
       } finally {
         if (!cancelled) setPspChecking(false);
       }
