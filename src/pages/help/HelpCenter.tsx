@@ -6,64 +6,40 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLocale } from '@/contexts/LocaleContext';
 
 // Replaces the previous version, which listed a fake article count per category
 // ("12 articles", "18 articles"...) on cards with no onClick or link — pure
 // decoration implying real articles existed when none did. Each category now
 // expands (same accordion pattern as the FAQ below) to real written guidance
 // grounded in what the platform actually does, not placeholder copy.
-const GUIDES = [
-  { icon: UtensilsCrossed, title: 'Menu Management', color: '#10B981', desc: 'Add items, set macros, configure allergens and modifiers.',
-    sections: [
-      'Go to Admin → Menu to add, edit, or reorder items. Each item can have a name, description, price, category, and photo (JPEG, PNG, WEBP or GIF, up to 2 MB).',
-      'Set macros (calories, protein, carbs, fats) and dietary flags (Halal, Vegan, Gluten-Free, Keto, Nut-Free, Dairy, Shellfish, Spicy) per item — these are what customers filter by on the tablet menu.',
-      'Track stock per item from the Menu page. Stock adjustments are applied atomically, so simultaneous sales from multiple POS terminals never overcount or lose a decrement.',
-      'Toggle an item\'s availability on/off instantly (e.g. when it sells out) without deleting it — it disappears from ordering views but stays in your catalog.',
-    ] },
-  { icon: Monitor, title: 'POS Terminal', color: '#3b82f6', desc: 'Process orders, handle payments, manage shifts and Z-reports.',
-    sections: [
-      'The POS terminal is PIN-protected — each staff member unlocks it with their own 4-to-8-digit PIN, entered via /app/pos. After 5 incorrect attempts, the PIN locks for 15 minutes to prevent guessing.',
-      'Take orders by table, apply discounts or loyalty rewards, and accept Cash, Card, or Mobile Money depending on which payment providers are configured for your account.',
-      'Refunds require a manager-level role and a reason, and are capped server-side at the order\'s remaining refundable amount — a cashier account alone cannot exceed it.',
-      'Tablet self-order requests appear in the POS for a staff member to review and send to the kitchen before they\'re prepared.',
-    ] },
-  { icon: ChefHat, title: 'Kitchen Display', color: '#f59e0b', desc: 'Set up KDS, understand ticket flow, configure alerts.',
-    sections: [
-      'The Kitchen Display (/app/kds) shows tickets in real time as soon as an order is sent to the kitchen from the POS.',
-      'Tickets change color the longer they sit unprepared, so the kitchen can spot what\'s falling behind at a glance.',
-      'Cancelled or refunded orders are automatically removed from the board — the kitchen never sees a ticket for an order that was called off.',
-      'Press "Ready" (or the equivalent action) to move a ticket through its stages; it clears from the board once served.',
-    ] },
-  { icon: Tablet, title: 'Tablet Menu', color: '#8b5cf6', desc: 'Customer-facing setup, language configuration, kiosk mode.',
-    sections: [
-      'The customer-facing tablet menu runs at /app/tablet, tied to a specific table via its link — no staff login required for guests to browse and order.',
-      'Supports English, French, and Arabic (with right-to-left layout for Arabic), and multiple currencies, both switchable by the guest at any time.',
-      'Guests can filter the whole menu by dietary flag and see full macros per dish before ordering.',
-      'Orders placed from the tablet land as "pending" until a staff member accepts them at the POS — nothing is sent to the kitchen without that review step.',
-    ] },
-  { icon: BarChart3, title: 'Analytics & Reports', color: '#06b6d4', desc: 'Revenue dashboards, export reports, financial summaries.',
-    sections: [
-      'The Admin dashboard shows today\'s revenue and order count, calculated from paid orders net of any refunds — matching what the Orders page itself totals.',
-      'Reports (Admin → Reports) let you filter by date range and export summaries for accounting.',
-      'Multi-branch accounts (Premium and Enterprise) get consolidated reporting across every site instead of checking each branch separately.',
-    ] },
-  { icon: Shield, title: 'Security & RBAC', color: '#ef4444', desc: 'Roles, permissions, PIN codes, and user access control.',
-    sections: [
-      'Staff roles range from cashier and kitchen staff up to branch manager, owner, and org owner, each with a different default set of accessible modules.',
-      'Only an owner or org owner can grant the owner-tier role to someone else, or edit/remove an existing owner\'s account — a lower-tier manager cannot demote or lock out the real owner.',
-      'Every table and function enforces tenant isolation at the database level — staff at one restaurant can never see another restaurant\'s data, even if they know its internal IDs.',
-      'PIN-based actions (POS unlock, staff identification) lock out after repeated failed attempts, on both the shared branch PIN and individual staff PINs.',
-    ] },
-];
+function getGuides(t: (key: string, fallback?: string) => string) {
+  return [
+    { icon: UtensilsCrossed, title: t('help.guide.menu.title'), color: '#10B981', desc: t('help.guide.menu.desc'),
+      sections: [t('help.guide.menu.s1'), t('help.guide.menu.s2'), t('help.guide.menu.s3'), t('help.guide.menu.s4')] },
+    { icon: Monitor, title: t('help.guide.pos.title'), color: '#3b82f6', desc: t('help.guide.pos.desc'),
+      sections: [t('help.guide.pos.s1'), t('help.guide.pos.s2'), t('help.guide.pos.s3'), t('help.guide.pos.s4')] },
+    { icon: ChefHat, title: t('help.guide.kds.title'), color: '#f59e0b', desc: t('help.guide.kds.desc'),
+      sections: [t('help.guide.kds.s1'), t('help.guide.kds.s2'), t('help.guide.kds.s3'), t('help.guide.kds.s4')] },
+    { icon: Tablet, title: t('help.guide.tablet.title'), color: '#8b5cf6', desc: t('help.guide.tablet.desc'),
+      sections: [t('help.guide.tablet.s1'), t('help.guide.tablet.s2'), t('help.guide.tablet.s3'), t('help.guide.tablet.s4')] },
+    { icon: BarChart3, title: t('help.guide.analytics.title'), color: '#06b6d4', desc: t('help.guide.analytics.desc'),
+      sections: [t('help.guide.analytics.s1'), t('help.guide.analytics.s2'), t('help.guide.analytics.s3')] },
+    { icon: Shield, title: t('help.guide.security.title'), color: '#ef4444', desc: t('help.guide.security.desc'),
+      sections: [t('help.guide.security.s1'), t('help.guide.security.s2'), t('help.guide.security.s3'), t('help.guide.security.s4')] },
+  ];
+}
 
-const FAQS = [
-  { q: 'How do I add a new menu item with allergen flags?', a: 'Go to Admin → Menu Manager → click "Add Item". Fill in the name, price, and macros, then toggle the relevant dietary flags (Halal, Vegan, Gluten-Free, etc.). Your changes are reflected on the customer tablet immediately.' },
-  { q: 'Can I use the POS without an internet connection?', a: 'The Nutro cloud POS requires an internet connection for full functionality. However, offline mode is on our Enterprise roadmap. For now, ensure a stable Wi-Fi connection at your location.' },
-  { q: 'How do I set up a new branch location?', a: 'In Admin → Settings, navigate to the Branches section. Click "Add Branch", fill in the location details, and assign staff roles. The branch will be linked to your organization automatically.' },
-  { q: 'What does the allergy alert look like on the KDS?', a: 'Allergy alerts appear as glowing red banners at the top of the KDS ticket, with the ticket itself having a red pulsing border. The alert text describes the specific allergen so kitchen staff can take appropriate action.' },
-  { q: 'How do PIN codes work for POS staff?', a: 'Each cashier has a personal 4-digit PIN assigned in Admin → Staff. This PIN is required to unlock the POS terminal and to perform sensitive actions like refunds or cash drawer access.' },
-  { q: 'Can I customize the brand colors for the customer tablet?', a: 'Yes! In Admin → Settings → Branding & Theme, use the Custom Accent Picker to set your brand primary color. This applies to all customer-facing views including the tablet menu.' },
-];
+function getFaqs(t: (key: string, fallback?: string) => string) {
+  return [
+    { q: t('help.faq.q1'), a: t('help.faq.a1') },
+    { q: t('help.faq.q2'), a: t('help.faq.a2') },
+    { q: t('help.faq.q3'), a: t('help.faq.a3') },
+    { q: t('help.faq.q4'), a: t('help.faq.a4') },
+    { q: t('help.faq.q5'), a: t('help.faq.a5') },
+    { q: t('help.faq.q6'), a: t('help.faq.a6') },
+  ];
+}
 
 interface Message { id: string; role: 'user' | 'assistant'; content: string; timestamp: Date; }
 
@@ -90,9 +66,10 @@ function getAIResponse(message: string): string {
 
 function AIChatWidget() {
   const { theme } = useTheme();
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { id: '0', role: 'assistant', content: AI_RESPONSES.default, timestamp: new Date() },
+    { id: '0', role: 'assistant', content: t('help.chat.greeting'), timestamp: new Date() },
   ]);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
@@ -129,7 +106,7 @@ function AIChatWidget() {
             <div className="px-4 py-3 flex items-center justify-between flex-shrink-0" style={{ background: theme.primary }}>
               <div className="flex items-center gap-2">
                 <Sparkles size={16} color="#fff" />
-                <span className="text-sm font-bold text-white">Nutro Assistant</span>
+                <span className="text-sm font-bold text-white">{t('help.chat.name')}</span>
               </div>
               <button onClick={() => setOpen(false)} className="text-white/70 hover:text-white"><X size={16} /></button>
             </div>
@@ -172,7 +149,7 @@ function AIChatWidget() {
             <div className="p-3 flex-shrink-0" style={{ borderTop: `1px solid ${theme.border}` }}>
               <div className="flex gap-2">
                 <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()}
-                  placeholder="Ask the Nutro Assistant…"
+                  placeholder={t('help.chat.placeholder')}
                   className="flex-1 px-3 py-2 rounded-xl text-xs outline-none"
                   style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
                 <button onClick={send} className="px-3 py-2 rounded-xl" style={{ background: theme.primary }}><Send size={13} color="#fff" /></button>
@@ -187,11 +164,24 @@ function AIChatWidget() {
 
 export default function HelpCenter() {
   const { theme } = useTheme();
+  const { t } = useLocale();
   const [search, setSearch] = useState('');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [openGuide, setOpenGuide] = useState<number | null>(null);
 
+  const GUIDES = getGuides(t);
+  const FAQS = getFaqs(t);
+
   const filteredFaqs = FAQS.filter(f => f.q.toLowerCase().includes(search.toLowerCase()) || f.a.toLowerCase().includes(search.toLowerCase()));
+  // Search previously only filtered the FAQ list — the User Manual guides were
+  // unsearchable even though they're now the bulk of this page's real content.
+  // A guide matches if the query hits its title, short description, or any of
+  // its step sections, and matching guides auto-expand so the match is visible
+  // immediately instead of the visitor having to click through blindly.
+  const query = search.trim().toLowerCase();
+  const filteredGuides = query
+    ? GUIDES.filter(g => g.title.toLowerCase().includes(query) || g.desc.toLowerCase().includes(query) || g.sections.some(s => s.toLowerCase().includes(query)))
+    : GUIDES;
 
   return (
     <div className="min-h-screen" style={{ background: theme.bg }}>
@@ -202,11 +192,11 @@ export default function HelpCenter() {
           </div>
           <span className="font-extrabold" style={{ color: theme.text }}>NUTRO</span>
         </Link>
-        <h1 className="text-2xl font-bold mb-4" style={{ color: theme.text }}>Help Center</h1>
-        <p className="text-lg mb-8" style={{ color: theme.textMuted }}>Find answers, guides, and tutorials for the Nutro platform</p>
+        <h1 className="text-2xl font-bold mb-4" style={{ color: theme.text }}>{t('help.title')}</h1>
+        <p className="text-lg mb-8" style={{ color: theme.textMuted }}>{t('help.subtitle')}</p>
         <div className="relative max-w-lg mx-auto">
           <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: theme.textMuted }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search help articles…"
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('help.searchPlaceholder')}
             className="w-full pl-12 pr-4 py-3 rounded-2xl text-sm outline-none"
             style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
         </div>
@@ -214,10 +204,10 @@ export default function HelpCenter() {
 
       <div className="max-w-5xl mx-auto px-6 py-12 space-y-12">
         <div>
-          <h2 className="text-2xl font-extrabold mb-2" style={{ color: theme.text }}>User Manual</h2>
-          <p className="text-sm mb-6" style={{ color: theme.textMuted }}>Click a topic to expand its guide.</p>
+          <h2 className="text-2xl font-extrabold mb-2" style={{ color: theme.text }}>{t('help.manual.title')}</h2>
+          <p className="text-sm mb-6" style={{ color: theme.textMuted }}>{t('help.manual.subtitle')}</p>
           <div className="space-y-3">
-            {GUIDES.map((cat, i) => (
+            {filteredGuides.map((cat, i) => (
               <motion.div key={cat.title} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
                 className="rounded-2xl overflow-hidden" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
                 <button className="w-full flex items-center gap-4 p-5 text-left" onClick={() => setOpenGuide(openGuide === i ? null : i)}>
@@ -247,7 +237,7 @@ export default function HelpCenter() {
         </div>
 
         <div>
-          <h2 className="text-2xl font-extrabold mb-6" style={{ color: theme.text }}>Frequently Asked Questions</h2>
+          <h2 className="text-2xl font-extrabold mb-6" style={{ color: theme.text }}>{t('help.faq.title')}</h2>
           <div className="space-y-3">
             {filteredFaqs.map((faq, i) => (
               <div key={i} className="rounded-xl overflow-hidden" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
@@ -269,8 +259,8 @@ export default function HelpCenter() {
 
         <div className="rounded-2xl p-8 text-center" style={{ background: theme.surface, border: `1px solid ${theme.border}` }}>
           <HelpCircle size={36} className="mx-auto mb-4" style={{ color: theme.primary }} />
-          <h2 className="text-xl font-extrabold mb-2" style={{ color: theme.text }}>Still need help?</h2>
-          <p className="text-sm mb-6" style={{ color: theme.textMuted }}>Our support team is available via email. Enterprise customers get 24/7 dedicated support.</p>
+          <h2 className="text-xl font-extrabold mb-2" style={{ color: theme.text }}>{t('help.stillNeedHelp.title')}</h2>
+          <p className="text-sm mb-6" style={{ color: theme.textMuted }}>{t('help.stillNeedHelp.desc')}</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <a href="mailto:support@liafrik.com" className="px-6 py-2.5 rounded-xl font-bold text-sm text-white" style={{ background: theme.primary }}>support@liafrik.com</a>
             <a href="mailto:cs@liafrik.com" className="px-6 py-2.5 rounded-xl font-bold text-sm" style={{ background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}>cs@liafrik.com</a>
