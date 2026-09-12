@@ -5,8 +5,29 @@
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <!-- Performance: preconnect to every external origin this page actually calls on
+         first paint — cuts the DNS+TLS handshake latency that would otherwise happen
+         only once the browser discovers each request deep in the JS bundle. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://images.pexels.com" />
+    <link rel="dns-prefetch" href="https://images.pexels.com" />
+    <!-- Supabase is this deployment's actual backend (auth, org context, and menu
+         data all load from it within the first seconds) — preconnecting saves a real
+         round trip on the very first authenticated call. -->
+    <link rel="preconnect" href="https://wqxjsbikoriuzinordko.supabase.co" />
+    <link rel="dns-prefetch" href="https://wqxjsbikoriuzinordko.supabase.co" />
+
+    <!-- Font was previously loaded via @import in index.css, which blocks that
+         stylesheet's own parsing until the imported one round-trips, then blocks again
+         for the @font-face it declares — a real render-blocking waterfall before any
+         text in the custom font can paint. A real <link> here lets the browser's
+         preloader discover and fetch it in parallel with everything else, with
+         display=swap already ensuring text isn't invisible while it loads. -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap" />
+
     <title>Nutro — La plateforme technologique tout-en-un pour restaurants | LiAfrik</title>
-    <meta name="description" content="Nutro unifie menu interactif sur tablette, caisse cloud (POS), kitchen display system et analytics multi-branches pour votre restaurant. Essai gratuit de 14 jours, sans carte bancaire." />
+    <meta name="description" content="Nutro unifie menu interactif, caisse cloud, kitchen display et analytics multi-branches pour votre restaurant. Essai gratuit 14 jours, sans carte." />
     <link rel="canonical" href="https://nutro.liafrik.com/" />
     <meta name="robots" content="index, follow" />
     <link rel="alternate" hreflang="en" href="https://nutro.liafrik.com/" />
@@ -33,6 +54,10 @@
 
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#10B981" />
+    <!-- mobile-web-app-capable is the current standard; apple-mobile-web-app-capable is
+         kept alongside it for older iOS Safari versions that don't read the standard
+         tag yet — Chrome DevTools flags the Apple-only tag alone as deprecated. -->
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 

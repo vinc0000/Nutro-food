@@ -350,7 +350,15 @@ export default function LandingPage() {
             transition={{ duration: 1.2, ease: 'easeInOut' }}
             className="absolute inset-0"
           >
-            <img src={SLIDES[currentSlide].image} alt={SLIDES[currentSlide].title.join(' ')} className="w-full h-full object-cover" />
+            <img
+              src={SLIDES[currentSlide].image}
+              srcSet={`${SLIDES[currentSlide].image.replace('w=1920&h=1080', 'w=800&h=450')} 800w, ${SLIDES[currentSlide].image.replace('w=1920&h=1080', 'w=1280&h=720')} 1280w, ${SLIDES[currentSlide].image} 1920w`}
+              sizes="100vw"
+              alt={SLIDES[currentSlide].title.join(' ')}
+              className="w-full h-full object-cover"
+              fetchPriority="high"
+              decoding="async"
+            />
             <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(15,23,42,0.85) 0%, rgba(15,23,42,0.6) 50%, rgba(15,23,42,0.75) 100%)' }} />
           </motion.div>
         </AnimatePresence>
