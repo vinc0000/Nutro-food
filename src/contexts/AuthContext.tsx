@@ -95,6 +95,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.auth.signUp({
       email, password,
       options: {
+        // Was missing entirely — without it, Supabase falls back to whatever "Site
+        // URL" is configured in the project's Auth settings for the confirmation
+        // email's link. On a project that still has the default localhost:3000
+        // Site URL (common until someone changes it after going to production),
+        // every signup confirmation email sends the user to localhost instead of
+        // the real site. Matches the same redirectTo pattern already used for
+        // password reset in LoginPage.tsx.
+        emailRedirectTo: `${window.location.origin}/auth/login`,
         data: {
           full_name: fullName,
           ...(onboarding ? {
