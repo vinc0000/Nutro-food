@@ -8,6 +8,7 @@ import { AuthGuard, SuperAdminGuard, PublicOnlyGuard, TabletGuard } from '@/comp
 const LandingPage = lazy(() => import('@/pages/LandingPage'));
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
 const SignupPage = lazy(() => import('@/pages/auth/SignupPage'));
+const ResetPasswordPage = lazy(() => import('@/pages/auth/ResetPasswordPage'));
 const HelpCenter = lazy(() => import('@/pages/help/HelpCenter'));
 
 const SuperAdminLayout = lazy(() => import('@/layouts/SuperAdminLayout'));
@@ -65,6 +66,12 @@ export default function App() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/auth/login" element={<PublicOnlyGuard><LoginPage /></PublicOnlyGuard>} />
               <Route path="/auth/signup" element={<PublicOnlyGuard><SignupPage /></PublicOnlyGuard>} />
+              {/* Deliberately unguarded — a password-recovery link creates a real
+                  Supabase session automatically, so wrapping this in PublicOnlyGuard
+                  (like the other /auth/* routes) would redirect that session straight
+                  into the app before the person ever sees the "set new password"
+                  form, same bug this route exists to fix. */}
+              <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
               <Route path="/help/*" element={<HelpCenter />} />
 
               <Route path="/app/tablet" element={<TabletGuard><TabletLayout /></TabletGuard>}>

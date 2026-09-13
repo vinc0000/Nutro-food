@@ -76,8 +76,15 @@ export default function LoginPage() {
     // Fire-and-forget: Supabase's resetPasswordForEmail doesn't reveal whether the
     // address is registered, and we mirror that by always showing the same success
     // state regardless of the outcome.
+    //
+    // redirectTo points at the dedicated /auth/reset-password page, not back here —
+    // clicking the email link creates a real Supabase session automatically, and this
+    // page (/auth/login) is wrapped in PublicOnlyGuard, which would immediately
+    // redirect that session into the app before the person ever saw a form to set a
+    // new password. That was the actual bug: the link "worked" in the sense that it
+    // logged them in, but never gave them anywhere to change the password.
     await supabase.auth.resetPasswordForEmail(forgotEmail, {
-      redirectTo: `${window.location.origin}/auth/login`,
+      redirectTo: `${window.location.origin}/auth/reset-password`,
     });
     setForgotSent(true);
   };
